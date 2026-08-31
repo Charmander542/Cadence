@@ -1,0 +1,9 @@
+data/cache/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+scraper/config.yaml
+*.xcuserstate
+xcuserdata/
+DerivedData/

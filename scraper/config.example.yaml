@@ -1,0 +1,94 @@
+# MuscleMeal scraper config
+# Copy to config.yaml and edit. Never commit real API keys.
+
+# ai_provider: anthropic | openai
+ai_provider: anthropic
+
+anthropic_api_key: "YOUR_ANTHROPIC_API_KEY_HERE"  # or set ANTHROPIC_API_KEY env var
+anthropic_model: "claude-sonnet-4-20250514"
+
+openai_api_key: "YOUR_OPENAI_API_KEY_HERE"  # or set OPENAI_API_KEY env var
+openai_model: "gpt-4o-mini"  # cheapest OpenAI chat model for these prompts
+
+ingredient_batch_size: 20
+
+user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 MuscleMealScraper/1.0"
+request_delay_min_s: 1.0
+request_delay_max_s: 3.0
+
+paths:
+  cache_dir: "data/cache"
+  db_path: "data/recipes.db"
+  json_export: "data/recipes.json"
+  ingredient_cache: "data/cache/ingredient_norm.json"
+
+# Per-domain on/off. Disabled sites reflect robots.txt / ToS review (2026-08).
+sites:
+  budgetbytes:
+    enabled: true
+    base_url: "https://www.budgetbytes.com"
+    sitemap_urls:
+      - "https://www.budgetbytes.com/post-sitemap.xml"
+      - "https://www.budgetbytes.com/post-sitemap2.xml"
+      - "https://www.budgetbytes.com/post-sitemap3.xml"
+    recipe_url_contains: []
+    notes: "robots.txt allows User-agent *; sitemap OK"
+
+  cookieandkate:
+    enabled: true
+    base_url: "https://cookieandkate.com"
+    sitemap_urls:
+      - "https://cookieandkate.com/post-sitemap.xml"
+      - "https://cookieandkate.com/post-sitemap2.xml"
+    recipe_url_contains: []
+    notes: "User-agent * allowed; recipe posts via JSON-LD"
+
+  loveandlemons:
+    enabled: true
+    base_url: "https://www.loveandlemons.com"
+    sitemap_urls:
+      - "https://www.loveandlemons.com/post-sitemap.xml"
+      - "https://www.loveandlemons.com/post-sitemap2.xml"
+      - "https://www.loveandlemons.com/post-sitemap3.xml"
+    recipe_url_contains: []
+    notes: "User-agent * allowed"
+
+  allrecipes:
+    enabled: false
+    base_url: "https://www.allrecipes.com"
+    sitemap_urls:
+      - "https://www.allrecipes.com/sitemap.xml"
+    recipe_url_contains: ["/recipe/"]
+    notes: "People Inc. ToS prohibits scraping / AI dataset creation — leave off unless licensed"
+
+  seriouseats:
+    enabled: false
+    base_url: "https://www.seriouseats.com"
+    sitemap_urls:
+      - "https://www.seriouseats.com/sitemap.xml"
+    recipe_url_contains: ["/"]
+    notes: "People Inc. ToS prohibits scraping / AI dataset creation — leave off unless licensed"
+
+  eatingwell:
+    enabled: false
+    base_url: "https://www.eatingwell.com"
+    sitemap_urls:
+      - "https://www.eatingwell.com/sitemap.xml"
+    recipe_url_contains: ["/recipe/"]
+    notes: "People Inc. ToS prohibits scraping / AI dataset creation — leave off unless licensed"
+
+  foodnetwork:
+    enabled: true
+    base_url: "https://www.foodnetwork.com"
+    sitemap_urls:
+      - "https://www.foodnetwork.com/sitemaps/sitemap_food_index.xml"
+    recipe_url_contains: ["/recipes/"]
+    notes: "Uses curl_cffi Chrome TLS impersonation; gzip sitemaps"
+
+  bonappetit:
+    enabled: false
+    base_url: "https://www.bonappetit.com"
+    sitemap_urls:
+      - "https://www.bonappetit.com/sitemap.xml"
+    recipe_url_contains: ["/recipe/"]
+    notes: "Condé Nast typically restricts automated extraction — leave off unless licensed"
