@@ -86,6 +86,42 @@ enum PlannerPreferences {
         set { defaults.set(newValue, forKey: "planner.appleCalendarIdentifier") }
     }
 
+    /// Selected Apple sub-calendars for export. Empty after explicit init means sync to none.
+    static var appleCalendarIdentifiers: Set<String> {
+        get {
+            if let stored = stringSet(forKey: "planner.appleCalendarIdentifiers") {
+                return stored
+            }
+            if let legacy = appleCalendarIdentifier, !legacy.isEmpty {
+                return [legacy]
+            }
+            return []
+        }
+        set {
+            setStringSet(newValue, forKey: "planner.appleCalendarIdentifiers")
+            appleCalendarsSelectionInitialized = true
+        }
+    }
+
+    static var appleCalendarsSelectionInitialized: Bool {
+        get { defaults.bool(forKey: "planner.appleCalendarsSelectionInitialized") }
+        set { defaults.set(newValue, forKey: "planner.appleCalendarsSelectionInitialized") }
+    }
+
+    static func setAppleCalendarEnabled(_ calendarID: String, enabled: Bool) {
+        var set = appleCalendarIdentifiers
+        if enabled {
+            set.insert(calendarID)
+        } else {
+            set.remove(calendarID)
+        }
+        appleCalendarIdentifiers = set
+    }
+
+    static func isAppleCalendarEnabled(_ calendarID: String) -> Bool {
+        appleCalendarIdentifiers.contains(calendarID)
+    }
+
     // MARK: - Google Calendar (API)
 
     static var syncTasksToGoogleCalendar: Bool {
@@ -108,8 +144,58 @@ enum PlannerPreferences {
         set { defaults.set(newValue, forKey: "planner.googleCalendarID") }
     }
 
+    static var googleCalendarIDs: Set<String> {
+        get {
+            if let stored = stringSet(forKey: "planner.googleCalendarIdentifiers") {
+                return stored
+            }
+            if let legacy = googleCalendarID, !legacy.isEmpty {
+                return [legacy]
+            }
+            return []
+        }
+        set {
+            setStringSet(newValue, forKey: "planner.googleCalendarIdentifiers")
+            googleCalendarsSelectionInitialized = true
+            googleCalendarID = newValue.sorted().first
+            googleCalendarTitle = nil
+        }
+    }
+
+    static var googleCalendarsSelectionInitialized: Bool {
+        get { defaults.bool(forKey: "planner.googleCalendarsSelectionInitialized") }
+        set { defaults.set(newValue, forKey: "planner.googleCalendarsSelectionInitialized") }
+    }
+
+    static func setGoogleCalendarEnabled(_ calendarID: String, enabled: Bool) {
+        var set = googleCalendarIDs
+        if enabled {
+            set.insert(calendarID)
+        } else {
+            set.remove(calendarID)
+        }
+        googleCalendarIDs = set
+    }
+
+    static func isGoogleCalendarEnabled(_ calendarID: String) -> Bool {
+        googleCalendarIDs.contains(calendarID)
+    }
+
     static var googleCalendarTitle: String? {
         get { defaults.string(forKey: "planner.googleCalendarTitle") }
         set { defaults.set(newValue, forKey: "planner.googleCalendarTitle") }
+    }
+
+    // MARK: - Helpers
+
+    private static func stringSet(forKey key: String) -> Set<String>? {
+        guard defaults.object(forKey: key) != nil,
+              let array = defaults.array(forKey: key) as? [String]
+        else { return nil }
+        return Set(array)
+    }
+
+    private static func setStringSet(_ value: Set<String>, forKey key: String) {
+        defaults.set(Array(value).sorted(), forKey: key)
     }
 }

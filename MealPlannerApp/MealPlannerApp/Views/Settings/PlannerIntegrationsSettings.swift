@@ -185,17 +185,20 @@ struct CalendarSyncSettingsView: View {
                     .accessibilityAddTraits(.isStaticText)
             }
 
-            Picker("Target calendar", selection: Binding(
-                get: { PlannerPreferences.appleCalendarIdentifier ?? "" },
-                set: { PlannerPreferences.appleCalendarIdentifier = $0.isEmpty ? nil : $0 }
-            )) {
-                Text("Default").tag("")
+            if appleCalendars.isEmpty {
+                Text("Request calendar access to load your sub-calendars.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.muted)
+                    .accessibilityAddTraits(.isStaticText)
+            } else {
                 ForEach(appleCalendars) { cal in
-                    Text("\(cal.title) · \(cal.sourceKind.title)").tag(cal.id)
+                    Toggle(isOn: appleCalendarBinding(cal.id)) {
+                        Text("\(cal.title) · \(cal.sourceKind.title)")
+                    }
+                    .accessibilityLabel("\(cal.title), \(cal.sourceKind.title), \(PlannerPreferences.isAppleCalendarEnabled(cal.id) ? "on" : "off")")
+                    .accessibilityHint("Exports Cadence items to this calendar when sync is enabled")
                 }
             }
-            .accessibilityLabel("Target calendar, \(selectedAppleCalendarLabel)")
-            .accessibilityHint("Apple Calendar used for task, workout, and meal sync")
 
             Button("Request calendar access") {
                 Task { await requestCalendarAccess() }
@@ -205,7 +208,7 @@ struct CalendarSyncSettingsView: View {
         } header: {
             Text("Apple Calendar")
         } footer: {
-            Text("Google calendars added to iOS also appear in the picker above.")
+            Text("Turn on any sub-calendars where Cadence should export. Google calendars added to iOS appear here too.")
                 .accessibilityAddTraits(.isStaticText)
         }
     }
@@ -239,27 +242,21 @@ struct CalendarSyncSettingsView: View {
                     .accessibilityLabel("Sync meals to Google Calendar, \(PlannerPreferences.syncMealsToGoogleCalendar ? "on" : "off")")
                     .accessibilityHint("Exports planned dinners to Google Calendar")
 
-                Picker("Google calendar", selection: Binding(
-                    get: { PlannerPreferences.googleCalendarID ?? "" },
-                    set: { newID in
-                        PlannerPreferences.googleCalendarID = newID.isEmpty ? nil : newID
-                        PlannerPreferences.googleCalendarTitle = googleCalendars.first { $0.id == newID }?.title
-                    }
-                )) {
-                    Text("Primary").tag("")
-                    ForEach(googleCalendars) { cal in
-                        Text(cal.title).tag(cal.id)
-                    }
-                }
-                .accessibilityLabel("Google calendar, \(selectedGoogleCalendarLabel)")
-                .accessibilityHint("Google Calendar used for task, workout, and meal sync")
-
                 if googleCalendars.isEmpty, GoogleCalendarService.shared.isSignedIn {
                     Button("Load calendars") {
                         Task { await loadGoogleCalendars() }
                     }
                     .accessibilityHint("Fetches available Google calendars to sync")
+                } else if GoogleCalendarService.shared.isSignedIn {
+                    ForEach(googleCalendars) { cal in
+                        Toggle(isOn: googleCalendarBinding(cal.id)) {
+                            Text(cal.title)
+                        }
+                        .accessibilityLabel("\(cal.title), \(PlannerPreferences.isGoogleCalendarEnabled(cal.id) ? "on" : "off")")
+                        .accessibilityHint("Exports Cadence items to this Google calendar when sync is enabled")
+                    }
                 }
+
             } else {
                 Text("Add a Google OAuth iOS client ID as GoogleOAuthClientID in Info.plist to enable direct Google Calendar sync.")
                     .font(.footnote)
@@ -272,28 +269,30 @@ struct CalendarSyncSettingsView: View {
             if !GoogleCalendarService.shared.isConfigured {
                 EmptyView()
             } else {
-                Text("Workout and meal sync to Google creates new events; toggling sync off does not yet remove past Google events.")
+                Text("Turn on any Google calendars where Cadence should export. Workout and meal sync to Google creates new events; toggling a calendar off does not yet remove past events from it.")
                     .accessibilityAddTraits(.isStaticText)
             }
         }
     }
 
-    private var selectedAppleCalendarLabel: String {
-        let id = PlannerPreferences.appleCalendarIdentifier ?? ""
-        guard !id.isEmpty else { return "Default" }
-        if let cal = appleCalendars.first(where: { $0.id == id }) {
-            return "\(cal.title), \(cal.sourceKind.title)"
-        }
-        return "Default"
+    private func appleCalendarBinding(_ calendarID: String) -> Binding<Bool> {
+        Binding(
+            get: { PlannerPreferences.isAppleCalendarEnabled(calendarID) },
+            set: { enabled in
+                PlannerPreferences.setAppleCalendarEnabled(calendarID, enabled: enabled)
+                Task { await syncCalendars() }
+            }
+        )
     }
 
-    private var selectedGoogleCalendarLabel: String {
-        let id = PlannerPreferences.googleCalendarID ?? ""
-        guard !id.isEmpty else { return "Primary" }
-        if let cal = googleCalendars.first(where: { $0.id == id }) {
-            return cal.title
-        }
-        return PlannerPreferences.googleCalendarTitle ?? "Primary"
+    private func googleCalendarBinding(_ calendarID: String) -> Binding<Bool> {
+        Binding(
+            get: { PlannerPreferences.isGoogleCalendarEnabled(calendarID) },
+            set: { enabled in
+                PlannerPreferences.setGoogleCalendarEnabled(calendarID, enabled: enabled)
+                Task { await syncCalendars() }
+            }
+        )
     }
 
     private func syncBinding(get: @escaping () -> Bool, set: @escaping (Bool) -> Void) -> Binding<Bool> {
@@ -312,6 +311,7 @@ struct CalendarSyncSettingsView: View {
         _ = try? await CalendarSyncService.shared.requestAccess()
         calendarStatus = CalendarSyncService.shared.authorizationStatus
         appleCalendars = CalendarSyncService.shared.availableCalendars()
+        CalendarSyncService.shared.initializeAppleCalendarSelectionIfNeeded()
         await syncCalendars()
     }
 
@@ -337,11 +337,7 @@ struct CalendarSyncSettingsView: View {
     private func loadGoogleCalendars() async {
         do {
             googleCalendars = try await GoogleCalendarService.shared.listCalendars()
-            if PlannerPreferences.googleCalendarID == nil,
-               let primary = googleCalendars.first(where: \.primary) {
-                PlannerPreferences.googleCalendarID = primary.id
-                PlannerPreferences.googleCalendarTitle = primary.title
-            }
+            GoogleCalendarService.shared.initializeGoogleCalendarSelectionIfNeeded(with: googleCalendars)
         } catch {
             statusMessage = error.localizedDescription
         }
@@ -350,6 +346,7 @@ struct CalendarSyncSettingsView: View {
     private func onAppearLoad() async {
         calendarStatus = CalendarSyncService.shared.authorizationStatus
         appleCalendars = CalendarSyncService.shared.availableCalendars()
+        CalendarSyncService.shared.initializeAppleCalendarSelectionIfNeeded()
         if GoogleCalendarService.shared.isSignedIn {
             await loadGoogleCalendars()
         }

@@ -9,6 +9,7 @@ private struct MatrixUndoAction {
 struct MatrixView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appModel: AppModel
+    var onOpenDrawer: () -> Void = {}
     @Query(
         filter: #Predicate<PlannerTaskEntity> { task in
             !task.isCompleted && !task.isEvent
@@ -32,7 +33,7 @@ struct MatrixView: View {
         ZStack(alignment: .bottomTrailing) {
             Theme.canvas.ignoresSafeArea()
             VStack(alignment: .leading, spacing: 0) {
-                PlannerTitleHeader(title: "Matrix")
+                PlannerTitleHeader(title: "Matrix", onMenu: onOpenDrawer)
                     .padding(.bottom, 14)
 
                 GeometryReader { geo in

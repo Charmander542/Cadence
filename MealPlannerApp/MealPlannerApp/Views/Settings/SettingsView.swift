@@ -169,25 +169,27 @@ struct SettingsView: View {
     }
 
     private var calendarSubtitle: String {
+        let appleCount = PlannerPreferences.appleCalendarIdentifiers.count
+        let googleCount = PlannerPreferences.googleCalendarIDs.count
         var parts: [String] = []
         if PlannerPreferences.syncTasksToAppleCalendar
             || PlannerPreferences.syncWorkoutsToAppleCalendar
             || PlannerPreferences.syncMealsToAppleCalendar {
-            parts.append("Apple")
+            parts.append(appleCount == 1 ? "1 Apple calendar" : "\(appleCount) Apple calendars")
         }
         if GoogleCalendarService.shared.isSignedIn,
            PlannerPreferences.syncTasksToGoogleCalendar
             || PlannerPreferences.syncWorkoutsToGoogleCalendar
             || PlannerPreferences.syncMealsToGoogleCalendar {
-            parts.append("Google")
+            parts.append(googleCount == 1 ? "1 Google calendar" : "\(googleCount) Google calendars")
         }
         if parts.isEmpty {
             if GoogleCalendarService.shared.isConfigured && !GoogleCalendarService.shared.isSignedIn {
-                return "Apple ready · Google not connected"
+                return "Pick calendars to sync"
             }
-            return "Not syncing"
+            return "Pick calendars to sync"
         }
-        return parts.joined(separator: " & ") + " sync on"
+        return parts.joined(separator: " · ")
     }
 
     private var aiSubtitle: String {

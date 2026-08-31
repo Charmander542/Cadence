@@ -71,17 +71,17 @@ struct MainTabView: View {
                 Label("Calendar", systemImage: "calendar")
             }
             lazyTab(MainTab.meals.rawValue) {
-                MealPlanView(profile: profile, openShop: $openShopOnMeals)
+                MealPlanView(profile: profile, openShop: $openShopOnMeals, onOpenDrawer: { showDrawer = true })
             } label: {
                 Label("Meals", systemImage: "fork.knife")
             }
             lazyTab(MainTab.matrix.rawValue) {
-                MatrixView()
+                MatrixView(onOpenDrawer: { showDrawer = true })
             } label: {
                 Label("Matrix", systemImage: "square.grid.2x2")
             }
             lazyTab(MainTab.habits.rawValue) {
-                HabitsHomeView()
+                HabitsHomeView(onOpenDrawer: { showDrawer = true })
             } label: {
                 Label("Habits", systemImage: "repeat")
             }

@@ -56,9 +56,22 @@ final class CalendarSyncService {
         availableCalendars().filter { $0.sourceKind == kind }
     }
 
-    func calendar(for identifier: String?) -> EKCalendar? {
-        guard let identifier else { return store.defaultCalendarForNewEvents }
-        return store.calendar(withIdentifier: identifier) ?? store.defaultCalendarForNewEvents
+    func selectedAppleCalendars() -> [EKCalendar] {
+        let ids = PlannerPreferences.appleCalendarIdentifiers
+        guard !ids.isEmpty else { return [] }
+        return ids.compactMap { store.calendar(withIdentifier: $0) }
+    }
+
+    func initializeAppleCalendarSelectionIfNeeded() {
+        guard !PlannerPreferences.appleCalendarsSelectionInitialized else { return }
+        var selected = Set<String>()
+        if let legacy = PlannerPreferences.appleCalendarIdentifier, !legacy.isEmpty {
+            selected.insert(legacy)
+        } else if let defaultID = store.defaultCalendarForNewEvents?.calendarIdentifier {
+            selected.insert(defaultID)
+        }
+        PlannerPreferences.appleCalendarIdentifiers = selected
+        PlannerPreferences.appleCalendarsSelectionInitialized = true
     }
 
     // MARK: - Task sync
@@ -72,30 +85,53 @@ final class CalendarSyncService {
             return
         }
 
-        let calendar = calendar(for: PlannerPreferences.appleCalendarIdentifier)
-        guard let calendar else { return }
+        let calendars = selectedAppleCalendars()
+        guard !calendars.isEmpty else { return }
 
-        let event = existingEvent(id: task.appleCalendarEventID) ?? EKEvent(eventStore: store)
-        event.calendar = calendar
-        event.title = task.title
-        event.notes = task.notes.isEmpty ? "Cadence task" : task.notes
-        event.location = task.location.isEmpty ? nil : task.location
-        event.startDate = dueAt
-        if task.durationMinutes > 0 {
-            event.endDate = dueAt.addingTimeInterval(TimeInterval(task.durationMinutes * 60))
-        } else {
-            event.endDate = dueAt.addingTimeInterval(3600)
+        var map = task.appleCalendarEventIDs
+        let selectedIDs = Set(calendars.map(\.calendarIdentifier))
+
+        for (calendarID, eventID) in map where !selectedIDs.contains(calendarID) {
+            if let event = existingEvent(id: eventID) {
+                try store.remove(event, span: .thisEvent, commit: false)
+            }
+            map.removeValue(forKey: calendarID)
         }
-        event.isAllDay = !hasTimeComponent(dueAt)
-        event.recurrenceRules = recurrenceRules(for: task)
-        try store.save(event, span: .thisEvent, commit: true)
-        task.appleCalendarEventID = event.eventIdentifier
+
+        for calendar in calendars {
+            let calendarID = calendar.calendarIdentifier
+            let event = existingEvent(id: map[calendarID]) ?? EKEvent(eventStore: store)
+            event.calendar = calendar
+            event.title = task.title
+            event.notes = task.notes.isEmpty ? "Cadence task" : task.notes
+            event.location = task.location.isEmpty ? nil : task.location
+            event.startDate = dueAt
+            if task.durationMinutes > 0 {
+                event.endDate = dueAt.addingTimeInterval(TimeInterval(task.durationMinutes * 60))
+            } else {
+                event.endDate = dueAt.addingTimeInterval(3600)
+            }
+            event.isAllDay = !hasTimeComponent(dueAt)
+            event.recurrenceRules = recurrenceRules(for: task)
+            try store.save(event, span: .thisEvent, commit: false)
+            map[calendarID] = event.eventIdentifier
+        }
+
+        try store.commit()
+        task.appleCalendarEventIDs = map
     }
 
     func deleteTask(_ task: PlannerTaskEntity) throws {
-        guard let id = task.appleCalendarEventID, let event = existingEvent(id: id) else { return }
-        try store.remove(event, span: .thisEvent, commit: true)
-        task.appleCalendarEventID = nil
+        var map = task.appleCalendarEventIDs
+        for (_, eventID) in map {
+            if let event = existingEvent(id: eventID) {
+                try store.remove(event, span: .thisEvent, commit: false)
+            }
+        }
+        if !map.isEmpty {
+            try store.commit()
+        }
+        task.appleCalendarEventIDs = [:]
     }
 
     // MARK: - Workout sync
@@ -105,31 +141,32 @@ final class CalendarSyncService {
             try removeWorkoutProgramEvents()
             return
         }
-        let calendar = calendar(for: PlannerPreferences.appleCalendarIdentifier)
-        guard let calendar else { return }
+        let calendars = selectedAppleCalendars()
+        guard !calendars.isEmpty else { return }
 
         try removeWorkoutProgramEvents()
 
-        for session in WorkoutProgram.sessions {
-            let event = EKEvent(eventStore: store)
-            event.calendar = calendar
-            event.title = "Lift · \(session.name)"
-            event.notes = session.focus
-            let start = WorkoutIntegration.workoutBlockDate(on: dateForWeekday(session.weekday))
-            event.startDate = start
-            event.endDate = start.addingTimeInterval(3600)
-            event.recurrenceRules = [weeklyRule(weekday: session.weekday)]
-            try store.save(event, span: .futureEvents, commit: false)
+        for calendar in calendars {
+            for session in WorkoutProgram.sessions {
+                let event = EKEvent(eventStore: store)
+                event.calendar = calendar
+                event.title = "Lift · \(session.name)"
+                event.notes = session.focus
+                let start = WorkoutIntegration.workoutBlockDate(on: dateForWeekday(session.weekday))
+                event.startDate = start
+                event.endDate = start.addingTimeInterval(3600)
+                event.recurrenceRules = [weeklyRule(weekday: session.weekday)]
+                try store.save(event, span: .futureEvents, commit: false)
+            }
         }
         try store.commit()
     }
 
     func removeWorkoutProgramEvents() throws {
-        let prefix = "Cadence workout"
         let start = Calendar.current.date(byAdding: .year, value: -1, to: .now) ?? .now
         let end = Calendar.current.date(byAdding: .year, value: 1, to: .now) ?? .now
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: nil)
-        let events = store.events(matching: predicate).filter { $0.notes == prefix || $0.title.hasPrefix("Lift ·") }
+        let events = store.events(matching: predicate).filter { $0.notes == "Cadence workout" || $0.title.hasPrefix("Lift ·") }
         for event in events {
             try store.remove(event, span: .futureEvents, commit: false)
         }
@@ -143,31 +180,33 @@ final class CalendarSyncService {
             try removeMealPlanEvents()
             return
         }
-        let calendar = calendar(for: PlannerPreferences.appleCalendarIdentifier)
-        guard let calendar else { return }
+        let calendars = selectedAppleCalendars()
+        guard !calendars.isEmpty else { return }
 
         try removeMealPlanEvents()
 
         let cal = Calendar.current
         let monday = mondayOfCurrentWeek()
-        for dayIndex in 0..<7 {
-            guard let day = cal.date(byAdding: .day, value: dayIndex, to: monday) else { continue }
-            for slot in [MealSlot.lunch, MealSlot.dinner] {
-                guard let meal = plan.meal(day: dayIndex, slot: slot) else { continue }
-                let hour = slot == .lunch ? PlannerPreferences.lunchReminderHour : PlannerPreferences.dinnerReminderHour
-                var comps = cal.dateComponents([.year, .month, .day], from: day)
-                comps.hour = hour
-                comps.minute = 0
-                guard let start = cal.date(from: comps) else { continue }
+        for calendar in calendars {
+            for dayIndex in 0..<7 {
+                guard let day = cal.date(byAdding: .day, value: dayIndex, to: monday) else { continue }
+                for slot in [MealSlot.lunch, MealSlot.dinner] {
+                    guard let meal = plan.meal(day: dayIndex, slot: slot) else { continue }
+                    let hour = slot == .lunch ? PlannerPreferences.lunchReminderHour : PlannerPreferences.dinnerReminderHour
+                    var comps = cal.dateComponents([.year, .month, .day], from: day)
+                    comps.hour = hour
+                    comps.minute = 0
+                    guard let start = cal.date(from: comps) else { continue }
 
-                let event = EKEvent(eventStore: store)
-                event.calendar = calendar
-                let name = recipeNames[meal.recipeID] ?? "Planned meal"
-                event.title = slot == .lunch ? "Lunch · \(name)" : "Dinner · \(name)"
-                event.notes = "Cadence meal plan"
-                event.startDate = start
-                event.endDate = start.addingTimeInterval(3600)
-                try store.save(event, span: .thisEvent, commit: false)
+                    let event = EKEvent(eventStore: store)
+                    event.calendar = calendar
+                    let name = recipeNames[meal.recipeID] ?? "Planned meal"
+                    event.title = slot == .lunch ? "Lunch · \(name)" : "Dinner · \(name)"
+                    event.notes = "Cadence meal plan"
+                    event.startDate = start
+                    event.endDate = start.addingTimeInterval(3600)
+                    try store.save(event, span: .thisEvent, commit: false)
+                }
             }
         }
         try store.commit()

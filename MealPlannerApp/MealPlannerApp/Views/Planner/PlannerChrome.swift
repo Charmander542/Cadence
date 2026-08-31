@@ -105,8 +105,6 @@ struct PlannerDrawer: View {
                         ForEach(navigableLists) { list in
                             listDrawerRow(list)
                         }
-                        Divider().overlay(Theme.gridDivider).padding(.vertical, 8)
-                        drawerRow("Shop", icon: "basket", dest: .shop, hint: "Opens grocery shop list on Meals tab")
                         Button {
                             showNewList = true
                         } label: {
@@ -118,6 +116,8 @@ struct PlannerDrawer: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityHint("Creates a custom task list")
+                        Divider().overlay(Theme.gridDivider).padding(.vertical, 8)
+                        drawerRow("Shop", icon: "basket", dest: .shop, hint: "Opens grocery shop list on Meals tab")
                         Button(action: onManageTags) {
                             Label("Manage tags", systemImage: "number")
                                 .foregroundStyle(Theme.accent)
@@ -313,19 +313,41 @@ struct PlannerHeaderActions: View {
     }
 }
 
+/// Opens the planner lists drawer (Today, Inbox, custom lists, search, settings).
+struct PlannerMenuButton: View {
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "line.3.horizontal")
+                .font(.title3)
+                .foregroundStyle(Theme.ink)
+                .frame(width: 36, height: 36)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open menu")
+        .accessibilityHint("Opens planner drawer with lists, search, shop, and settings")
+    }
+}
+
 /// Large-title header with optional trailing toolbar (Meals, Calendar scope picker).
 /// Content-first tabs without header actions use `PlannerTitleHeader` instead.
 struct PlannerScreenHeader<Trailing: View>: View {
     let title: String
+    var onMenu: (() -> Void)?
     @ViewBuilder var trailing: () -> Trailing
 
-    init(title: String, @ViewBuilder trailing: @escaping () -> Trailing) {
+    init(title: String, onMenu: (() -> Void)? = nil, @ViewBuilder trailing: @escaping () -> Trailing) {
         self.title = title
+        self.onMenu = onMenu
         self.trailing = trailing
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: 8) {
+            if let onMenu {
+                PlannerMenuButton(action: onMenu)
+            }
             Text(title)
                 .font(Theme.display(.largeTitle, weight: .bold))
                 .foregroundStyle(Theme.ink)
@@ -341,8 +363,9 @@ struct PlannerScreenHeader<Trailing: View>: View {
 }
 
 extension PlannerScreenHeader where Trailing == EmptyView {
-    init(title: String) {
+    init(title: String, onMenu: (() -> Void)? = nil) {
         self.title = title
+        self.onMenu = onMenu
         self.trailing = { EmptyView() }
     }
 }
@@ -351,39 +374,45 @@ extension PlannerScreenHeader where Trailing == EmptyView {
 /// Tabs with actions (Meals, Calendar) use `PlannerScreenHeader` with a trailing toolbar instead.
 struct PlannerTitleHeader: View {
     let title: String
+    var onMenu: (() -> Void)?
+
+    init(title: String, onMenu: (() -> Void)? = nil) {
+        self.title = title
+        self.onMenu = onMenu
+    }
 
     var body: some View {
-        Text(title)
-            .font(Theme.display(.largeTitle, weight: .bold))
-            .foregroundStyle(Theme.ink)
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
+        HStack(alignment: .center, spacing: 8) {
+            if let onMenu {
+                PlannerMenuButton(action: onMenu)
+            }
+            Text(title)
+                .font(Theme.display(.largeTitle, weight: .bold))
+                .foregroundStyle(Theme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
     }
 }
 
 struct PlannerTopBar: View {
     var title: String
     var onMenu: () -> Void
-    /// Muted line above the title (e.g. "Today tab" when viewing Inbox inside Today).
-    var contextLabel: String? = nil
     /// When false, search is omitted from the top bar (e.g. Today uses a prominent pill below the title).
     var showSearchInBar = true
     var trailing: (() -> AnyView)? = nil
 
     var body: some View {
-        HStack {
-            Button(action: onMenu) {
-                Image(systemName: "line.3.horizontal")
-                    .font(.title3)
-                    .foregroundStyle(Theme.ink)
-                    .frame(width: 36, height: 36)
-            }
-            .accessibilityLabel("Open menu")
-            .accessibilityHint("Opens planner drawer with lists, search, shop, and settings")
-            Spacer()
+        HStack(alignment: .center, spacing: 8) {
+            PlannerMenuButton(action: onMenu)
+            Text(title)
+                .font(Theme.display(.largeTitle, weight: .bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            Spacer(minLength: 0)
             if let trailing {
                 trailing()
             } else if showSearchInBar {
@@ -392,20 +421,7 @@ struct PlannerTopBar: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
-        if let contextLabel {
-            Text(contextLabel)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Theme.muted)
-                .textCase(.uppercase)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.top, 2)
-        }
-        Text(title)
-            .font(Theme.display(.largeTitle, weight: .bold))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
-            .padding(.top, 4)
+        .padding(.bottom, 4)
     }
 }
 

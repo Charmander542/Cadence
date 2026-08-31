@@ -6,6 +6,7 @@ struct MealPlanView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var profile: UserProfileEntity
     @Binding var openShop: Bool
+    var onOpenDrawer: () -> Void = {}
     @Query private var plans: [WeeklyPlanEntity]
     @Query private var grocery: [GroceryItemEntity]
     @State private var confirmRegenerate = false
@@ -17,9 +18,10 @@ struct MealPlanView: View {
     @State private var cachedPlan: WeeklyPlan?
     @State private var cachedRecipeLookup: [String: Recipe] = [:]
 
-    init(profile: UserProfileEntity, openShop: Binding<Bool> = .constant(false)) {
+    init(profile: UserProfileEntity, openShop: Binding<Bool> = .constant(false), onOpenDrawer: @escaping () -> Void = {}) {
         self.profile = profile
         _openShop = openShop
+        self.onOpenDrawer = onOpenDrawer
     }
 
     private let dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -46,7 +48,7 @@ struct MealPlanView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Tab-specific actions (browse, shop, plan week) — use PlannerScreenHeader, not PlannerTitleHeader.
-                PlannerScreenHeader(title: "This week") {
+                PlannerScreenHeader(title: "Meals", onMenu: onOpenDrawer) {
                     HStack(spacing: 4) {
                         Button {
                             showBrowse = true

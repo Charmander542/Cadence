@@ -4,6 +4,7 @@ import SwiftData
 struct HabitsHomeView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appModel: AppModel
+    var onOpenDrawer: () -> Void = {}
     @Query(sort: \HabitEntity.sortOrder) private var habits: [HabitEntity]
     @Query private var profiles: [UserProfileEntity]
     @State private var showAdd = false
@@ -25,7 +26,7 @@ struct HabitsHomeView: View {
         ZStack(alignment: .bottomTrailing) {
             Theme.canvas.ignoresSafeArea()
             VStack(alignment: .leading, spacing: 0) {
-                PlannerTitleHeader(title: "Habits")
+                PlannerTitleHeader(title: "Habits", onMenu: onOpenDrawer)
 
                 weekStrip
                     .padding(.vertical, 10)

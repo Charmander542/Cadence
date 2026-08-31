@@ -231,9 +231,13 @@ final class PlannerTaskEntity {
     var completedAt: Date?
     var createdAt: Date
     var list: TaskListEntity?
-    /// EventKit event identifier for Apple Calendar sync.
+    /// EventKit event identifiers per Apple sub-calendar (calendarIdentifier → eventIdentifier).
+    var appleCalendarEventIDsJSON: String = "{}"
+    /// Google Calendar API event ids per calendar (calendarID → eventID).
+    var googleCalendarEventIDsJSON: String = "{}"
+    /// Legacy single-calendar EventKit id (migrated into `appleCalendarEventIDsJSON`).
     var appleCalendarEventID: String?
-    /// Google Calendar API event id.
+    /// Legacy single-calendar Google id (migrated into `googleCalendarEventIDsJSON`).
     var googleCalendarEventID: String?
     /// Calendar events (created via PlannerEventSheet) — excluded from task/todo lists.
     var isEvent: Bool = false
@@ -283,6 +287,45 @@ final class PlannerTaskEntity {
     var isOverdue: Bool {
         guard !isCompleted, let dueAt else { return false }
         return dueAt < Calendar.current.startOfDay(for: .now)
+    }
+
+    var appleCalendarEventIDs: [String: String] {
+        get { CalendarEventIDMap.decode(appleCalendarEventIDsJSON, legacy: appleCalendarEventID, legacyCalendarID: PlannerPreferences.appleCalendarIdentifier) }
+        set {
+            appleCalendarEventIDsJSON = CalendarEventIDMap.encode(newValue)
+            appleCalendarEventID = newValue.values.first
+        }
+    }
+
+    var googleCalendarEventIDs: [String: String] {
+        get {
+            var map = CalendarEventIDMap.decode(googleCalendarEventIDsJSON, legacy: googleCalendarEventID, legacyCalendarID: PlannerPreferences.googleCalendarID)
+            if map.isEmpty, let legacy = googleCalendarEventID, !legacy.isEmpty {
+                map["primary"] = legacy
+            }
+            return map
+        }
+        set {
+            googleCalendarEventIDsJSON = CalendarEventIDMap.encode(newValue)
+            googleCalendarEventID = newValue.values.first
+        }
+    }
+}
+
+enum CalendarEventIDMap {
+    static func decode(_ json: String, legacy: String?, legacyCalendarID: String?) -> [String: String] {
+        var map = (try? JSONDecoder().decode([String: String].self, from: Data(json.utf8))) ?? [:]
+        if map.isEmpty, let legacy, !legacy.isEmpty, let calID = legacyCalendarID, !calID.isEmpty {
+            map[calID] = legacy
+        }
+        return map
+    }
+
+    static func encode(_ map: [String: String]) -> String {
+        guard let data = try? JSONEncoder().encode(map),
+              let string = String(data: data, encoding: .utf8)
+        else { return "{}" }
+        return string
     }
 }
 

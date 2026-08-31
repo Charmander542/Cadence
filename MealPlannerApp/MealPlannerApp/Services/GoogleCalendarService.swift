@@ -99,8 +99,26 @@ final class GoogleCalendarService: NSObject {
 
     func signOut() {
         deleteTokens()
+        PlannerPreferences.googleCalendarIDs = []
         PlannerPreferences.googleCalendarID = nil
         PlannerPreferences.googleCalendarTitle = nil
+    }
+
+    func selectedGoogleCalendarIDs() -> [String] {
+        let ids = Array(PlannerPreferences.googleCalendarIDs)
+        return ids.isEmpty ? [] : ids
+    }
+
+    func initializeGoogleCalendarSelectionIfNeeded(with calendars: [GoogleCalendarSummary]) {
+        guard !PlannerPreferences.googleCalendarsSelectionInitialized else { return }
+        var selected = Set<String>()
+        if let legacy = PlannerPreferences.googleCalendarID, !legacy.isEmpty {
+            selected.insert(legacy)
+        } else if let primary = calendars.first(where: \.primary) {
+            selected.insert(primary.id)
+        }
+        PlannerPreferences.googleCalendarIDs = selected
+        PlannerPreferences.googleCalendarsSelectionInitialized = true
     }
 
     // MARK: - API
@@ -130,7 +148,20 @@ final class GoogleCalendarService: NSObject {
             return
         }
 
-        let calendarID = PlannerPreferences.googleCalendarID ?? "primary"
+        let calendarIDs = selectedGoogleCalendarIDs()
+        guard !calendarIDs.isEmpty else { return }
+
+        var map = task.googleCalendarEventIDs
+        let selected = Set(calendarIDs)
+
+        for (calendarID, eventID) in map where !selected.contains(calendarID) {
+            _ = try? await apiRequest(
+                path: "/calendars/\(calendarID.urlPathEncoded)/events/\(eventID.urlPathEncoded)",
+                method: "DELETE"
+            )
+            map.removeValue(forKey: calendarID)
+        }
+
         let end = dueAt.addingTimeInterval(task.durationMinutes > 0 ? TimeInterval(task.durationMinutes * 60) : 3600)
         let body = GoogleEventPayload.summary(
             title: task.title,
@@ -139,76 +170,86 @@ final class GoogleCalendarService: NSObject {
             end: end
         )
 
-        if let eventID = task.googleCalendarEventID {
-            _ = try await apiRequest(
-                path: "/calendars/\(calendarID.urlPathEncoded)/events/\(eventID.urlPathEncoded)",
-                method: "PATCH",
-                body: body
-            )
-        } else {
-            let data = try await apiRequest(
-                path: "/calendars/\(calendarID.urlPathEncoded)/events",
-                method: "POST",
-                body: body
-            )
-            struct Created: Decodable { var id: String }
-            task.googleCalendarEventID = try JSONDecoder().decode(Created.self, from: data).id
+        for calendarID in calendarIDs {
+            if let eventID = map[calendarID] {
+                _ = try await apiRequest(
+                    path: "/calendars/\(calendarID.urlPathEncoded)/events/\(eventID.urlPathEncoded)",
+                    method: "PATCH",
+                    body: body
+                )
+            } else {
+                let data = try await apiRequest(
+                    path: "/calendars/\(calendarID.urlPathEncoded)/events",
+                    method: "POST",
+                    body: body
+                )
+                struct Created: Decodable { var id: String }
+                map[calendarID] = try JSONDecoder().decode(Created.self, from: data).id
+            }
         }
+        task.googleCalendarEventIDs = map
     }
 
     func deleteTaskEvent(_ task: PlannerTaskEntity) async throws {
-        guard let eventID = task.googleCalendarEventID else { return }
-        let calendarID = PlannerPreferences.googleCalendarID ?? "primary"
-        _ = try await apiRequest(
-            path: "/calendars/\(calendarID.urlPathEncoded)/events/\(eventID.urlPathEncoded)",
-            method: "DELETE"
-        )
-        task.googleCalendarEventID = nil
+        var map = task.googleCalendarEventIDs
+        for (calendarID, eventID) in map {
+            _ = try? await apiRequest(
+                path: "/calendars/\(calendarID.urlPathEncoded)/events/\(eventID.urlPathEncoded)",
+                method: "DELETE"
+            )
+        }
+        task.googleCalendarEventIDs = [:]
     }
 
     func syncWorkoutProgram() async throws {
         guard PlannerPreferences.syncWorkoutsToGoogleCalendar else { return }
-        let calendarID = PlannerPreferences.googleCalendarID ?? "primary"
-        for session in WorkoutProgram.sessions {
-            let start = WorkoutIntegration.workoutBlockDate(on: dateForWeekday(session.weekday))
-            let body = GoogleEventPayload.recurringWorkout(session: session, start: start)
-            _ = try await apiRequest(
-                path: "/calendars/\(calendarID.urlPathEncoded)/events",
-                method: "POST",
-                body: body
-            )
-        }
-    }
-
-    func syncMealPlan(_ plan: WeeklyPlan, recipeNames: [String: String]) async throws {
-        guard PlannerPreferences.syncMealsToGoogleCalendar else { return }
-        let calendarID = PlannerPreferences.googleCalendarID ?? "primary"
-        let cal = Calendar.current
-        let monday = mondayOfCurrentWeek()
-        for dayIndex in 0..<7 {
-            guard let day = cal.date(byAdding: .day, value: dayIndex, to: monday) else { continue }
-            for slot in [MealSlot.lunch, MealSlot.dinner] {
-                guard let meal = plan.meal(day: dayIndex, slot: slot) else { continue }
-                let hour = slot == .lunch ? PlannerPreferences.lunchReminderHour : PlannerPreferences.dinnerReminderHour
-                var comps = cal.dateComponents([.year, .month, .day], from: day)
-                comps.hour = hour
-                comps.minute = 0
-                guard let start = cal.date(from: comps),
-                      let end = cal.date(byAdding: .hour, value: 1, to: start)
-                else { continue }
-                let name = recipeNames[meal.recipeID] ?? "Planned meal"
-                let title = slot == .lunch ? "Lunch · \(name)" : "Dinner · \(name)"
-                let body = GoogleEventPayload.summary(
-                    title: title,
-                    notes: "Cadence meal plan",
-                    start: start,
-                    end: end
-                )
+        let calendarIDs = selectedGoogleCalendarIDs()
+        guard !calendarIDs.isEmpty else { return }
+        for calendarID in calendarIDs {
+            for session in WorkoutProgram.sessions {
+                let start = WorkoutIntegration.workoutBlockDate(on: dateForWeekday(session.weekday))
+                let body = GoogleEventPayload.recurringWorkout(session: session, start: start)
                 _ = try await apiRequest(
                     path: "/calendars/\(calendarID.urlPathEncoded)/events",
                     method: "POST",
                     body: body
                 )
+            }
+        }
+    }
+
+    func syncMealPlan(_ plan: WeeklyPlan, recipeNames: [String: String]) async throws {
+        guard PlannerPreferences.syncMealsToGoogleCalendar else { return }
+        let calendarIDs = selectedGoogleCalendarIDs()
+        guard !calendarIDs.isEmpty else { return }
+        let cal = Calendar.current
+        let monday = mondayOfCurrentWeek()
+        for calendarID in calendarIDs {
+            for dayIndex in 0..<7 {
+                guard let day = cal.date(byAdding: .day, value: dayIndex, to: monday) else { continue }
+                for slot in [MealSlot.lunch, MealSlot.dinner] {
+                    guard let meal = plan.meal(day: dayIndex, slot: slot) else { continue }
+                    let hour = slot == .lunch ? PlannerPreferences.lunchReminderHour : PlannerPreferences.dinnerReminderHour
+                    var comps = cal.dateComponents([.year, .month, .day], from: day)
+                    comps.hour = hour
+                    comps.minute = 0
+                    guard let start = cal.date(from: comps),
+                          let end = cal.date(byAdding: .hour, value: 1, to: start)
+                    else { continue }
+                    let name = recipeNames[meal.recipeID] ?? "Planned meal"
+                    let title = slot == .lunch ? "Lunch · \(name)" : "Dinner · \(name)"
+                    let body = GoogleEventPayload.summary(
+                        title: title,
+                        notes: "Cadence meal plan",
+                        start: start,
+                        end: end
+                    )
+                    _ = try await apiRequest(
+                        path: "/calendars/\(calendarID.urlPathEncoded)/events",
+                        method: "POST",
+                        body: body
+                    )
+                }
             }
         }
     }

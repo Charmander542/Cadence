@@ -112,7 +112,6 @@ struct TodayView: View {
                 PlannerTopBar(
                     title: title,
                     onMenu: onOpenDrawer,
-                    contextLabel: destination == .today ? nil : "Today tab",
                     showSearchInBar: false
                 )
                 ScrollView {
