@@ -240,7 +240,7 @@ struct MealsCookingSettingsView: View {
                 }
                 Stepper("Servings / recipe: \(profile.servingsPerRecipe)", value: $profile.servingsPerRecipe, in: 1...12)
                     .accessibilityLabel("Servings per recipe, \(profile.servingsPerRecipe)")
-                    .accessibilityHint("Default batch size for generated recipes")
+                    .accessibilityHint("Scales each dinner cook and the shop list amounts")
                 ForEach(CookingTool.allCases) { tool in
                     Toggle(tool.title, isOn: Binding(
                         get: { profile.availableTools.contains(tool.storageKey) },

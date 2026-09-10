@@ -14,8 +14,8 @@ private enum WidgetTheme {
 }
 
 struct ToggleWidgetTaskIntent: AppIntent {
-    static var title: LocalizedStringResource = "Toggle task"
-    static var isDiscoverable: Bool = false
+    static let title: LocalizedStringResource = "Toggle task"
+    static let isDiscoverable: Bool = false
 
     @Parameter(title: "Task ID")
     var taskID: String
@@ -35,8 +35,8 @@ struct ToggleWidgetTaskIntent: AppIntent {
 }
 
 struct ToggleWidgetHabitIntent: AppIntent {
-    static var title: LocalizedStringResource = "Toggle habit"
-    static var isDiscoverable: Bool = false
+    static let title: LocalizedStringResource = "Toggle habit"
+    static let isDiscoverable: Bool = false
 
     @Parameter(title: "Habit ID")
     var habitID: String

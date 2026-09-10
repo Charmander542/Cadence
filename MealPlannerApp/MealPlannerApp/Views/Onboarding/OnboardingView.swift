@@ -150,7 +150,7 @@ struct OnboardingView: View {
                         Stepper("Servings / batch: \(profile.servingsPerRecipe)", value: $profile.servingsPerRecipe, in: 1...12)
                             .accessibilityLabel("Servings per batch, \(profile.servingsPerRecipe)")
                             .accessibilityHint("Default batch size for generated recipes")
-                        Text("Servings per cooked batch — e.g. 4 = lunch + dinner for 2 days.")
+                        Text("Servings per cooked batch — scales each dinner and the shop list.")
                             .font(.footnote)
                             .foregroundStyle(Theme.muted)
                             .accessibilityAddTraits(.isStaticText)

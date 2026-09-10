@@ -14,6 +14,7 @@ struct TodayView: View {
 
     @State private var showQuickAdd = false
     @State private var editingTask: PlannerTaskEntity?
+    @State private var editingEvent: EventSheetContext?
     @State private var editingHabit: HabitEntity?
     @State private var pendingUndo: TodayUndoAction?
     @State private var undoDismissTask: Task<Void, Never>?
@@ -71,6 +72,27 @@ struct TodayView: View {
         visibleTasks.filter { !$0.isCompleted && !$0.isOverdue }
     }
 
+    private var todayEvents: [PlannerTaskEntity] {
+        guard destination == .today else { return [] }
+        return tasks.filter { task in
+            guard task.isEvent, !task.isCompleted else { return false }
+            guard let due = task.dueAt else { return false }
+            return Calendar.current.isDateInToday(due)
+        }
+        .sorted { ($0.dueAt ?? .distantFuture) < ($1.dueAt ?? .distantFuture) }
+    }
+
+    private var completedEventsToday: [PlannerTaskEntity] {
+        guard destination == .today else { return [] }
+        return tasks.filter { task in
+            guard task.isEvent, task.isCompleted else { return false }
+            if let due = task.dueAt, Calendar.current.isDateInToday(due) { return true }
+            if let completedAt = task.completedAt, Calendar.current.isDateInToday(completedAt) { return true }
+            return false
+        }
+        .sorted { ($0.dueAt ?? .distantFuture) < ($1.dueAt ?? .distantFuture) }
+    }
+
     private var completedToday: [PlannerTaskEntity] {
         guard destination == .today else {
             return visibleTasks.filter(\.isCompleted)
@@ -95,118 +117,154 @@ struct TodayView: View {
     }
 
     private var completedCount: Int {
-        completedToday.count + (destination == .today ? completedHabits.count : 0)
+        completedToday.count
+            + completedEventsToday.count
+            + (destination == .today ? completedHabits.count : 0)
+    }
+
+    private var isMorningFocus: Bool {
+        Calendar.current.component(.hour, from: .now) < 12
+    }
+
+    private var isEveningFocus: Bool {
+        Calendar.current.component(.hour, from: .now) >= 17
     }
 
     var body: some View {
-        NavigationStack {
-            todayContent
-        }
+        todayContent
     }
 
     private var todayContent: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Theme.canvas.ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: 0) {
-                PlannerTopBar(
-                    title: title,
-                    onMenu: onOpenDrawer,
-                    showSearchInBar: false
-                )
-                ScrollView {
-                    VStack(spacing: 14) {
-                        if destination == .today {
-                            WorkoutDayCard()
-                            TonightMealCard()
+        VStack(alignment: .leading, spacing: 0) {
+            PlannerTopBar(
+                title: title,
+                onMenu: onOpenDrawer,
+                showSearchInBar: false
+            )
+            ScrollView {
+                VStack(spacing: 14) {
+                    if destination == .today {
+                        todayHeroCards
+                    }
+                    if destination == .today,
+                       overdue.isEmpty && openToday.isEmpty && todayEvents.isEmpty && openHabits.isEmpty && completedCount == 0 {
+                        Theme.EmptyState(
+                            systemImage: "checkmark.circle",
+                            title: "All clear",
+                            message: "No tasks or habits due today. Add something from the + button.",
+                            cta: "Add task",
+                            ctaHint: "Opens quick add for a new task"
+                        ) {
+                            showQuickAdd = true
                         }
-                        if destination == .today,
-                           overdue.isEmpty && openToday.isEmpty && openHabits.isEmpty && completedCount == 0 {
-                            Theme.EmptyState(
-                                systemImage: "checkmark.circle",
-                                title: "All clear",
-                                message: "No tasks or habits due today. Add something from the + button.",
-                                cta: "Add task",
-                                ctaHint: "Opens quick add for a new task"
-                            ) {
-                                showQuickAdd = true
+                        .frame(minHeight: 120)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("All clear. No tasks or habits due today. Add a task from the add button.")
+                    }
+                    if visibleTasks.isEmpty && overdue.isEmpty && completedCount == 0 && destination != .today {
+                        Theme.EmptyState(
+                            systemImage: "checkmark.circle",
+                            title: "Nothing scheduled",
+                            message: "Tap + to add a task, or open Meals to plan dinner.",
+                            cta: "Add task",
+                            ctaHint: "Opens quick add for a new task"
+                        ) {
+                            showQuickAdd = true
+                        }
+                        .frame(minHeight: 220)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Nothing scheduled. Tap add task or open Meals to plan dinner.")
+                    }
+                    if !overdue.isEmpty {
+                        sectionCard(id: "overdue", title: "Overdue", count: overdue.count, trailing: postponeMenu) {
+                            ForEach(overdue) { task in
+                                taskRow(task)
                             }
-                            .frame(minHeight: 120)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("All clear. No tasks or habits due today. Add a task from the add button.")
-                        }
-                        if visibleTasks.isEmpty && overdue.isEmpty && completedCount == 0 && destination != .today {
-                            Theme.EmptyState(
-                                systemImage: "checkmark.circle",
-                                title: "Nothing scheduled",
-                                message: "Tap + to add a task, or open Meals to plan dinner.",
-                                cta: "Add task",
-                                ctaHint: "Opens quick add for a new task"
-                            ) {
-                                showQuickAdd = true
-                            }
-                            .frame(minHeight: 220)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("Nothing scheduled. Tap add task or open Meals to plan dinner.")
-                        }
-                        if !overdue.isEmpty {
-                            sectionCard(id: "overdue", title: "Overdue", count: overdue.count, trailing: postponeMenu) {
-                                ForEach(overdue) { task in
-                                    taskRow(task)
-                                }
-                            }
-                        }
-                        if destination == .today, !openHabits.isEmpty {
-                            sectionCard(id: "habits", title: "Habits", count: openHabits.count) {
-                                ForEach(openHabits) { habit in
-                                    habitRow(habit, showSkip: true)
-                                }
-                            }
-                        }
-                        if !openToday.isEmpty {
-                            VStack(spacing: 0) {
-                                ForEach(openToday) { task in
-                                    taskRow(task)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 10)
-                                }
-                            }
-                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        }
-                        if completedCount > 0 {
-                            completedSection
                         }
                     }
-                    .padding(16)
-                    .padding(.bottom, 88)
-                }
-            }
-
-            HStack {
-                if pendingUndo != nil {
-                    UndoFAB(accessibilityHint: todayUndoAccessibilityHint) {
-                        performUndo()
+                    if destination == .today, !todayEvents.isEmpty {
+                        sectionCard(id: "events", title: "Events", count: todayEvents.count) {
+                            ForEach(todayEvents) { event in
+                                eventRow(event)
+                            }
+                        }
                     }
-                    .padding(.leading, 22)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    if destination == .today, !openHabits.isEmpty {
+                        sectionCard(id: "habits", title: "Habits", count: openHabits.count) {
+                            ForEach(openHabits) { habit in
+                                habitRow(habit, showSkip: true)
+                            }
+                        }
+                    }
+                    if destination == .today, !openToday.isEmpty {
+                        sectionCard(id: "tasks", title: "Tasks", count: openToday.count) {
+                            ForEach(openToday.prefix(5)) { task in
+                                taskRow(task)
+                            }
+                        }
+                    }
+                    if !openToday.isEmpty && destination != .today {
+                        VStack(spacing: 0) {
+                            ForEach(openToday) { task in
+                                taskRow(task)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 10)
+                            }
+                        }
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    if completedCount > 0 {
+                        completedSection
+                    }
                 }
-                Spacer()
-                OrangeFAB { showQuickAdd = true }
-                    .padding(.trailing, 22)
+                .padding(16)
+                .padding(.bottom, 88)
             }
-            .padding(.bottom, 12)
-            .animation(.easeInOut(duration: 0.22), value: pendingUndo != nil)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.canvas.ignoresSafeArea())
+        .dialFABChrome(
+            leading: {
+                Group {
+                    if pendingUndo != nil {
+                        UndoFAB(accessibilityHint: todayUndoAccessibilityHint) {
+                            performUndo()
+                        }
+                        .padding(.leading, 22)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                    }
+                }
+                .animation(.easeInOut(duration: 0.22), value: pendingUndo != nil)
+            },
+            fab: {
+                OrangeFAB { showQuickAdd = true }
+            }
+        )
         .sheet(isPresented: $showQuickAdd) {
             QuickAddSheet()
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
         }
         .sheet(item: $editingTask) { task in
             TaskEditorSheet(task: task)
         }
+        .sheet(item: $editingEvent) { context in
+            PlannerEventSheet(context: context)
+        }
         .sheet(item: $editingHabit) { habit in
             NewHabitSheet(habit: habit)
+        }
+    }
+
+    @ViewBuilder
+    private var todayHeroCards: some View {
+        if isEveningFocus {
+            TonightMealCard(compact: true, promoted: true)
+            WorkoutDayCard(compact: true)
+        } else if isMorningFocus {
+            WorkoutDayCard(compact: true, promoted: true)
+            TonightMealCard(compact: true)
+        } else {
+            WorkoutDayCard()
+            TonightMealCard()
         }
     }
 
@@ -232,7 +290,7 @@ struct TodayView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Completed, \(completedCount) items")
             .accessibilityValue(showCompleted ? "Expanded" : "Collapsed")
-            .accessibilityHint("Double tap to show or hide completed tasks and habits")
+            .accessibilityHint("Double tap to show or hide completed tasks, events, and habits")
 
             if showCompleted {
                 if !completedToday.isEmpty {
@@ -241,6 +299,9 @@ struct TodayView: View {
                     }
                 }
                 if destination == .today {
+                    ForEach(completedEventsToday) { event in
+                        eventRow(event, completed: true)
+                    }
                     ForEach(completedHabits) { habit in
                         habitRow(habit)
                     }
@@ -345,6 +406,50 @@ struct TodayView: View {
         .accessibilityHint("Double tap to edit")
     }
 
+    private func eventRow(_ event: PlannerTaskEntity, completed: Bool = false) -> some View {
+        HStack(spacing: 8) {
+            CountdownTrackButton(eventID: event.id)
+            Button {
+                editingEvent = EventSheetContext(task: event, startDate: event.dueAt ?? .now)
+            } label: {
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(PlannerColor.from(hex: event.colorHex.isEmpty ? PlannerColor.palette[0] : event.colorHex))
+                        .frame(width: 8, height: 8)
+                    Text(event.title)
+                        .font(.subheadline)
+                        .foregroundStyle(completed ? Theme.muted : Theme.ink)
+                        .strikethrough(completed)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if let due = event.dueAt {
+                        Text(due, style: .time)
+                            .font(.caption)
+                            .foregroundStyle(Theme.muted)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(todayEventAccessibilityLabel(event, completed: completed))
+            .accessibilityHint("Double tap to edit event")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    private func todayEventAccessibilityLabel(_ event: PlannerTaskEntity, completed: Bool) -> String {
+        var parts = [event.title, "event"]
+        if completed { parts.append("completed") }
+        if CountdownTracking.isTracked(event.id) { parts.append("countdown tracked") }
+        if let due = event.dueAt {
+            parts.append(due.formatted(date: .omitted, time: .shortened))
+        }
+        return parts.joined(separator: ", ")
+    }
+
     private func taskRowAccessibilityLabel(_ task: PlannerTaskEntity) -> String {
         var parts = [task.title]
         if task.isCompleted { parts.append("completed") }
@@ -380,10 +485,11 @@ struct TodayView: View {
                 Button {
                     skipHabit(habit)
                 } label: {
-                    Image(systemName: "forward.fill")
-                        .font(.caption)
+                    Text("Skip")
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(Theme.muted)
-                        .frame(width: 32, height: 32)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Skip habit")
@@ -526,6 +632,10 @@ struct QuickAddSheet: View {
     @State private var priority: TaskPriority = .none
     @State private var listID: UUID?
     @State private var showDatePicker = false
+    @State private var sheetDetent: PresentationDetent = Self.compactDetent
+
+    private static let compactDetent = PresentationDetent.height(390)
+    private static let expandedDetent = PresentationDetent.large
 
     private var parsed: ParsedTaskTitle {
         TaskTitleParser.parse(title)
@@ -544,107 +654,112 @@ struct QuickAddSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 14) {
-            Text("Save to list")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Theme.muted)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityAddTraits(.isHeader)
-            HStack {
-                Menu {
-                    ForEach(pickerLists) { list in
-                        Button(list.name) { listID = list.id }
-                            .accessibilityHint("Saves task to \(list.name) list")
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(selectedListName)
-                            .font(.headline)
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption)
-                    }
-                    .foregroundStyle(Theme.ink)
-                }
-                .accessibilityLabel("List, \(selectedListName)")
-                .accessibilityHint("Choose which list saves this task")
-                Spacer()
-                PriorityPickerMenu(priority: $priority) {
-                    PriorityFlagIcon(priority: priority)
-                }
-            }
-            HStack(alignment: .top) {
-                Circle().stroke(Theme.muted.opacity(0.45), lineWidth: 1.5).frame(width: 22, height: 22)
-                TextField("What do you want to do?", text: $title, axis: .vertical)
-                    .font(.title3)
-                    .submitLabel(.done)
-                    .onSubmit { save() }
-                    .onChange(of: title) { _, _ in applyParsedHints() }
-                    .accessibilityHint("Task title; try tomorrow or #tag for smart hints")
-            }
-            SmartTitleHints(parsed: parsed, tagColors: tagColorMap)
-            Text("Tips: tomorrow · #tag")
-                .font(.caption2)
-                .foregroundStyle(Theme.muted)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityLabel("Tips: type tomorrow or hash tag in the title")
-                .accessibilityAddTraits(.isStaticText)
-            Text("Due date")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Theme.muted)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityAddTraits(.isHeader)
-            if hasDue {
-                Button {
-                    showDatePicker = true
-                } label: {
-                    Text(dueLabel)
-                        .foregroundStyle(Theme.danger)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Due date, \(dueLabel)")
-                .accessibilityHint("Opens calendar to change due date")
-                Toggle("Remind me", isOn: $hasReminder)
-                    .font(.subheadline)
-                    .accessibilityLabel("Remind me, \(hasReminder ? "on" : "off")")
-                    .accessibilityHint("Schedules notification on due date")
-            } else {
-                Text("No due date")
+        ScrollView {
+            VStack(spacing: 14) {
+                Text("Save to list")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityLabel("Due date, none")
-                    .accessibilityAddTraits(.isStaticText)
-            }
-            Spacer()
-            HStack(spacing: 22) {
-                Menu {
-                    Button("Today") { hasDue = true; due = .now }
-                        .accessibilityHint("Sets due date to today")
-                    Button("Tomorrow") {
-                        hasDue = true
-                        due = Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now
+                    .accessibilityAddTraits(.isHeader)
+                HStack {
+                    Menu {
+                        ForEach(pickerLists) { list in
+                            Button(list.name) { listID = list.id }
+                                .accessibilityHint("Saves task to \(list.name) list")
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(selectedListName)
+                                .font(.headline)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption)
+                        }
+                        .foregroundStyle(Theme.ink)
                     }
-                    .accessibilityHint("Sets due date to tomorrow")
-                    Button("No date") { hasDue = false }
-                        .accessibilityHint("Clears due date")
-                } label: {
-                    Label("Date", systemImage: "calendar")
+                    .accessibilityLabel("List, \(selectedListName)")
+                    .accessibilityHint("Choose which list saves this task")
+                    Spacer()
+                    PriorityPickerMenu(priority: $priority) {
+                        PriorityFlagIcon(priority: priority)
+                    }
                 }
-                .accessibilityLabel("Due date, \(hasDue ? dueLabel : "none")")
-                .accessibilityHint("Set or clear due date")
-                Spacer()
-                Button("Save") { save() }
-                    .font(.headline)
-                    .foregroundStyle(Theme.accent)
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    .accessibilityHint(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Enter a task title to save" : "Creates task in selected list")
+                HStack(alignment: .center) {
+                    Circle().stroke(Theme.muted.opacity(0.45), lineWidth: 1.5).frame(width: 22, height: 22)
+                    TextField("What do you want to do?", text: $title)
+                        .font(.title3)
+                        .submitLabel(.done)
+                        .onSubmit { save() }
+                        .onChange(of: title) { _, _ in applyParsedHints() }
+                        .accessibilityHint("Task title; try tomorrow or #tag for smart hints")
+                }
+                SmartTitleHints(parsed: parsed, tagColors: tagColorMap)
+                Text("Tips: tomorrow · #tag")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel("Tips: type tomorrow or hash tag in the title")
+                    .accessibilityAddTraits(.isStaticText)
+                Text("Due date")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityAddTraits(.isHeader)
+                if hasDue {
+                    Button {
+                        showDatePicker = true
+                    } label: {
+                        Text(dueLabel)
+                            .foregroundStyle(Theme.danger)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Due date, \(dueLabel)")
+                    .accessibilityHint("Opens calendar to change due date")
+                    Toggle("Remind me", isOn: $hasReminder)
+                        .font(.subheadline)
+                        .accessibilityLabel("Remind me, \(hasReminder ? "on" : "off")")
+                        .accessibilityHint("Schedules notification on due date")
+                } else {
+                    Text("No due date")
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityLabel("Due date, none")
+                        .accessibilityAddTraits(.isStaticText)
+                }
+                HStack(spacing: 22) {
+                    Menu {
+                        Button("Today") { hasDue = true; due = .now }
+                            .accessibilityHint("Sets due date to today")
+                        Button("Tomorrow") {
+                            hasDue = true
+                            due = Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now
+                        }
+                        .accessibilityHint("Sets due date to tomorrow")
+                        Button("No date") { hasDue = false }
+                            .accessibilityHint("Clears due date")
+                    } label: {
+                        Label("Date", systemImage: "calendar")
+                    }
+                    .accessibilityLabel("Due date, \(hasDue ? dueLabel : "none")")
+                    .accessibilityHint("Set or clear due date")
+                    Spacer()
+                    Button("Save") { save() }
+                        .font(.headline)
+                        .foregroundStyle(Theme.accent)
+                        .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityHint(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Enter a task title to save" : "Creates task in selected list")
+                }
+                .foregroundStyle(Theme.ink)
+                .font(.title3)
             }
-            .foregroundStyle(Theme.ink)
-            .font(.title3)
+            .padding(18)
         }
-        .padding(18)
+        .scrollDismissesKeyboard(.interactively)
         .background(Theme.surface)
+        .presentationDetents([Self.compactDetent, Self.expandedDetent], selection: $sheetDetent)
+        .presentationDragIndicator(.visible)
+        .presentationContentInteraction(.scrolls)
         .onAppear {
             listID = lists.first { $0.name == "Inbox" }?.id
             if let initialDue {
@@ -702,6 +817,10 @@ struct TaskEditorSheet: View {
     @Query(sort: \TaskListEntity.sortOrder) private var lists: [TaskListEntity]
     @Query(sort: \PlannerTagEntity.name) private var plannerTags: [PlannerTagEntity]
     @State private var hasReminder = false
+    @State private var sheetDetent: PresentationDetent = Self.compactDetent
+
+    private static let compactDetent = PresentationDetent.height(460)
+    private static let expandedDetent = PresentationDetent.large
 
     private var tagColorMap: [String: Color] {
         Dictionary(uniqueKeysWithValues: plannerTags.map { ($0.name, PlannerColor.from(hex: $0.colorHex)) })
@@ -749,26 +868,27 @@ struct TaskEditorSheet: View {
                     .accessibilityLabel("Notes")
                     .accessibilityValue(task.notes.isEmpty ? "Empty" : task.notes)
                     .accessibilityHint("Optional notes for this task")
-                TextField("Location", text: $task.location)
-                    .accessibilityLabel("Location")
-                    .accessibilityValue(task.location.isEmpty ? "Empty" : task.location)
-                    .accessibilityHint("Optional location for calendar export")
-                DatePicker("Due", selection: Binding(
-                    get: { task.dueAt ?? .now },
-                    set: { task.dueAt = $0 }
-                ), displayedComponents: [.date, .hourAndMinute])
-                .accessibilityLabel(taskDueAccessibilityLabel)
-                .accessibilityHint("Due date and time for this task")
+                LocationField(text: $task.location, mapsHint: "Opens task location in Apple Maps")
+                PlannerDateTimeRow(
+                    label: "Due",
+                    date: Binding(
+                        get: { task.dueAt ?? .now },
+                        set: { task.dueAt = DateSnapping.tenMinutes($0) }
+                    ),
+                    hint: "Opens date and time picker in five-minute steps"
+                )
                 Toggle("Reminder", isOn: $hasReminder)
                     .accessibilityLabel("Reminder, \(hasReminder ? "on" : "off")")
                     .accessibilityHint("Schedules notification for this task")
                 if hasReminder {
-                    DatePicker("Remind at", selection: Binding(
-                        get: { task.reminderAt ?? task.dueAt ?? .now },
-                        set: { task.reminderAt = $0 }
-                    ), displayedComponents: [.date, .hourAndMinute])
-                    .accessibilityLabel(taskRemindAtAccessibilityLabel)
-                    .accessibilityHint("When to notify before this task is due")
+                    PlannerDateTimeRow(
+                        label: "Remind at",
+                        date: Binding(
+                            get: { task.reminderAt ?? task.dueAt ?? .now },
+                            set: { task.reminderAt = DateSnapping.tenMinutes($0) }
+                        ),
+                        hint: "Opens reminder time picker in five-minute steps"
+                    )
                     Stepper(
                         "Duration: \(task.durationMinutes) min",
                         value: $task.durationMinutes,
@@ -853,6 +973,7 @@ struct TaskEditorSheet: View {
                 .accessibilityLabel("Completed, \(task.isCompleted ? "on" : "off")")
                 .accessibilityHint("Marks task done or reopens it")
             }
+            .scrollDismissesKeyboard(.never)
             .scrollContentBackground(.hidden)
             .background(Theme.canvas)
             .navigationTitle("Task")
@@ -879,8 +1000,17 @@ struct TaskEditorSheet: View {
             .onAppear {
                 hasReminder = task.reminderAt != nil
                     || (PlannerPreferences.taskRemindersEnabled && task.dueAt != nil)
+                if let due = task.dueAt {
+                    task.dueAt = DateSnapping.tenMinutes(due)
+                }
+                if let remind = task.reminderAt {
+                    task.reminderAt = DateSnapping.tenMinutes(remind)
+                }
             }
         }
+        .presentationDetents([Self.compactDetent, Self.expandedDetent], selection: $sheetDetent)
+        .presentationDragIndicator(.visible)
+        .presentationContentInteraction(.scrolls)
     }
 
     private func deleteTask() {

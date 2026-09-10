@@ -188,7 +188,23 @@ enum IngredientCanonicalizer {
         s = s.replacingOccurrences(of: ",", with: " ")
         s = s.replacingOccurrences(of: "-", with: " ")
         s = s.replacingOccurrences(of: #"\boptional\b:?"#, with: " ", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"\bif desired\b"#, with: " ", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"\bas desired\b"#, with: " ", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"\bscrubbed\b"#, with: " ", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"\bpeeled\b"#, with: " ", options: .regularExpression)
         s = s.replacingOccurrences(of: #"\bup to\b"#, with: " ", options: .regularExpression)
+        // Yield footnotes mis-parsed as ingredients ("1 cup rice … yields a generous 2 cups").
+        if s.range(of: #"\byields?\b"#, options: .regularExpression) != nil {
+            return ""
+        }
+        if s.range(of: #"\bsee here\b|\bsee below\b|\bsee page\b"#, options: .regularExpression) != nil {
+            // Keep the food words before the cross-ref when possible by stripping the pointer.
+            s = s.replacingOccurrences(
+                of: #"\bsee (here|below|page|above).*$"#,
+                with: " ",
+                options: .regularExpression
+            )
+        }
         s = s.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         s = resolveOrAlternatives(s)
@@ -563,6 +579,8 @@ enum IngredientCanonicalizer {
         let refs = [
             "vinaigrette", "chimichurri", "gremolata",
             "aioli", "aïoli", "remoulade", "rémoulade", "marinara",
+            "marinade", "pan sauce", "herb pan sauce",
+            "steak au poivre", "steak diane", "carne asada",
         ]
         guard refs.contains(where: { s.contains($0) }) else { return nil }
         if s.contains("mayonnaise") || s.range(of: #"\bmayo\b"#, options: .regularExpression) != nil {
@@ -570,6 +588,7 @@ enum IngredientCanonicalizer {
         }
         if s.contains("sour cream") { return "sour cream" }
         if s.contains("yogurt") || s.contains("yoghurt") { return "yogurt" }
+        // Pure cross-recipe pointers are not shoppable.
         return ""
     }
 
@@ -1060,9 +1079,13 @@ enum GroceryConsolidator {
 
     /// Round quantities into how you'd buy them (bunches, heads, egg counts).
     /// Always re-canonicalizes names and merges duplicates so LLM leftovers can't linger.
-    static func finalizeForShopping(_ items: [ConsolidatedGroceryItem]) -> [ConsolidatedGroceryItem] {
+    static func finalizeForShopping(
+        _ items: [ConsolidatedGroceryItem],
+        cookingComplexity: Int = 5
+    ) -> [ConsolidatedGroceryItem] {
         let normalized = mergeByCanonicalName(items.compactMap(sanitizeItem(_:)))
-        return normalized.sorted { a, b in
+        let realistic = ShoppingRealism.refine(normalized, complexity: cookingComplexity)
+        return mergeByCanonicalName(realistic).sorted { a, b in
             let ai = categoryOrder.firstIndex(of: a.category) ?? 99
             let bi = categoryOrder.firstIndex(of: b.category) ?? 99
             if ai != bi { return ai < bi }

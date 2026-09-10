@@ -67,6 +67,7 @@ struct DayAgendaSection: View {
             guard let due = task.dueAt else { return false }
             return Calendar.current.isDate(due, inSameDayAs: day)
         }
+        .sorted { ($0.dueAt ?? .distantFuture) < ($1.dueAt ?? .distantFuture) }
     }
 
     var body: some View {
@@ -80,7 +81,7 @@ struct DayAgendaSection: View {
                             .multilineTextAlignment(.center)
                         Button("Add task") { showQuickAdd = true }
                             .buttonStyle(.borderedProminent)
-                            .tint(Theme.accent)
+                            .tint(Theme.cta)
                             .accessibilityHint("Opens quick add with this day as due date")
                         Button("Add event") {
                             newEventContext = EventSheetContext(startDate: day)
@@ -386,7 +387,7 @@ struct WorkoutTodayActions: View {
                         .padding(.vertical, 12)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Theme.accent)
+                .tint(Theme.cta)
                 .accessibilityLabel("Resume workout")
                 .accessibilityHint("Returns to in-progress live workout")
             } else {
@@ -398,7 +399,7 @@ struct WorkoutTodayActions: View {
                             .padding(.vertical, 12)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(Theme.accent)
+                    .tint(Theme.cta)
                     .accessibilityLabel("Begin \(todaySession.name) workout")
                     .accessibilityHint("Starts live workout session")
                     Button("Skip") { showSkipConfirm = true }

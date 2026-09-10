@@ -2,7 +2,7 @@ import Foundation
 
 /// On-device planner notification + calendar sync preferences.
 enum PlannerPreferences {
-    private static let defaults = UserDefaults.standard
+    private static var defaults: UserDefaults { .standard }
 
     // MARK: - Notifications
 
@@ -197,5 +197,24 @@ enum PlannerPreferences {
 
     private static func setStringSet(_ value: Set<String>, forKey key: String) {
         defaults.set(Array(value).sorted(), forKey: key)
+    }
+
+    // MARK: - Search recents
+
+    static var settingsIntroSeen: Bool {
+        get { defaults.bool(forKey: "cadence.settingsIntroSeen") }
+        set { defaults.set(newValue, forKey: "cadence.settingsIntroSeen") }
+    }
+
+    static func searchRecents() -> [String] {
+        (defaults.stringArray(forKey: "cadence.searchRecents") ?? []).filter { !$0.isEmpty }
+    }
+
+    static func recordSearchQuery(_ raw: String) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count > 1 else { return }
+        var list = searchRecents().filter { $0.caseInsensitiveCompare(trimmed) != .orderedSame }
+        list.insert(trimmed, at: 0)
+        defaults.set(Array(list.prefix(8)), forKey: "cadence.searchRecents")
     }
 }

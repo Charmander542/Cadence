@@ -3,19 +3,23 @@ import SwiftData
 import WidgetKit
 
 enum WidgetSnapshotWriter {
-    private static var publishTask: Task<Void, Never>?
+    nonisolated(unsafe) private static var publishTask: Task<Void, Never>?
+    nonisolated(unsafe) private static var reloadTask: Task<Void, Never>?
 
     /// Coalesces rapid toggles so task/habit updates don't hitch the UI.
+    @MainActor
     static func publish(in context: ModelContext) {
         publishDebounced(in: context)
     }
 
+    @MainActor
     static func publishImmediately(in context: ModelContext) {
         publishTask?.cancel()
         publishTask = nil
         publishNow(in: context)
     }
 
+    @MainActor
     static func publishDebounced(in context: ModelContext, delay: Duration = .milliseconds(250)) {
         publishTask?.cancel()
         publishTask = Task { @MainActor in
@@ -25,6 +29,7 @@ enum WidgetSnapshotWriter {
         }
     }
 
+    @MainActor
     static func applyPendingToggles(in context: ModelContext) {
         let pending = WidgetSnapshotStore.consumePendingToggles()
         guard !pending.tasks.isEmpty || !pending.habits.isEmpty else { return }
@@ -49,6 +54,7 @@ enum WidgetSnapshotWriter {
         publishImmediately(in: context)
     }
 
+    @MainActor
     private static func publishNow(in context: ModelContext) {
         let allTasks = (try? context.fetch(FetchDescriptor<PlannerTaskEntity>())) ?? []
         let widgetTasks = allTasks
@@ -79,7 +85,18 @@ enum WidgetSnapshotWriter {
         snap.habits = Array(habits)
         snap.nextEvent = nextEvent
         WidgetSnapshotStore.save(snap)
-        WidgetCenter.shared.reloadAllTimelines()
+        scheduleTimelineReload()
+    }
+
+    /// WidgetKit reloads are expensive; coalesce them so rapid toggles don't hitch the UI.
+    @MainActor
+    private static func scheduleTimelineReload() {
+        reloadTask?.cancel()
+        reloadTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            WidgetCenter.shared.reloadAllTimelines()
+        }
     }
 
     private static func isTodayOpenTask(_ task: PlannerTaskEntity) -> Bool {

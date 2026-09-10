@@ -10,11 +10,17 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack(path: $path) {
             Form {
+                if !PlannerPreferences.settingsIntroSeen {
+                    Section {
+                        Text("Tap a category to change profile, meals, reminders, or calendar sync.")
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                            .accessibilityAddTraits(.isStaticText)
+                    }
+                }
+
                 Section {
-                    Text("Tap a category to change profile, meals, reminders, or calendar sync.")
-                        .font(.footnote)
-                        .foregroundStyle(Theme.muted)
-                        .accessibilityAddTraits(.isStaticText)
+                    SettingsQuickTweaks(path: $path)
                 }
 
                 Section("You") {
@@ -108,6 +114,9 @@ struct SettingsView: View {
             .settingsFormChrome()
         }
         .onAppear(perform: openPendingRoute)
+        .onDisappear {
+            PlannerPreferences.settingsIntroSeen = true
+        }
         .onChange(of: appModel.pendingSettingsRoute) { _, _ in
             openPendingRoute()
         }
@@ -196,5 +205,43 @@ struct SettingsView: View {
         appModel.hasKeyForSelectedProvider()
             ? "\(appModel.selectedProvider.title) key saved"
             : "Optional · no key saved"
+    }
+}
+
+private struct SettingsQuickTweaks: View {
+    @Binding var path: NavigationPath
+
+    var body: some View {
+        HStack(spacing: 10) {
+            quickChip("Units", icon: "ruler") {
+                path.append(SettingsRoute.profile)
+            }
+            quickChip("Reminders", icon: "bell") {
+                path.append(SettingsRoute.reminders)
+            }
+            quickChip("Meals", icon: "fork.knife") {
+                path.append(SettingsRoute.recipes)
+            }
+        }
+        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+        .accessibilityElement(children: .contain)
+    }
+
+    private func quickChip(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.body.weight(.semibold))
+                Text(title)
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(Theme.cta)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(Theme.cta.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityHint("Opens \(title.lowercased()) settings")
     }
 }

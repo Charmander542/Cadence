@@ -60,10 +60,7 @@ struct PlannerEventSheet: View {
                         .accessibilityValue(title.isEmpty ? "Empty" : title)
                         .accessibilityHint("Event name shown on calendar")
                     SmartTitleHints(parsed: parsed, tagColors: tagColorMap)
-                    TextField("Location", text: $location)
-                        .accessibilityLabel("Location")
-                        .accessibilityValue(location.isEmpty ? "Empty" : location)
-                        .accessibilityHint("Optional location for calendar export")
+                    LocationField(text: $location, mapsHint: "Opens event location in Apple Maps")
                     TextField("Notes", text: $notes, axis: .vertical)
                         .lineLimit(3...6)
                         .accessibilityLabel("Notes")
@@ -95,16 +92,29 @@ struct PlannerEventSheet: View {
                         .accessibilityValue(isAllDay ? "All day event" : "Timed event")
                         .accessibilityHint("Treats event as full day without specific times")
                     if isAllDay {
-                        DatePicker("Starts", selection: $startDate, displayedComponents: .date)
-                            .accessibilityLabel("Start date, all-day event")
-                            .accessibilityHint("Start date for all-day event")
+                        PlannerDateTimeRow(
+                            label: "Starts",
+                            date: $startDate,
+                            includeTime: false,
+                            hint: "Opens start date picker"
+                        )
                     } else {
-                        DatePicker("Starts", selection: $startDate, displayedComponents: [.date, .hourAndMinute])
-                            .accessibilityLabel("Start date and time, timed event")
-                            .accessibilityHint("Start date and time for event")
-                        DatePicker("Ends", selection: $endDate, displayedComponents: [.date, .hourAndMinute])
-                            .accessibilityLabel("End date and time, timed event")
-                            .accessibilityHint("End date and time; sets event duration")
+                        PlannerDateTimeRow(
+                            label: "Starts",
+                            date: Binding(
+                                get: { startDate },
+                                set: { startDate = DateSnapping.tenMinutes($0) }
+                            ),
+                            hint: "Opens start date and time picker in five-minute steps"
+                        )
+                        PlannerDateTimeRow(
+                            label: "Ends",
+                            date: Binding(
+                                get: { endDate },
+                                set: { endDate = DateSnapping.tenMinutes($0) }
+                            ),
+                            hint: "Opens end date and time picker in five-minute steps"
+                        )
                     }
                     Picker("Repeat", selection: $recurrence) {
                         ForEach(TaskRecurrence.allCases) { item in
@@ -146,9 +156,14 @@ struct PlannerEventSheet: View {
                         .accessibilityLabel("Reminder, \(hasReminder ? "on" : "off")")
                         .accessibilityHint("Schedules notification before the event")
                     if hasReminder {
-                        DatePicker("Alert", selection: $reminderDate, displayedComponents: [.date, .hourAndMinute])
-                            .accessibilityLabel("Alert, \(eventDateTimeLabel(reminderDate))")
-                            .accessibilityHint("When to notify before this event")
+                        PlannerDateTimeRow(
+                            label: "Alert",
+                            date: Binding(
+                                get: { reminderDate },
+                                set: { reminderDate = DateSnapping.tenMinutes($0) }
+                            ),
+                            hint: "Opens alert time picker in five-minute steps"
+                        )
                     }
                 }
 
@@ -197,6 +212,7 @@ struct PlannerEventSheet: View {
                     }
                 }
             }
+            .scrollDismissesKeyboard(.never)
             .scrollContentBackground(.hidden)
             .background(Theme.canvas)
             .navigationTitle(isEditing ? "Edit Event" : "New Event")
@@ -260,12 +276,15 @@ struct PlannerEventSheet: View {
             colorHex = task.colorHex.isEmpty ? PlannerColor.palette[0] : task.colorHex
             selectedTags = Set(task.tags)
         } else {
-            startDate = context.startDate
-            endDate = context.startDate.addingTimeInterval(3600)
+            startDate = DateSnapping.tenMinutes(context.startDate)
+            endDate = DateSnapping.tenMinutes(context.startDate.addingTimeInterval(3600))
             listID = lists.first { $0.name == "Inbox" }?.id
-            reminderDate = context.startDate.addingTimeInterval(-900)
+            reminderDate = DateSnapping.tenMinutes(context.startDate.addingTimeInterval(-900))
             recurrenceWeekdayMask = RecurrenceWeekdayMask.from(startDate: startDate)
         }
+        startDate = DateSnapping.tenMinutes(startDate)
+        endDate = DateSnapping.tenMinutes(endDate)
+        reminderDate = DateSnapping.tenMinutes(reminderDate)
     }
 
     private func applyParsedHints() {
@@ -286,8 +305,10 @@ struct PlannerEventSheet: View {
 
         let parsed = TaskTitleParser.parse(trimmed)
         let finalTitle = parsed.cleanTitle.isEmpty ? trimmed : parsed.cleanTitle
-        var due = isAllDay ? Calendar.current.startOfDay(for: startDate) : startDate
-        if let parsedDue = parsed.dueDate { due = isAllDay ? Calendar.current.startOfDay(for: parsedDue) : parsedDue }
+        var due = isAllDay ? Calendar.current.startOfDay(for: startDate) : DateSnapping.tenMinutes(startDate)
+        if let parsedDue = parsed.dueDate {
+            due = isAllDay ? Calendar.current.startOfDay(for: parsedDue) : DateSnapping.tenMinutes(parsedDue)
+        }
 
         let duration = max(Int(endDate.timeIntervalSince(startDate) / 60), isAllDay ? 1440 : 15)
         var resolvedList = lists.first { $0.id == listID }

@@ -51,6 +51,9 @@ struct MealPlannerApp: App {
             RootView()
                 .environmentObject(appModel)
                 .tint(Color.accentColor)
+                .onOpenURL { url in
+                    CadenceAutomation.handle(url, appModel: appModel)
+                }
                 .task {
                     await Task.yield()
                     let context = sharedModelContainer.mainContext

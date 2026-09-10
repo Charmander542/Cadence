@@ -10,6 +10,7 @@ final class RecipeDatabase: @unchecked Sendable {
     private var byID: [String: Recipe] = [:]
     private var ordered: [Recipe] = []
     private var isLoaded = false
+    private var isLoading = false
 
     private init() { open() }
 
@@ -29,32 +30,112 @@ final class RecipeDatabase: @unchecked Sendable {
 
     deinit { if let db { sqlite3_close(db) } }
 
-    func warmCache() { _ = ensureLoaded() }
+    /// Prefetch on a background queue so UI never waits on SQLite decode.
+    func warmCache() {
+        lock.lock()
+        if isLoaded || isLoading {
+            lock.unlock()
+            return
+        }
+        isLoading = true
+        lock.unlock()
 
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.finishLoad()
+        }
+    }
+
+    /// Block until the in-memory cache is ready (tests / tooling). Safe to call from any thread.
+    @discardableResult
+    func waitUntilLoaded(timeout: TimeInterval = 60) -> Bool {
+        warmCache()
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            lock.lock()
+            let ready = isLoaded
+            let loading = isLoading
+            lock.unlock()
+            if ready { return true }
+            if !loading, !Thread.isMainThread {
+                // Nobody is loading (open failed or race) — try once more synchronously.
+                lock.lock()
+                if !isLoaded && !isLoading {
+                    isLoading = true
+                    lock.unlock()
+                    finishLoad()
+                } else {
+                    lock.unlock()
+                }
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        lock.lock()
+        defer { lock.unlock() }
+        return isLoaded
+    }
+
+    /// Returns true when the in-memory cache is ready. Never blocks the main thread on a cold load.
     @discardableResult
     private func ensureLoaded() -> Bool {
         lock.lock()
-        defer { lock.unlock() }
-        if isLoaded { return true }
-        guard db != nil else { return false }
-        ordered = loadAll()
-        // Bundled data should be unique, but never crash if a duplicate id slips in.
-        byID = Dictionary(ordered.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        if byID.count != ordered.count {
-            var seen = Set<String>()
-            ordered = ordered.filter { seen.insert($0.id).inserted }
+        if isLoaded {
+            lock.unlock()
+            return true
         }
+        let alreadyLoading = isLoading
+        if !alreadyLoading {
+            isLoading = true
+        }
+        lock.unlock()
+
+        if alreadyLoading {
+            return false
+        }
+
+        if Thread.isMainThread {
+            DispatchQueue.global(qos: .userInitiated).async {
+                self.finishLoad()
+            }
+            return false
+        }
+
+        finishLoad()
+        lock.lock()
+        let ready = isLoaded
+        lock.unlock()
+        return ready
+    }
+
+    private func finishLoad() {
+        let recipes = loadAll()
+        // Bundled data should be unique, but never crash if a duplicate id slips in.
+        var map = Dictionary(recipes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var orderedRecipes = recipes
+        if map.count != orderedRecipes.count {
+            var seen = Set<String>()
+            orderedRecipes = orderedRecipes.filter { seen.insert($0.id).inserted }
+            map = Dictionary(uniqueKeysWithValues: orderedRecipes.map { ($0.id, $0) })
+        }
+
+        lock.lock()
+        ordered = orderedRecipes
+        byID = map
         isLoaded = true
-        return true
+        isLoading = false
+        lock.unlock()
     }
 
     func allRecipes(includeDetails: Bool = true) -> [Recipe] {
         _ = ensureLoaded()
+        lock.lock()
+        defer { lock.unlock() }
         return ordered
     }
 
     func recipe(id: String) -> Recipe? {
         _ = ensureLoaded()
+        lock.lock()
+        defer { lock.unlock() }
         return byID[id]
     }
 
@@ -64,18 +145,26 @@ final class RecipeDatabase: @unchecked Sendable {
 
     func recipesByID() -> [String: Recipe] {
         _ = ensureLoaded()
+        lock.lock()
+        defer { lock.unlock() }
         return byID
     }
 
     func count() -> Int {
         _ = ensureLoaded()
+        lock.lock()
+        defer { lock.unlock() }
         return ordered.count
     }
 
     func search(_ query: String, course: String? = nil, limit: Int = 40) -> [Recipe] {
         _ = ensureLoaded()
+        lock.lock()
+        let snapshot = ordered
+        lock.unlock()
+
         let tokens = query.lowercased().split(separator: " ").map(String.init).filter { $0.count > 1 }
-        var hits = ordered
+        var hits = snapshot
         if let course, !course.isEmpty {
             hits = hits.filter { $0.course == course }
         }
@@ -105,12 +194,18 @@ final class RecipeDatabase: @unchecked Sendable {
 
     func mains(excluding banned: Set<String> = []) -> [Recipe] {
         _ = ensureLoaded()
-        return ordered.filter { $0.course == "main" && !banned.contains($0.id) && $0.parsedIngredients.count >= 3 }
+        lock.lock()
+        let snapshot = ordered
+        lock.unlock()
+        return snapshot.filter { $0.course == "main" && !banned.contains($0.id) && $0.parsedIngredients.count >= 3 }
     }
 
     func sides(excluding banned: Set<String> = []) -> [Recipe] {
         _ = ensureLoaded()
-        return ordered.filter { $0.course == "side" && !banned.contains($0.id) && $0.parsedIngredients.count >= 2 }
+        lock.lock()
+        let snapshot = ordered
+        lock.unlock()
+        return snapshot.filter { $0.course == "side" && !banned.contains($0.id) && $0.parsedIngredients.count >= 2 }
     }
 
     private func loadAll() -> [Recipe] {

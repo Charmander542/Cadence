@@ -15,7 +15,7 @@ struct MacroEstimate: Hashable {
 /// Per-meal protein/calorie math. Cookbook extras rarely include nutrition, so we
 /// estimate from parsed ingredients and scale with the batch size.
 enum MealNutrition {
-    private static var cache: [String: MacroEstimate] = [:]
+    nonisolated(unsafe) private static var cache: [String: MacroEstimate] = [:]
     private static let lock = NSLock()
 
     /// One plated serving of a recipe (lunch or dinner portion).

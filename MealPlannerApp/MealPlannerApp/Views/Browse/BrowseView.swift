@@ -3,14 +3,17 @@ import SwiftUI
 struct BrowseView: View {
     @EnvironmentObject private var appModel: AppModel
     @State private var query = ""
+    @State private var searchQuery = ""
+    @State private var searchDebounceTask: Task<Void, Never>?
     @State private var course = "all"
     @State private var displayLimit = 50
 
     private let courses = ["all", "main", "side", "dessert", "other"]
     private let pageSize = 50
+    private let searchDebounceMs = 350
 
     private var filtered: [Recipe] {
-        let q = query.trimmingCharacters(in: .whitespaces)
+        let q = searchQuery.trimmingCharacters(in: .whitespaces)
         if q.isEmpty {
             let all = appModel.recipeDB.allRecipes()
             if course == "all" { return all }
@@ -102,8 +105,26 @@ struct BrowseView: View {
         .background(Theme.canvas)
         .navigationTitle("Recipes")
         .searchable(text: $query, prompt: "Chicken, sheet pan, mushrooms…")
-        .onChange(of: query) { _, _ in displayLimit = pageSize }
+        .onChange(of: query) { _, newValue in
+            scheduleSearchQuery(newValue)
+        }
         .onChange(of: course) { _, _ in displayLimit = pageSize }
+        .onDisappear { searchDebounceTask?.cancel() }
+    }
+
+    private func scheduleSearchQuery(_ newValue: String) {
+        searchDebounceTask?.cancel()
+        displayLimit = pageSize
+        let trimmed = newValue.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty {
+            searchQuery = ""
+            return
+        }
+        searchDebounceTask = Task {
+            try? await Task.sleep(for: .milliseconds(searchDebounceMs))
+            guard !Task.isCancelled else { return }
+            searchQuery = newValue
+        }
     }
 
     private func browseRecipeRowLabel(_ recipe: Recipe) -> String {

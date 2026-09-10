@@ -31,6 +31,7 @@ struct CalendarPlannerView: View {
     ) private var tasks: [PlannerTaskEntity]
     @Query private var profiles: [UserProfileEntity]
     @State private var scope: CalendarScope = .month
+    @State private var scopeBeforeDayDrill: CalendarScope?
     @State private var cursor = Date()
     @State private var showScope = false
     @State private var eventContext: EventSheetContext?
@@ -38,6 +39,7 @@ struct CalendarPlannerView: View {
     @State private var draftSlot: DraftEventSlot?
     @State private var eventsByDay: [Date: [PlannerTaskEntity]] = [:]
     @State private var eventIndexStamp: Int = 0
+    @State private var previewDay: Date = Calendar.current.startOfDay(for: .now)
 
     private let weekdaySymbols = ["S", "M", "Tu", "W", "Th", "F", "S"]
     private let hourRowHeight: CGFloat = 52
@@ -50,32 +52,34 @@ struct CalendarPlannerView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Theme.canvas.ignoresSafeArea()
-            VStack(spacing: 0) {
-                header
-                Group {
-                    switch scope {
-                    case .year: yearScope
-                    case .month: monthScope
-                    case .week: weekScope(days: 7)
-                    case .threeDay: weekScope(days: 3)
-                    case .day: weekScope(days: 1)
-                    }
+        VStack(spacing: 0) {
+            header
+            Group {
+                switch scope {
+                case .year: yearScope
+                case .month: monthScope
+                case .week: weekScope(days: 7)
+                case .threeDay: weekScope(days: 3)
+                case .day: weekScope(days: 1)
                 }
             }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.canvas.ignoresSafeArea())
+        .dialFABChrome {
             OrangeFAB(
                 accessibilityLabel: "Add event",
                 accessibilityHint: "Opens new calendar event"
             ) {
                 openNewEvent(at: defaultEventStart)
             }
-                .padding(.trailing, 22)
-                .padding(.bottom, 12)
         }
         .confirmationDialog("View", isPresented: $showScope, titleVisibility: .visible) {
             ForEach(CalendarScope.allCases) { item in
-                Button(item.title) { scope = item }
+                Button(item.title) {
+                    scopeBeforeDayDrill = nil
+                    scope = item
+                }
                     .accessibilityLabel(scope == item ? "\(item.title) view, selected" : "\(item.title) view")
                     .accessibilityHint("Switches calendar to \(item.title.lowercased()) view")
             }
@@ -91,26 +95,58 @@ struct CalendarPlannerView: View {
         .onChange(of: eventContext?.id) { _, new in
             if new == nil { draftSlot = nil }
         }
+        .onChange(of: tasks.count) { _, _ in
+            eventIndexStamp = 0
+            rebuildEventIndex()
+        }
+        .onAppear {
+            rebuildEventIndex()
+        }
     }
 
     private var header: some View {
         HStack(spacing: 12) {
-            Button { shift(-1) } label: {
-                Image(systemName: "chevron.left")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                    .frame(width: 32, height: 32)
+            if scope == .day, let previous = scopeBeforeDayDrill {
+                Button { exitDayDrill(to: previous) } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.body.weight(.semibold))
+                        Text(previous.title)
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundStyle(Theme.cta)
+                }
+                .accessibilityLabel("Back to \(previous.title) view")
+                .accessibilityHint("Returns to the calendar view you were on")
+            } else {
+                Button { shift(-1) } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 32, height: 32)
+                }
+                .accessibilityLabel("Previous \(scope.title.lowercased())")
+                .accessibilityHint("Shows earlier \(scope.title.lowercased())")
             }
-            .accessibilityLabel("Previous \(scope.title.lowercased())")
-            .accessibilityHint("Shows earlier \(scope.title.lowercased())")
-            Button { shift(1) } label: {
-                Image(systemName: "chevron.right")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                    .frame(width: 32, height: 32)
+            if scope == .day, scopeBeforeDayDrill != nil {
+                Button { shift(1) } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 32, height: 32)
+                }
+                .accessibilityLabel("Next day")
+                .accessibilityHint("Shows the following day")
+            } else {
+                Button { shift(1) } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 32, height: 32)
+                }
+                .accessibilityLabel("Next \(scope.title.lowercased())")
+                .accessibilityHint("Shows later \(scope.title.lowercased())")
             }
-            .accessibilityLabel("Next \(scope.title.lowercased())")
-            .accessibilityHint("Shows later \(scope.title.lowercased())")
             Spacer()
             Button { showScope = true } label: {
                 HStack(spacing: 6) {
@@ -124,7 +160,7 @@ struct CalendarPlannerView: View {
             .accessibilityLabel("Calendar view, \(headerTitle)")
             .accessibilityHint("Double tap to change month, week, or day view")
             Spacer()
-            Button { cursor = .now } label: {
+            Button { cursor = .now; previewDay = Calendar.current.startOfDay(for: .now) } label: {
                 Text("Today")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.accent)
@@ -191,6 +227,21 @@ struct CalendarPlannerView: View {
         dayDetailContext = DayDetailContext(day: Calendar.current.startOfDay(for: day))
     }
 
+    private func openDayView(for day: Date) {
+        let normalized = Calendar.current.startOfDay(for: day)
+        if scope != .day {
+            scopeBeforeDayDrill = scope
+        }
+        cursor = normalized
+        previewDay = normalized
+        scope = .day
+    }
+
+    private func exitDayDrill(to previous: CalendarScope) {
+        scope = previous
+        scopeBeforeDayDrill = nil
+    }
+
     private func date(on day: Date, hour: Int) -> Date {
         var comps = Calendar.current.dateComponents([.year, .month, .day], from: day)
         comps.hour = hour
@@ -205,7 +256,8 @@ struct CalendarPlannerView: View {
             let gridWidth = max(0, geo.size.width)
             let colWidth = gridWidth / 7
             let headerHeight: CGFloat = 28
-            let cellHeight = max(64, (geo.size.height - headerHeight - calendarFABClearance) / 6)
+            let previewHeight: CGFloat = 132
+            let cellHeight = max(52, (geo.size.height - headerHeight - calendarFABClearance - previewHeight) / 6)
             let days = monthDays(for: cursor)
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 0) {
@@ -223,21 +275,90 @@ struct CalendarPlannerView: View {
                     }
                 }
                 .frame(width: gridWidth, alignment: .leading)
-                .padding(.bottom, calendarFABClearance)
+                monthDayPreview
+                    .frame(height: previewHeight)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, calendarFABClearance)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
+    private var monthDayPreview: some View {
+        let items = dayCalendarItems(for: previewDay)
+        let dayTitle: String = {
+            let f = DateFormatter()
+            f.dateFormat = Calendar.current.isDateInToday(previewDay) ? "'Today,' EEEE MMM d" : "EEEE, MMM d"
+            return f.string(from: previewDay)
+        }()
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(dayTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                Spacer()
+                Button("Agenda") { openDayDetail(for: previewDay) }
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Theme.cta)
+                    .accessibilityHint("Opens full day agenda")
+            }
+            if items.isEmpty {
+                Text("Nothing scheduled — tap a day or + to add.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+            } else {
+                ForEach(items.prefix(3)) { item in
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(item.color)
+                            .frame(width: 6, height: 6)
+                        Text(item.title)
+                            .font(.caption)
+                            .foregroundStyle(Theme.ink)
+                            .lineLimit(1)
+                    }
+                }
+                if items.count > 3 {
+                    Text("+\(items.count - 3) more")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(monthPreviewAccessibilityLabel(day: previewDay, items: items))
+    }
+
+    private func monthPreviewAccessibilityLabel(day: Date, items: [CalendarDayItem]) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMMM d"
+        var label = "Preview for \(f.string(from: day))"
+        if items.isEmpty {
+            label += ", nothing scheduled"
+        } else {
+            label += ", \(items.count) item\(items.count == 1 ? "" : "s")"
+        }
+        return label
+    }
+
     private func monthCell(_ day: Date, width: CGFloat, height: CGFloat) -> some View {
         let inMonth = Calendar.current.isDate(day, equalTo: cursor, toGranularity: .month)
         let isToday = Calendar.current.isDateInToday(day)
+        let isPreview = Calendar.current.isDate(previewDay, inSameDayAs: day)
         let items = dayCalendarItems(for: day)
         return VStack(alignment: .leading, spacing: 6) {
             ZStack {
                 if isToday {
                     Circle()
                         .fill(Theme.accent)
+                        .frame(width: 28, height: 28)
+                } else if isPreview {
+                    Circle()
+                        .stroke(Theme.accent.opacity(0.65), lineWidth: 1.5)
                         .frame(width: 28, height: 28)
                 }
                 Text("\(Calendar.current.component(.day, from: day))")
@@ -272,9 +393,13 @@ struct CalendarPlannerView: View {
             Spacer(minLength: 0)
         }
         .contentShape(Rectangle())
-        .onTapGesture {
-            openDayDetail(for: day)
-        }
+        .gesture(
+            TapGesture(count: 2)
+                .onEnded { openDayView(for: day) }
+                .exclusively(before: TapGesture(count: 1).onEnded {
+                    previewDay = Calendar.current.startOfDay(for: day)
+                })
+        )
         .padding(.horizontal, 4)
         .padding(.vertical, 6)
         .frame(width: width, height: height, alignment: .topLeading)
@@ -291,7 +416,7 @@ struct CalendarPlannerView: View {
         .opacity(inMonth ? 1 : 0.35)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(monthCellAccessibilityLabel(day: day, items: items, isToday: isToday, inMonth: inMonth))
-        .accessibilityHint("Double tap to open day agenda")
+        .accessibilityHint("Single tap to preview below. Double tap to open day view.")
         .accessibilityAddTraits(isToday ? [.isButton, .isSelected] : .isButton)
     }
 
@@ -339,14 +464,17 @@ struct CalendarPlannerView: View {
                 HStack(spacing: 0) {
                     Color.clear.frame(width: timeGutter, height: 44)
                     ForEach(columns, id: \.self) { day in
-                        Button {
-                            openDayDetail(for: day)
-                        } label: {
-                            dayColumnHeader(day, width: colWidth)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(dayColumnAccessibilityLabel(day))
-                        .accessibilityHint("Double tap to open day agenda")
+                        dayColumnHeader(day, width: colWidth)
+                            .contentShape(Rectangle())
+                            .gesture(
+                                TapGesture(count: 2)
+                                    .onEnded { openDayView(for: day) }
+                                    .exclusively(before: TapGesture(count: 1).onEnded {
+                                        cursor = Calendar.current.startOfDay(for: day)
+                                    })
+                            )
+                            .accessibilityLabel(dayColumnAccessibilityLabel(day))
+                            .accessibilityHint("Double tap to open day view")
                     }
                 }
                 Divider().overlay(Theme.gridDivider)
@@ -583,6 +711,7 @@ struct CalendarPlannerView: View {
     private func calendarEvents(on day: Date) -> [PlannerTaskEntity] {
         rebuildEventIndex()
         return eventsByDay[Calendar.current.startOfDay(for: day), default: []]
+            .sorted { ($0.dueAt ?? .distantFuture) < ($1.dueAt ?? .distantFuture) }
     }
 
     private func rebuildEventIndex() {
@@ -601,6 +730,9 @@ struct CalendarPlannerView: View {
             guard let due = task.dueAt else { continue }
             let day = cal.startOfDay(for: due)
             index[day, default: []].append(task)
+        }
+        for key in index.keys {
+            index[key]?.sort { ($0.dueAt ?? .distantFuture) < ($1.dueAt ?? .distantFuture) }
         }
         eventsByDay = index
     }

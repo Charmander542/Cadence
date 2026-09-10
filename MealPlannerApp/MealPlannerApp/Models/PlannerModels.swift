@@ -491,6 +491,7 @@ enum PlannerStore {
         lists.filter { !isLegacyShoppingList($0) }
     }
 
+    @MainActor
     static func addTask(
         title: String,
         due: Date?,

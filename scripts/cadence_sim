@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Thin wrapper — prefer invoking cadence_sim.py directly.
+exec python3 "$(dirname "$0")/cadence_sim.py" "$@"

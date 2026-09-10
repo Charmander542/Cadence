@@ -635,4 +635,257 @@ final class PlanningQualityTests: XCTestCase {
         let salmon = try! XCTUnwrap(clean.first { $0.ingredientName == "salmon" })
         XCTAssertEqual(salmon.quantity, 2, accuracy: 0.1)
     }
+
+    // MARK: - Dinner-only + realism
+
+    func testMealSlotRecipeSlotsAreDinnerOnly() {
+        XCTAssertEqual(MealSlot.recipeSlots, [.dinner])
+        XCTAssertFalse(MealSlot.recipeSlots.contains(.lunch))
+    }
+
+    func testShoppingRealismSubstitutesShallotAndDropsTinyExotic() {
+        let dirty: [ConsolidatedGroceryItem] = [
+            .init(ingredientName: "shallot", category: "produce", quantity: 2, unit: "count", isApproximate: false, note: "", isChecked: false, isManual: false),
+            .init(ingredientName: "chicken thigh", category: "protein", quantity: 1.5, unit: "lb", isApproximate: false, note: "", isChecked: false, isManual: false),
+            .init(ingredientName: "mirin", category: "pantry", quantity: 1, unit: "tbsp", isApproximate: false, note: "", isChecked: false, isManual: false),
+            .init(ingredientName: "soy sauce", category: "pantry", quantity: 2, unit: "tbsp", isApproximate: false, note: "", isChecked: false, isManual: false),
+            .init(ingredientName: "thyme", category: "produce", quantity: 1, unit: "tsp", isApproximate: false, note: "", isChecked: false, isManual: false),
+            .init(ingredientName: "lemon juice", category: "produce", quantity: 2, unit: "tbsp", isApproximate: false, note: "", isChecked: false, isManual: false),
+            .init(ingredientName: "lemon", category: "produce", quantity: 1, unit: "count", isApproximate: false, note: "", isChecked: false, isManual: false),
+            .init(ingredientName: "cilantro", category: "produce", quantity: 1, unit: "count", isApproximate: false, note: "", isChecked: false, isManual: false),
+            .init(ingredientName: "basil", category: "produce", quantity: 1, unit: "count", isApproximate: false, note: "", isChecked: false, isManual: false),
+            .init(ingredientName: "mint", category: "produce", quantity: 1, unit: "count", isApproximate: false, note: "", isChecked: false, isManual: false),
+        ]
+        let clean = GroceryConsolidator.finalizeForShopping(dirty, cookingComplexity: 1)
+        let names = Set(clean.map { $0.ingredientName.lowercased() })
+        XCTAssertTrue(names.contains("onion"), "shallot should become onion at Simple")
+        XCTAssertFalse(names.contains("shallot"))
+        XCTAssertFalse(names.contains("thyme"), "tiny woody herb garnish should drop")
+        XCTAssertTrue(names.contains("lemon"))
+        XCTAssertFalse(names.contains("lemon juice"), "juice merges into lemon")
+        let herbs = clean.filter { RecipeComplexity.isFreshHerb($0.ingredientName) }
+        XCTAssertLessThanOrEqual(herbs.count, 1, "Simple week keeps at most one fresh herb")
+    }
+
+    func testFussyProduceFailsSimpleFits() {
+        let fussy = Recipe(
+            id: "fussy-1",
+            name: "Shallot Shiitake Chicken",
+            source: "test",
+            sourceID: "f1",
+            ingredients: ["chicken", "shallot", "shiitake", "parsley", "oil"],
+            steps: [],
+            description: "",
+            yieldText: "4",
+            page: nil,
+            chapter: "",
+            section: "",
+            tags: ["main"],
+            url: "",
+            extras: [:],
+            parsedIngredients: [
+                ParsedIngredient(raw: "chicken", quantity: 1, unit: "lb", item: "chicken", prep: "", toTaste: false, optional: false, allergens: [], notes: ""),
+                ParsedIngredient(raw: "shallot", quantity: 2, unit: "count", item: "shallot", prep: "", toTaste: false, optional: false, allergens: [], notes: ""),
+                ParsedIngredient(raw: "shiitake", quantity: 4, unit: "count", item: "shiitake", prep: "", toTaste: false, optional: false, allergens: [], notes: ""),
+                ParsedIngredient(raw: "parsley", quantity: 0.25, unit: "cup", item: "parsley", prep: "", toTaste: false, optional: false, allergens: [], notes: ""),
+            ],
+            allergens: [],
+            course: "main"
+        )
+        XCTAssertFalse(RecipeComplexity.fits(fussy, level: 1, course: "main"))
+        XCTAssertTrue(RecipeComplexity.fits(fussy, level: 5, course: "main"))
+    }
+
+    private func waitForRecipeDB() -> RecipeDatabase {
+        let db = RecipeDatabase.shared
+        let exp = expectation(description: "recipes loaded")
+        DispatchQueue.global(qos: .userInitiated).async {
+            XCTAssertTrue(db.waitUntilLoaded(timeout: 55), "recipe DB failed to load")
+            exp.fulfill()
+        }
+        wait(for: [exp], timeout: 60)
+        XCTAssertGreaterThan(db.count(), 50, "bundled recipe DB should load in tests")
+        return db
+    }
+
+    func testSimpleWeekPlanIsDinnerRealistic() {
+        let db = waitForRecipeDB()
+        let settings = WeekPlanner.Settings(cookingComplexity: 1)
+        let result = WeekPlanner.plan(store: db, settings: settings, bannedIDs: [], days: 7)
+        XCTAssertEqual(result.mains.count, 7)
+        for main in result.mains {
+            // After soft widen, still prefer fitting level ≤ 2
+            XCTAssertTrue(
+                RecipeComplexity.fits(main, level: 2, course: "main")
+                    || RecipeComplexity.fits(main, level: 3, course: "main"),
+                "Simple week main too complex: \(main.name) shop=\(RecipeComplexity.shoppableCount(main)) exotic=\(RecipeComplexity.exoticCount(main, treatUnknownAsExotic: true))"
+            )
+            let proteins = WeekPlanner.flavor(main).proteins
+            XCTAssertFalse(proteins.contains("lamb"), "Simple week should avoid lamb: \(main.name)")
+            XCTAssertFalse(proteins.contains("shellfish"), "Simple week should avoid shellfish: \(main.name)")
+            XCTAssertFalse(proteins.contains("fish"), "Simple week should avoid fish: \(main.name)")
+            XCTAssertFalse(WeekPlanner.looksLikeAdvancedTechnique(main), main.name)
+            XCTAssertFalse(WeekPlanner.looksLikeOrganMeatMain(main), main.name)
+        }
+
+        var cart = Set<String>()
+        for (i, main) in result.mains.enumerated() {
+            cart.formUnion(RecipeComplexity.shoppableItems(main))
+            if i < result.sides.count, result.sides[i].id != main.id {
+                cart.formUnion(RecipeComplexity.shoppableItems(result.sides[i]))
+            }
+        }
+        XCTAssertLessThanOrEqual(
+            cart.count,
+            RecipeComplexity.weeklySKUBudget(for: 1) + 12,
+            "cart SKUs=\(cart.count) items=\(cart.sorted())"
+        )
+
+        let scale = Dictionary(uniqueKeysWithValues: (result.mains + result.sides).map { ($0.id, 2) })
+        var recipes: [Recipe] = []
+        var seen = Set<String>()
+        for r in result.mains + result.sides where seen.insert(r.id).inserted {
+            recipes.append(r)
+        }
+        let shop = GroceryConsolidator.finalizeForShopping(
+            GroceryConsolidator.consolidate(from: recipes, scaledServings: scale),
+            cookingComplexity: 1
+        )
+        let exoticOnShop = shop.filter {
+            RecipeComplexity.isExoticName($0.ingredientName, treatUnknownAsExotic: false)
+        }
+        XCTAssertTrue(
+            exoticOnShop.isEmpty,
+            "Simple shop still has exotic: \(exoticOnShop.map(\.ingredientName))"
+        )
+        let herbs = shop.filter { RecipeComplexity.isFreshHerb($0.ingredientName) }
+        XCTAssertLessThanOrEqual(herbs.count, 1, "herbs=\(herbs.map(\.ingredientName))")
+
+        // Dump for human inspection in test logs.
+        var dump = "=== SIMPLE WEEK DUMP ===\n"
+        for (i, main) in result.mains.enumerated() {
+            let side = i < result.sides.count && result.sides[i].id != main.id ? result.sides[i].name : "(no side)"
+            dump += "D\(i + 1): \(main.name) + \(side)\n"
+        }
+        dump += "--- Shop (\(shop.count) SKUs) ---\n"
+        for item in shop {
+            dump += "- \(GroceryConsolidator.displayText(item))\n"
+        }
+        dump += "=== END DUMP ===\n"
+        print(dump)
+        let attachment = XCTAttachment(string: dump)
+        attachment.name = "simple_week_dump"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    func testEasyWeekAllowsAtMostOneSpecialty() {
+        let db = waitForRecipeDB()
+        let settings = WeekPlanner.Settings(cookingComplexity: 2)
+        let result = WeekPlanner.plan(store: db, settings: settings, bannedIDs: [], days: 7)
+        XCTAssertEqual(result.mains.count, 7)
+        let scale = Dictionary(uniqueKeysWithValues: (result.mains + result.sides).map { ($0.id, 4) })
+        var recipes: [Recipe] = []
+        var seen = Set<String>()
+        for r in result.mains + result.sides where seen.insert(r.id).inserted {
+            recipes.append(r)
+        }
+        let shop = GroceryConsolidator.finalizeForShopping(
+            GroceryConsolidator.consolidate(from: recipes, scaledServings: scale),
+            cookingComplexity: 2
+        )
+        let exotic = shop.filter {
+            RecipeComplexity.isExoticName($0.ingredientName, treatUnknownAsExotic: false)
+        }
+        XCTAssertLessThanOrEqual(exotic.count, 2, "Easy shop exotic=\(exotic.map(\.ingredientName))")
+        var dump = "=== EASY WEEK DUMP ===\n"
+        for (i, main) in result.mains.enumerated() {
+            let side = i < result.sides.count && result.sides[i].id != main.id ? result.sides[i].name : "(no side)"
+            dump += "D\(i + 1): \(main.name) + \(side)\n"
+        }
+        dump += "--- Shop (\(shop.count) SKUs) ---\n"
+        for item in shop {
+            dump += "- \(GroceryConsolidator.displayText(item))\n"
+        }
+        dump += "=== END DUMP ===\n"
+        print(dump)
+        let attachment = XCTAttachment(string: dump)
+        attachment.name = "easy_week_dump"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    func testVegetarianWeekRespectsDietAndDislikes() {
+        let db = waitForRecipeDB()
+        let settings = WeekPlanner.Settings(
+            dietRaw: "vegetarian",
+            dietaryRestrictionsText: "cilantro",
+            cookingComplexity: 2
+        )
+        let result = WeekPlanner.plan(store: db, settings: settings, bannedIDs: [], days: 7)
+        XCTAssertFalse(result.mains.isEmpty)
+        let blocked: Set<String> = ["chicken", "beef", "pork", "lamb", "fish", "shellfish"]
+        for main in result.mains {
+            let prots = WeekPlanner.flavor(main).proteins
+            XCTAssertTrue(prots.isDisjoint(with: blocked), "veg main \(main.name) proteins=\(prots)")
+            XCTAssertFalse(DislikeMatcher.blocks(main, dislikes: ["cilantro"]))
+        }
+        for side in result.sides where !result.mains.contains(where: { $0.id == side.id }) {
+            XCTAssertFalse(DislikeMatcher.blocks(side, dislikes: ["cilantro"]), "side \(side.name)")
+        }
+    }
+
+    func testShoppingNamesStripHedgesAndCookbookRefs() {
+        XCTAssertEqual(
+            IngredientCanonicalizer.canonicalize("4 large sweet potatoes, scrubbed and peeled, if desired"),
+            "sweet potato"
+        )
+        XCTAssertEqual(
+            IngredientCanonicalizer.canonicalize("1 cup rice and 1 cup plus 1 ½ tablespoons water yields a generous 2 cups"),
+            ""
+        )
+        XCTAssertEqual(
+            IngredientCanonicalizer.canonicalize("Lemon Marinade , Balkan Marinade , Teriyaki Marinade"),
+            ""
+        )
+        let dirty: [ConsolidatedGroceryItem] = [
+            .init(ingredientName: "sweet potatoes scrubbed if desired", category: "produce", quantity: 2, unit: "count", isApproximate: false, note: "", isChecked: false, isManual: false),
+            .init(ingredientName: "inches vegetable oil", category: "pantry", quantity: 3, unit: "count", isApproximate: false, note: "", isChecked: false, isManual: false),
+            .init(ingredientName: "herb pan sauce", category: "pantry", quantity: 1, unit: "count", isApproximate: false, note: "", isChecked: false, isManual: false),
+        ]
+        let clean = GroceryConsolidator.finalizeForShopping(dirty, cookingComplexity: 1)
+        let names = Set(clean.map { $0.ingredientName.lowercased() })
+        XCTAssertTrue(names.contains("sweet potato") || names.contains { $0.contains("sweet potato") })
+        XCTAssertFalse(names.contains { $0.contains("inch") })
+        XCTAssertFalse(names.contains { $0.contains("pan sauce") })
+    }
+
+    func testRequiresPriorRecipeDetected() {
+        let creamed = Recipe(
+            id: "creamed",
+            name: "CREAMED CHICKEN",
+            source: "test",
+            sourceID: "c",
+            ingredients: ["Poached Chicken", "butter", "flour", "milk"],
+            steps: [
+                RecipeStep(stepNumber: 1, instruction: ""),
+                RecipeStep(stepNumber: 2, instruction: "Melt butter"),
+                RecipeStep(stepNumber: 3, instruction: "Add flour"),
+            ],
+            description: "",
+            yieldText: "4",
+            page: nil,
+            chapter: "",
+            section: "",
+            tags: [],
+            url: "",
+            extras: [:],
+            parsedIngredients: [
+                ParsedIngredient(raw: "Poached Chicken", quantity: nil, unit: nil, item: "Poached Chicken", prep: "", toTaste: false, optional: false, allergens: [], notes: ""),
+            ],
+            allergens: [],
+            course: "main"
+        )
+        XCTAssertTrue(WeekPlanner.looksLikeRequiresPriorRecipe(creamed))
+    }
 }

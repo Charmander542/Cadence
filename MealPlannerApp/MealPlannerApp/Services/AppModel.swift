@@ -21,6 +21,10 @@ final class AppModel: ObservableObject {
     @Published var requestedMainTab: Int?
     /// When set, `MainTabView` opens the shop list on Meals then clears.
     @Published var requestedOpenShop = false
+    /// When set, `MainTabView` opens the planner drawer then clears.
+    @Published var requestedOpenDrawer = false
+    /// When set, `MainTabView` closes the planner drawer then clears.
+    @Published var requestedCloseDrawer = false
     @Published var generatingStatus = "Planning your week"
     @Published var isBuildingShopList = false
     @Published var isRefreshingGrocery = false
@@ -234,21 +238,19 @@ final class AppModel: ObservableObject {
                 let side = sideByDay[day % max(result.mains.count, 1)]
                 let sideID = side?.id
                 let plate = MealNutrition.plate(main: main, side: side)
-                let reason = "Protein dinner with a plate-ready side — lunch is leftovers."
-                for slot in MealSlot.recipeSlots {
-                    meals.append(
-                        PlannedMeal(
-                            dayIndex: day,
-                            slot: slot,
-                            recipeID: main.id,
-                            reason: slot == .lunch ? "Leftover from tonight’s cook." : reason,
-                            scaledServings: batch,
-                            proteinG: plate.proteinG > 0 ? plate.proteinG : nil,
-                            calories: plate.calories > 0 ? plate.calories : nil,
-                            sideRecipeID: sideID
-                        )
+                let reason = "Protein dinner with a plate-ready side."
+                meals.append(
+                    PlannedMeal(
+                        dayIndex: day,
+                        slot: .dinner,
+                        recipeID: main.id,
+                        reason: reason,
+                        scaledServings: batch,
+                        proteinG: plate.proteinG > 0 ? plate.proteinG : nil,
+                        calories: plate.calories > 0 ? plate.calories : nil,
+                        sideRecipeID: sideID
                     )
-                }
+                )
             }
 
             let overlap = result.scores["ingredient_overlap"].map { String(format: "%.0f%% shared pantry", $0 * 100) } ?? ""
@@ -258,8 +260,8 @@ final class AppModel: ObservableObject {
                 generatedAt: .now,
                 meals: meals,
                 rationaleSummary: summary.isEmpty
-                    ? "A week of dinners (lunch is leftovers) with overlapping groceries."
-                    : "Dinners + leftover lunches. \(summary).",
+                    ? "A week of dinners with overlapping groceries."
+                    : "Seven dinners. \(summary).",
                 breakfasts: [],
                 scores: result.scores
             )
@@ -278,12 +280,14 @@ final class AppModel: ObservableObject {
             defer { isBuildingShopList = false }
             let groceries = await buildShopList(
                 from: source.recipes,
-                scaledServings: source.scaleMap
+                scaledServings: source.scaleMap,
+                cookingComplexity: profile.cookingComplexity
             )
             try persistGroceries(
                 for: cleanPlan,
                 in: modelContext,
-                groceries: groceries
+                groceries: groceries,
+                cookingComplexity: profile.cookingComplexity
             )
             try modelContext.save()
             return true
@@ -344,10 +348,10 @@ final class AppModel: ObservableObject {
         }
         let sideID = newSide?.id
         let plate = MealNutrition.plate(main: next, side: newSide)
-        for i in meals.indices where meals[i].dayIndex == day && (meals[i].slot == .lunch || meals[i].slot == .dinner) {
+        for i in meals.indices where meals[i].dayIndex == day && meals[i].slot == .dinner {
             meals[i] = PlannedMeal(
                 dayIndex: day,
-                slot: meals[i].slot,
+                slot: .dinner,
                 recipeID: next.id,
                 reason: "Swapped in for variety.",
                 scaledServings: meals[i].scaledServings,
@@ -356,6 +360,8 @@ final class AppModel: ObservableObject {
                 sideRecipeID: sideID
             )
         }
+        // Drop any legacy leftover-lunch row for this day.
+        meals.removeAll { $0.dayIndex == day && $0.slot == .lunch }
         let updated = WeeklyPlan(
             generatedAt: plan.generatedAt,
             meals: meals,
@@ -438,15 +444,19 @@ final class AppModel: ObservableObject {
         do {
             let clean = plan.strippingBreakfast()
             let source = grocerySource(from: clean)
+            let profile = ((try? modelContext.fetch(FetchDescriptor<UserProfileEntity>())) ?? []).first
+            let complexity = profile?.cookingComplexity ?? 3
             let groceries = await buildShopList(
                 from: source.recipes,
-                scaledServings: source.scaleMap
+                scaledServings: source.scaleMap,
+                cookingComplexity: complexity
             )
             try persistGroceries(
                 for: clean,
                 in: modelContext,
                 preservingUserEdits: true,
-                groceries: groceries
+                groceries: groceries,
+                cookingComplexity: complexity
             )
             try modelContext.save()
             return true
@@ -486,7 +496,8 @@ final class AppModel: ObservableObject {
     }
 
     func taskCompletionHaptic() {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
     }
 
     func startRest(seconds: Int) {
@@ -629,18 +640,21 @@ final class AppModel: ObservableObject {
 
     private func buildShopList(
         from recipes: [Recipe],
-        scaledServings: [String: Int]
+        scaledServings: [String: Int],
+        cookingComplexity: Int = 5
     ) async -> [ConsolidatedGroceryItem] {
         // Local consolidator is instant; LLM shopping lists blocked the Shop screen for seconds.
-        consolidatedShopList(from: recipes, scaledServings: scaledServings)
+        consolidatedShopList(from: recipes, scaledServings: scaledServings, cookingComplexity: cookingComplexity)
     }
 
     private func consolidatedShopList(
         from recipes: [Recipe],
-        scaledServings: [String: Int]
+        scaledServings: [String: Int],
+        cookingComplexity: Int = 5
     ) -> [ConsolidatedGroceryItem] {
         GroceryConsolidator.finalizeForShopping(
-            GroceryConsolidator.consolidate(from: recipes, scaledServings: scaledServings)
+            GroceryConsolidator.consolidate(from: recipes, scaledServings: scaledServings),
+            cookingComplexity: cookingComplexity
         )
     }
 
@@ -651,12 +665,14 @@ final class AppModel: ObservableObject {
         preservingUserEdits: Bool = false,
         groceries: [ConsolidatedGroceryItem]? = nil
     ) throws -> [Recipe] {
+        let complexity = ((try? modelContext.fetch(FetchDescriptor<UserProfileEntity>())) ?? []).first?.cookingComplexity ?? 5
         try persistPlan(plan, in: modelContext)
         try persistGroceries(
             for: plan,
             in: modelContext,
             preservingUserEdits: preservingUserEdits,
-            groceries: groceries
+            groceries: groceries,
+            cookingComplexity: complexity
         )
         return grocerySource(from: plan.strippingBreakfast()).recipes
     }
@@ -671,11 +687,12 @@ final class AppModel: ObservableObject {
         for plan: WeeklyPlan,
         in modelContext: ModelContext,
         preservingUserEdits: Bool = false,
-        groceries: [ConsolidatedGroceryItem]? = nil
+        groceries: [ConsolidatedGroceryItem]? = nil,
+        cookingComplexity: Int = 5
     ) throws {
         let clean = plan.strippingBreakfast()
         let source = grocerySource(from: clean)
-        var groceries = groceries ?? consolidatedShopList(from: source.recipes, scaledServings: source.scaleMap)
+        var groceries = groceries ?? consolidatedShopList(from: source.recipes, scaledServings: source.scaleMap, cookingComplexity: cookingComplexity)
         groceries = groceries.filter { !Self.isLeftoverBreakfastStaple($0) }
         groceries = GroceryConsolidator.applyPantry(groceries, names: Pantry.names(in: modelContext))
         groceries = groceries.filter { !Self.isLeftoverBreakfastStaple($0) }

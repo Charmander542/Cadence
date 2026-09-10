@@ -7,6 +7,7 @@ struct MealPlanView: View {
     @Bindable var profile: UserProfileEntity
     @Binding var openShop: Bool
     var onOpenDrawer: () -> Void = {}
+    var onShopDismiss: () -> Void = {}
     @Query private var plans: [WeeklyPlanEntity]
     @Query private var grocery: [GroceryItemEntity]
     @State private var confirmRegenerate = false
@@ -18,10 +19,16 @@ struct MealPlanView: View {
     @State private var cachedPlan: WeeklyPlan?
     @State private var cachedRecipeLookup: [String: Recipe] = [:]
 
-    init(profile: UserProfileEntity, openShop: Binding<Bool> = .constant(false), onOpenDrawer: @escaping () -> Void = {}) {
+    init(
+        profile: UserProfileEntity,
+        openShop: Binding<Bool> = .constant(false),
+        onOpenDrawer: @escaping () -> Void = {},
+        onShopDismiss: @escaping () -> Void = {}
+    ) {
         self.profile = profile
         _openShop = openShop
         self.onOpenDrawer = onOpenDrawer
+        self.onShopDismiss = onShopDismiss
     }
 
     private let dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -85,7 +92,7 @@ struct MealPlanView: View {
                             } else {
                                 Text(plans.isEmpty ? "Plan week" : "New week")
                                     .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(Theme.accent)
+                                    .foregroundStyle(Theme.cta)
                                     .lineLimit(1)
                                     .fixedSize(horizontal: true, vertical: false)
                             }
@@ -107,11 +114,11 @@ struct MealPlanView: View {
             }
             .background(Theme.canvas)
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(isPresented: $showShop) {
-                GroceryListView(profile: profile)
-            }
             .navigationDestination(isPresented: $showBrowse) {
                 BrowseView()
+            }
+            .sheet(isPresented: $showShop, onDismiss: onShopDismiss) {
+                GroceryListView(profile: profile)
             }
             .confirmationDialog("Replace this week’s groceries?", isPresented: $confirmRegenerate, titleVisibility: .visible) {
                 Button("Generate new plan", role: .destructive) { Task { await generate() } }
@@ -125,6 +132,11 @@ struct MealPlanView: View {
             .onAppear {
                 selectedDay = todayIndex
                 refreshPlanCache()
+                // Drawer/shop deep-link may set openShop before this view exists — onChange won't fire.
+                if openShop {
+                    showShop = true
+                    openShop = false
+                }
             }
             .onChange(of: plans.count) { _, _ in refreshPlanCache() }
             .onChange(of: plans.first?.planJSON) { _, _ in refreshPlanCache() }
@@ -141,7 +153,7 @@ struct MealPlanView: View {
         Theme.EmptyState(
             systemImage: "fork.knife.circle.fill",
             title: "Your week, already decided",
-            message: "Seven protein dinners with plate-ready sides. Cook once — lunch is leftovers. Shop list builds itself.",
+            message: "Seven protein dinners with plate-ready sides. Shop list builds itself.",
             cta: "Build this week",
             ctaHint: "Generates weekly meal plan and shop list",
             busy: appModel.isGeneratingPlan
@@ -149,7 +161,7 @@ struct MealPlanView: View {
             Task { await generate() }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Your week, already decided. Seven protein dinners with plate-ready sides. Cook once, lunch is leftovers. Shop list builds itself.")
+        .accessibilityLabel("Your week, already decided. Seven protein dinners with plate-ready sides. Shop list builds itself.")
     }
 
     private func weekScroll(plan: WeeklyPlan, recipes: [String: Recipe]) -> some View {
@@ -278,10 +290,6 @@ struct MealPlanView: View {
                 }
 
                 HStack {
-                    Label("Lunch is leftovers", systemImage: "takeoutbag.and.cup.and.straw")
-                        .font(.caption)
-                        .foregroundStyle(Theme.muted)
-                        .accessibilityAddTraits(.isStaticText)
                     Spacer()
                     Button {
                         swappingDay = day

@@ -1,0 +1,17 @@
+{
+  "name": "drawer_and_settings",
+  "description": "Open drawer, tap Settings, screenshot — useful for chrome/layout review.",
+  "restore_dark": true,
+  "steps": [
+    { "action": "boot" },
+    { "action": "install" },
+    { "action": "navigate", "target": "tab", "value": "today" },
+    { "action": "wait", "seconds": 1.2 },
+    { "action": "tap-label", "label": "Open menu" },
+    { "action": "wait", "seconds": 0.6 },
+    { "action": "screenshot", "name": "drawer-open" },
+    { "action": "tap-label", "label": "Settings" },
+    { "action": "wait", "seconds": 0.8 },
+    { "action": "screenshot", "name": "settings-from-drawer" }
+  ]
+}

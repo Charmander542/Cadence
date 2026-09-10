@@ -742,13 +742,112 @@ _All P1 verified 2026-08-30 batch 3._
 - [x] **Shop populate failure** — 2026-08-30. Failed populate clears attempt flag so Build shop list can retry.
 - [x] **Meals header doc** — 2026-08-30. Comment documents PlannerScreenHeader for action tabs.
 
-### Batch CB — Audit round 75 (next)
+### Batch CB — Audit round 75
 
-- [ ] **Global search empty hint a11y** — Empty-state scope line gets explicit accessibility label.
-- [ ] **Drawer settings row label** — Settings footer gets explicit accessibility label (not just hint).
-- [ ] **Calendar today a11y** — Month cell label still mentions today when badge is centered.
-- [ ] **Shop manual refresh clears flag** — Rebuild shop list resets populate attempt for forced refresh.
-- [ ] **PlannerScreenHeader doc** — Trailing-toolbar pattern comment on struct itself.
+- [x] **Global search empty hint a11y** — 2026-09-09. Empty-state scope line uses explicit “Search scope: …” label.
+- [x] **Drawer settings row label** — 2026-09-09. Settings footer has explicit accessibility label + hint.
+- [x] **Calendar today a11y** — 2026-09-09. Month cell label still prefixes “Today,” when badge is centered.
+- [x] **Shop manual refresh clears flag** — 2026-09-09. `refreshGroceryFromCurrentPlan` resets `didAttemptShopPopulate`.
+- [x] **PlannerScreenHeader doc** — 2026-09-09. Struct comment documents trailing-toolbar vs `PlannerTitleHeader`.
+
+### Batch CC — Design language & UX polish (2026-08-31)
+
+- [x] **Blue/orange accent split** — 2026-08-31. `Theme.cta` (blue) for actions; `Theme.accent` (orange) for nav/selection.
+- [x] **FAB flat shadow** — 2026-08-31. Removed orange glow; blue fill + subtle elevation.
+- [x] **Today time-aware hero** — 2026-08-31. Morning promotes workout; evening promotes dinner (`promoted` card gradient).
+- [x] **Today tasks section + habit Skip label** — 2026-08-31. Open tasks in collapsible section; text Skip replaces ⏩ icon.
+- [x] **Habits compact workout banner** — 2026-08-31. `WorkoutCompactBanner` replaces duplicate full card.
+- [x] **Global search quick jumps + recents** — 2026-08-31. Recent queries + dinner/shop/workout/settings shortcuts.
+- [x] **Calendar day preview strip** — 2026-08-31. Selected-day agenda below month grid; tap updates preview.
+- [x] **Matrix unified empty state** — 2026-08-31. Center overlay when all quadrants empty.
+- [x] **Drawer Menu sections** — 2026-08-31. Views / Lists / More grouping; title → Menu.
+- [x] **Shop Done + items-left header** — 2026-08-31. Top Done button; sticky unchecked count.
+- [x] **Settings quick tweaks** — 2026-08-31. Units / Reminders / Meals chips; intro shown once.
+
+### Batch CD — Wheel nav + app grid (2026-09-09)
+
+- [x] **Swipe-up app grid** — 2026-09-09. Vertical swipe on wheel expands 4-column Apps grid; swipe down / dim tap collapses.
+  → Fix: `WheelNav` `isExpanded` + `RootView` binding/scrim (scrim under dock so cells stay tappable).
+- [x] **Grid pick commits + closes** — 2026-09-09. Grid cell selects destination, snaps wheel, collapses panel.
+- [x] **Neighbor icon readability** — 2026-09-09. Raised arc neighbor opacity/scale floor so side apps stay discoverable.
+- [x] **Idle dim less aggressive** — 2026-09-09. Collapsed wheel idle opacity 0.55 so grabber/center remain readable.
+- [x] **Hide FAB over app grid** — 2026-09-09. `OrangeFAB` respects `isAppGridExpanded` environment.
+
+### Batch CE — Wheel polish
+
+- [x] **Collapsed label while spinning** — 2026-09-09. Selected name stays visible during drag (`showLabel || isDragging`).
+- [x] **Shop/Settings from grid** — 2026-09-09. Grid pick uses same `onSelect` → Shop sheet / Settings sheet as spin.
+- [x] **Placeholder pages empty CTA** — 2026-09-09. Inbox/Browse/Workout get “Back to Today”.
+- [x] **Grid cell VoiceOver order** — 2026-09-09. Cells expose individual labels + sort priority; panel uses `.contain`.
+- [x] **Expand pull preview** — 2026-09-09. Drag-up peeks a sheet silhouette + lifts wheel before commit.
+
+### Batch CF — Wheel polish 2
+
+- [x] **FAB clearance above wheel** — 2026-09-09. FAB bottom padding 12 → 28 on Today/Calendar/Matrix/Habits.
+- [x] **Settings dismiss restores content wheel** — 2026-09-09. Already restored `contentDestination` on sheet dismiss (verified earlier).
+- [x] **Shop dismiss restores Meals selection** — 2026-09-09. `onChange(openShopOnMeals)` snaps wheel to Meals.
+- [x] **Grid “Apps” title a11y** — 2026-09-09. Title `accessibilityHidden`; cells individually labeled.
+- [x] **Spot-check flow for swipe-up grid** — 2026-09-09. `spot_check.json` swipe + tap-label Calendar; `cadence_sim` swipe/tap ints for idb.
+- [x] **Grid row-3 clipped** — 2026-09-09. Smaller 56pt cells so Workout/Settings fully visible.
+
+### Batch CG — Wheel polish 3
+
+- [x] **Collapse gesture vs buttons** — 2026-09-09. `simultaneousGesture` on panel so cells stay tappable; grabber has Close action.
+- [x] **Shop Done a11y label** — 2026-09-09. Explicit Done in shop header inset with label + identifier (toolbar AX flaky in idb).
+- [x] **Wheel value announces on VO** — 2026-09-09. Collapsed wheel already exposes `accessibilityValue` from selection.
+- [x] **Light-mode grid contrast** — 2026-09-09. Expanded grid readable on light surface; restored dark after shot.
+- [x] **Drawer vs wheel swipe conflict** — 2026-09-09. Opening drawer collapses app grid.
+- [x] **Shop dismiss restores Meals (real dismiss)** — 2026-09-09. `MealPlanView.onShopDismiss` (not `openShop` clear-on-open).
+- [x] **Grid cell AX ids** — 2026-09-09. `wheel-app-{id}` identifiers; spot-check taps Calendar by UniqueId.
+
+### Batch CH — Next audit
+
+- [x] **Duplicate Done in shop chrome** — 2026-09-09. Removed toolbar Done; header inset Done is the single control.
+- [x] **Grid expands over Meals empty CTA** — 2026-09-09. Accepted; scrim dims content under panel.
+- [x] **Haptic on grid collapse** — 2026-09-09. Light impact when swipe-down closes.
+- [x] **Settings sheet dismiss from grid** — 2026-09-09. Dismiss restores prior content page (Meals verified).
+- [x] **Automation: shop via wheel-app-shop** — 2026-09-09. UniqueId open + Done restore verified.
+
+### Batch CI — Wheel polish 4
+
+- [x] **Close app grid via scrim a11y** — 2026-09-09. Scrim labeled “Dismiss app grid” with button traits.
+- [x] **Selected wheel icon uses Theme.accent** — 2026-09-09. Center glow + grid selection use nav orange.
+- [x] **Expand threshold feel** — 2026-09-09. Threshold 48pt / predicted 90pt.
+- [x] **Placeholder Back to Today a11y smoke** — 2026-09-09. Tap-label returns to Today.
+- [x] **Spot-check includes shop-from-grid** — 2026-09-09. Flow taps `wheel-app-shop` then Done.
+
+### Batch CJ — Rotary dial redesign (2026-09-09)
+
+- [x] **Compact submerged dial** — 2026-09-09. ~58pt dial, no grabber, soft arc glass (not full chrome bar).
+- [x] **Continuous position + 1:1 drag** — 2026-09-09. Floating `position`; deferred page commit until snap.
+- [x] **Flick momentum** — 2026-09-09. Friction coast capped at ~2.4 segments, then spring snap.
+- [x] **Idle neighbors fade** — 2026-09-09. After 2.4s only center stays clear; touch wakes.
+- [x] **Transient labels** — 2026-09-09. Capsule label ~650ms above center; no permanent labels.
+- [x] **Swipe-up grid (no dock handle)** — 2026-09-09. Vertical swipe expands apps; dock has no grabber.
+- [x] **Page content stays readable** — 2026-09-09. Soft 35–55% bottom fade instead of opaque gradient takeover.
+
+### Batch CK — Dial polish
+
+- [x] **Idle neighbors more visible** — 2026-09-09. ±1 ~62%, ±2 ~38% when idle; no pill chrome on collapsed dial.
+- [x] **Expand morphs one menu** — 2026-09-09. Shared growing shell + matchedGeometry icons; pull peeks growth.
+- [x] **Expanded takes ~72% screen** — 2026-09-09. Larger 74pt cells, vertical spacers, all 10 apps with room.
+
+### Batch CL — Idle flat pill + smoother expand
+
+- [x] **Idle morphs to flat 5-icon pill** — 2026-09-09. After 5s, arc lerps into flat capsule (center bright, neighbors muted).
+- [x] **Touch wakes back to arc** — 2026-09-09. Drag/tap animates `idleAmount` → 0 with spring.
+- [x] **Smoother expand/collapse** — 2026-09-09. Softer spring, removed matchedGeometry fight; easier swipe-down / scrim dismiss.
+
+### Batch CM — Dial destinations
+
+- [x] **Remove Shop + Settings from dial/grid** — 2026-09-09. `WheelDestination.dialCases` excludes them; still open via drawer / Meals sheet / settings sheet.
+  → Fix: dial + app grid use `dialCases`; shop/settings no longer select a wheel id.
+
+---
+
+## Done
+
+_(See prior entries — all pre-H batches verified 2026-08-30.)_
 
 ---
 
@@ -828,6 +927,22 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 
 - **Batch CA PASS 2026-08-30** — footer touch targets, today circle, search copy, shop retry, meals header doc; spot-check OK.
 
+- **Batch CB PASS 2026-09-09** — CB items already in tree; spot-check OK after wheel grid work.
+
+- **Batch CD PASS 2026-09-09** — swipe-up Apps grid, pick/collapse, neighbor readability, idle dim, FAB hide; sim verified.
+
+- **Batch CE PASS 2026-09-09** — spinning label, Shop/Settings from grid, placeholder CTA, VO order, expand peek; sim verified.
+
+- **Batch CF PASS 2026-09-09** — FAB clearance, Shop→Meals restore, Apps title a11y, spot-check swipe+pick, grid fit; sim verified.
+
+- **Batch CG PASS 2026-09-09** — simultaneous collapse gesture, Done header a11y, light grid, drawer collapses grid, real shop dismiss restore, wheel-app ids.
+
+- **Batch CH PASS 2026-09-09** — single Shop Done, collapse haptic, Settings restore, shop-from-grid automation.
+
+- **Batch CI PASS 2026-09-09** — accent nav selection, expand threshold, Back to Today, spot-check shop-from-grid.
+
+- **Batch CL PASS 2026-09-09** — idle flat pill morph (5s), wake-to-arc, smoother expand/collapse.
+
 ---
 
 ## Loop signal
@@ -835,5 +950,5 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 | Field | Value |
 |-------|-------|
 | **Phase** | `RUNNING` |
-| **Next batch** | **CB** |
-| **Summary** | Batch CA done (footer targets, today circle, search copy, shop retry). Loop RUNNING. |
+| **Next batch** | **CM** |
+| **Summary** | Idle flat pill shipping. Next: CM expand pull preview / polish. |

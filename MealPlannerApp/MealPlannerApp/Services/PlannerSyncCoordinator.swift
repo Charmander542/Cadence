@@ -82,9 +82,13 @@ final class PlannerSyncCoordinator {
         }
 
         let tasks = (try? context.fetch(FetchDescriptor<PlannerTaskEntity>())) ?? []
-        for task in tasks where !task.isCompleted {
+        for (index, task) in tasks.enumerated() where !task.isCompleted {
             try? CalendarSyncService.shared.upsertTask(task)
             try? await GoogleCalendarService.shared.upsertTaskEvent(task)
+            // Keep the UI responsive during large calendar backfills.
+            if index % 8 == 7 {
+                await Task.yield()
+            }
         }
         try? context.save()
     }

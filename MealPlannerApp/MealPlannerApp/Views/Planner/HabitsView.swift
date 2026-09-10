@@ -23,62 +23,56 @@ struct HabitsHomeView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Theme.canvas.ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 0) {
-                PlannerTitleHeader(title: "Habits", onMenu: onOpenDrawer)
+        VStack(alignment: .leading, spacing: 0) {
+            PlannerTitleHeader(title: "Habits", onMenu: onOpenDrawer)
 
-                weekStrip
-                    .padding(.vertical, 10)
+            weekStrip
+                .padding(.vertical, 10)
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 22) {
-                        if workoutsEnabled,
-                           WorkoutIntegration.scheduledSession(on: selectedDay, workoutsEnabled: true) != nil
-                               || Calendar.current.isDateInToday(selectedDay) {
-                            WorkoutDayCard(date: selectedDay, compact: true)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    WorkoutCompactBanner(date: selectedDay)
+
+                    if habits.isEmpty {
+                        Theme.EmptyState(
+                            systemImage: "repeat.circle",
+                            title: "No habits yet",
+                            message: "Track daily routines like water, meds, or stretching.",
+                            cta: "Add habit",
+                            ctaHint: "Opens new habit form"
+                        ) {
+                            showAdd = true
+                        }
+                        .frame(minHeight: 200)
+                        .padding(.horizontal, 16)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("No habits yet. Track daily routines like water, meds, or stretching.")
+                    }
+
+                    ForEach(grouped, id: \.0) { period, items in
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(period.title.uppercased())
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(Theme.muted)
                                 .padding(.horizontal, 16)
-                        }
-
-                        if habits.isEmpty {
-                            Theme.EmptyState(
-                                systemImage: "repeat.circle",
-                                title: "No habits yet",
-                                message: "Track daily routines like water, meds, or stretching.",
-                                cta: "Add habit",
-                                ctaHint: "Opens new habit form"
-                            ) {
-                                showAdd = true
-                            }
-                            .frame(minHeight: 200)
-                            .padding(.horizontal, 16)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("No habits yet. Track daily routines like water, meds, or stretching.")
-                        }
-
-                        ForEach(grouped, id: \.0) { period, items in
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text(period.title.uppercased())
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(Theme.muted)
-                                    .padding(.horizontal, 16)
-                                ForEach(items) { habit in
-                                    habitCard(habit)
-                                }
+                            ForEach(items) { habit in
+                                habitCard(habit)
                             }
                         }
                     }
-                    .padding(.bottom, 88)
                 }
+                .padding(.bottom, 88)
             }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.canvas.ignoresSafeArea())
+        .dialFABChrome {
             OrangeFAB(
                 accessibilityLabel: "Add habit",
                 accessibilityHint: "Opens new habit form"
             ) {
                 showAdd = true
             }
-                .padding(.trailing, 22)
-                .padding(.bottom, 12)
         }
         .sheet(isPresented: $showAdd) {
             NewHabitSheet()

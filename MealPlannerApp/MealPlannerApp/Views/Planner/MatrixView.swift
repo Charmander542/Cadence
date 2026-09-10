@@ -6,6 +6,14 @@ private struct MatrixUndoAction {
     let completedAt: Date?
 }
 
+private struct MatrixGridHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let next = nextValue()
+        if next > value { value = next }
+    }
+}
+
 struct MatrixView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var appModel: AppModel
@@ -20,6 +28,9 @@ struct MatrixView: View {
     @State private var editingTask: PlannerTaskEntity?
     @State private var pendingUndo: MatrixUndoAction?
     @State private var undoDismissTask: Task<Void, Never>?
+    @State private var completingTaskID: UUID?
+    /// Locked after first layout so keyboard / Quick Add never shrinks the quadrants.
+    @State private var lockedGridHeight: CGFloat = 0
 
     private let matrixFABClearance: CGFloat = 78
 
@@ -30,49 +41,62 @@ struct MatrixView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Theme.canvas.ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 0) {
-                PlannerTitleHeader(title: "Matrix", onMenu: onOpenDrawer)
-                    .padding(.bottom, 14)
+        VStack(alignment: .leading, spacing: 0) {
+            PlannerTitleHeader(title: "Matrix", onMenu: onOpenDrawer)
+                .padding(.bottom, 14)
 
-                GeometryReader { geo in
-                    let gap: CGFloat = 10
-                    let w = (geo.size.width - 32 - gap) / 2
-                    let h = max(160, (geo.size.height - gap - matrixFABClearance) / 2)
-                    VStack(spacing: gap) {
-                        HStack(spacing: gap) {
-                            quadrant(.urgentImportant, width: w, height: h)
-                            quadrant(.notUrgentImportant, width: w, height: h)
-                        }
-                        HStack(spacing: gap) {
-                            quadrant(.urgentUnimportant, width: w, height: h)
-                            quadrant(.notUrgentUnimportant, width: w, height: h)
-                        }
+            GeometryReader { geo in
+                let gap: CGFloat = 10
+                let contentHeight = lockedGridHeight > 0 ? lockedGridHeight : geo.size.height
+                let w = (geo.size.width - 32 - gap) / 2
+                let h = max(160, (contentHeight - gap - matrixFABClearance) / 2)
+                VStack(spacing: gap) {
+                    HStack(spacing: gap) {
+                        quadrant(.urgentImportant, width: w, height: h)
+                        quadrant(.notUrgentImportant, width: w, height: h)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, matrixFABClearance)
+                    HStack(spacing: gap) {
+                        quadrant(.urgentUnimportant, width: w, height: h)
+                        quadrant(.notUrgentUnimportant, width: w, height: h)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, matrixFABClearance)
+            }
+            .frame(height: lockedGridHeight > 0 ? lockedGridHeight : nil)
+            .background {
+                GeometryReader { proxy in
+                    Color.clear.preference(key: MatrixGridHeightKey.self, value: proxy.size.height)
                 }
             }
-
-            HStack {
-                if pendingUndo != nil {
-                    UndoFAB(accessibilityHint: "Marks the last matrix task incomplete again") {
-                        performUndo()
-                    }
-                    .padding(.leading, 22)
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+            .onPreferenceChange(MatrixGridHeightKey.self) { height in
+                if height > 100, lockedGridHeight == 0 {
+                    lockedGridHeight = height
                 }
-                Spacer()
-                OrangeFAB { showQuickAdd = true }
-                    .padding(.trailing, 22)
             }
-            .padding(.bottom, 12)
-            .animation(.easeInOut(duration: 0.22), value: pendingUndo != nil)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.canvas.ignoresSafeArea())
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .dialFABChrome(
+            leading: {
+                Group {
+                    if pendingUndo != nil {
+                        UndoFAB(accessibilityHint: "Marks the last matrix task incomplete again") {
+                            performUndo()
+                        }
+                        .padding(.leading, 22)
+                        .transition(.move(edge: .leading).combined(with: .opacity))
+                    }
+                }
+                .animation(.easeInOut(duration: 0.22), value: pendingUndo != nil)
+            },
+            fab: {
+                OrangeFAB { showQuickAdd = true }
+            }
+        )
         .sheet(isPresented: $showQuickAdd) {
             QuickAddSheet()
-                .presentationDetents([.medium, .large])
         }
         .sheet(item: $editingTask) { task in
             TaskEditorSheet(task: task)
@@ -96,12 +120,17 @@ struct MatrixView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel(matrixQuadrantHeaderLabel(q, count: items.count))
             .accessibilityAddTraits(.isHeader)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(items) { task in
-                        matrixTaskRow(task)
+            if items.isEmpty {
+                Spacer(minLength: 0)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(items) { task in
+                            matrixTaskRow(task)
+                        }
                     }
                 }
+                .scrollIndicators(.never)
             }
         }
         .padding(10)
@@ -125,7 +154,10 @@ struct MatrixView: View {
 
     private func matrixTaskRow(_ task: PlannerTaskEntity) -> some View {
         HStack(alignment: .top, spacing: 8) {
-            TaskCheckbox(completed: false, overdue: task.isOverdue) {
+            TaskCheckbox(
+                completed: completingTaskID == task.id,
+                overdue: task.isOverdue
+            ) {
                 completeTask(task)
             }
             VStack(alignment: .leading, spacing: 2) {
@@ -161,13 +193,20 @@ struct MatrixView: View {
     }
 
     private func completeTask(_ task: PlannerTaskEntity) {
+        guard completingTaskID == nil else { return }
+        completingTaskID = task.id
         appModel.taskCompletionHaptic()
         let snapshot = MatrixUndoAction(taskID: task.id, completedAt: task.completedAt)
-        task.isCompleted = true
-        task.completedAt = .now
-        try? modelContext.save()
-        Task { await PlannerSyncCoordinator.shared.taskDidChange(task, in: modelContext) }
-        scheduleUndo(snapshot)
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(320))
+            guard completingTaskID == task.id else { return }
+            task.isCompleted = true
+            task.completedAt = .now
+            try? modelContext.save()
+            Task { await PlannerSyncCoordinator.shared.taskDidChange(task, in: modelContext) }
+            completingTaskID = nil
+            scheduleUndo(snapshot)
+        }
     }
 
     private func scheduleUndo(_ action: MatrixUndoAction) {

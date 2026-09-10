@@ -1,5 +1,7 @@
 import SwiftUI
 import SwiftData
+import MapKit
+import UIKit
 
 struct TaskTagChips: View {
     var tags: [String]
@@ -184,6 +186,272 @@ struct DueDatePickerSheet: View {
                 }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - Date/time (5-minute steps, sheet picker keeps keyboard stable)
+
+enum DateSnapping {
+    static let minuteStep = 5
+
+    static func snap(_ date: Date) -> Date {
+        let cal = Calendar.current
+        var comps = cal.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        let minute = comps.minute ?? 0
+        comps.minute = (minute / minuteStep) * minuteStep
+        comps.second = 0
+        comps.nanosecond = 0
+        return cal.date(from: comps) ?? date
+    }
+
+    /// Compatibility alias for call sites that still say "ten minutes".
+    static func tenMinutes(_ date: Date) -> Date { snap(date) }
+}
+
+struct TenMinuteDatePicker: UIViewRepresentable {
+    @Binding var date: Date
+    var mode: UIDatePicker.Mode = .dateAndTime
+
+    func makeUIView(context: Context) -> UIDatePicker {
+        let picker = UIDatePicker()
+        picker.datePickerMode = mode
+        picker.minuteInterval = DateSnapping.minuteStep
+        picker.preferredDatePickerStyle = .wheels
+        picker.date = DateSnapping.snap(date)
+        picker.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .valueChanged)
+        return picker
+    }
+
+    func updateUIView(_ picker: UIDatePicker, context: Context) {
+        let snapped = DateSnapping.snap(date)
+        if abs(picker.date.timeIntervalSince(snapped)) > 1 {
+            picker.date = snapped
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(date: $date)
+    }
+
+    final class Coordinator: NSObject {
+        var date: Binding<Date>
+
+        init(date: Binding<Date>) {
+            self.date = date
+        }
+
+        @MainActor @objc func changed(_ sender: UIDatePicker) {
+            date.wrappedValue = DateSnapping.snap(sender.date)
+        }
+    }
+}
+
+struct PlannerDateTimePickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var date: Date
+    var title: String
+    var includeTime = true
+
+    var body: some View {
+        NavigationStack {
+            TenMinuteDatePicker(
+                date: $date,
+                mode: includeTime ? .dateAndTime : .date
+            )
+            .padding(.horizontal)
+            .background(Theme.canvas)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        date = DateSnapping.snap(date)
+                        dismiss()
+                    }
+                    .foregroundStyle(Theme.cta)
+                    .accessibilityHint("Confirms selected date and time")
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+/// Tappable due/reminder row — opens wheel picker in a sheet so the title keyboard stays put.
+struct PlannerDateTimeRow: View {
+    let label: String
+    @Binding var date: Date
+    var includeTime = true
+    var hint: String
+
+    @State private var showPicker = false
+
+    var body: some View {
+        Button {
+            showPicker = true
+        } label: {
+            HStack {
+                Text(label)
+                    .foregroundStyle(Theme.ink)
+                Spacer()
+                Text(formatted)
+                    .foregroundStyle(Theme.muted)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label), \(formatted)")
+        .accessibilityHint(hint)
+        .sheet(isPresented: $showPicker) {
+            PlannerDateTimePickerSheet(date: $date, title: label, includeTime: includeTime)
+        }
+    }
+
+    private var formatted: String {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = includeTime ? .short : .none
+        return f.string(from: date)
+    }
+}
+
+// MARK: - Location + Apple Maps
+
+enum MapsNavigation {
+    @MainActor
+    static func open(query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let encoded = trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed
+        if let url = URL(string: "maps://?q=\(encoded)") {
+            UIApplication.shared.open(url)
+        }
+    }
+}
+
+@MainActor
+final class LocationSearchCompleter: ObservableObject {
+    @Published var completions: [MKLocalSearchCompletion] = []
+    private let bridge = LocationSearchCompleterBridge()
+
+    init() {
+        bridge.onResults = { [weak self] results in
+            Task { @MainActor in
+                self?.completions = results
+            }
+        }
+    }
+
+    func update(query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2 else {
+            completions = []
+            bridge.clear()
+            return
+        }
+        bridge.update(query: trimmed)
+    }
+
+    static func displayString(for completion: MKLocalSearchCompletion) -> String {
+        if completion.subtitle.isEmpty { return completion.title }
+        return "\(completion.title), \(completion.subtitle)"
+    }
+}
+
+private final class LocationSearchCompleterBridge: NSObject, MKLocalSearchCompleterDelegate {
+    var onResults: (([MKLocalSearchCompletion]) -> Void)?
+    private let completer = MKLocalSearchCompleter()
+
+    override init() {
+        super.init()
+        completer.delegate = self
+        completer.resultTypes = [.address, .pointOfInterest]
+    }
+
+    func update(query: String) {
+        completer.queryFragment = query
+    }
+
+    func clear() {
+        completer.queryFragment = ""
+        onResults?([])
+    }
+
+    func completerDidUpdateResults(_ completer: MKLocalSearchCompleter) {
+        onResults?(Array(completer.results.prefix(5)))
+    }
+
+    func completer(_ completer: MKLocalSearchCompleter, didFailWithError error: Error) {
+        onResults?([])
+    }
+}
+
+struct LocationField: View {
+    @Binding var text: String
+    var mapsHint = "Opens this place in Apple Maps"
+
+    @StateObject private var search = LocationSearchCompleter()
+    @FocusState private var focused: Bool
+
+    private var trimmed: String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                TextField("Location", text: $text)
+                    .focused($focused)
+                    .onChange(of: text) { _, value in
+                        search.update(query: value)
+                    }
+                    .accessibilityLabel("Location")
+                    .accessibilityValue(trimmed.isEmpty ? "Empty" : trimmed)
+                    .accessibilityHint("Address or place name; suggestions from Apple Maps")
+                if !trimmed.isEmpty {
+                    Button {
+                        MapsNavigation.open(query: trimmed)
+                    } label: {
+                        Image(systemName: "map.fill")
+                            .font(.body)
+                            .foregroundStyle(Theme.cta)
+                            .frame(width: 36, height: 36)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open in Maps")
+                    .accessibilityHint(mapsHint)
+                }
+            }
+            if focused, !search.completions.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(search.completions.enumerated()), id: \.offset) { _, item in
+                        Button {
+                            text = LocationSearchCompleter.displayString(for: item)
+                            focused = false
+                            search.completions = []
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title)
+                                    .font(.subheadline)
+                                    .foregroundStyle(Theme.ink)
+                                if !item.subtitle.isEmpty {
+                                    Text(item.subtitle)
+                                        .font(.caption)
+                                        .foregroundStyle(Theme.muted)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(LocationSearchCompleter.displayString(for: item))
+                        .accessibilityHint("Uses this Maps place for location")
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+        }
     }
 }
 

@@ -31,6 +31,7 @@
 		A20000000000000000000018 /* BrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* BrowseView.swift */; };
 		A20000000000000000000019 /* recipes.sqlite3 in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* recipes.sqlite3 */; };
 		A2000000000000000000001A /* DislikeMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001A /* DislikeMatcher.swift */; };
+		A2000000000000000000009A /* ShoppingRealism.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000009A /* ShoppingRealism.swift */; };
 		A2000000000000000000001B /* WorkoutModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* WorkoutModels.swift */; };
 		A2000000000000000000001C /* WorkoutProgression.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001C /* WorkoutProgression.swift */; };
 		A20000000000000000000034 /* WorkoutPrescription.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000034 /* WorkoutPrescription.swift */; };
@@ -38,6 +39,9 @@
 		A20000000000000000000036 /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000036 /* NotificationScheduler.swift */; };
 		A20000000000000000000037 /* CalendarSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000037 /* CalendarSyncService.swift */; };
 		A20000000000000000000038 /* GoogleCalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* GoogleCalendarService.swift */; };
+		A20000000000000000000099 /* CadenceAutomation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000099 /* CadenceAutomation.swift */; };
+		A2000000000000000000009B /* WheelNav.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000009B /* WheelNav.swift */; };
+		A2000000000000000000009C /* PlaceholderPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000009C /* PlaceholderPageView.swift */; };
 		A20000000000000000000039 /* PlannerSyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000039 /* PlannerSyncCoordinator.swift */; };
 		A2000000000000000000003E /* TaskTitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003E /* TaskTitleParser.swift */; };
 		A20000000000000000000040 /* TagCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* TagCatalog.swift */; };
@@ -107,6 +111,7 @@
 		A10000000000000000000018 /* BrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseView.swift; sourceTree = "<group>"; };
 		A10000000000000000000019 /* recipes.sqlite3 */ = {isa = PBXFileReference; lastKnownFileType = file; path = recipes.sqlite3; sourceTree = "<group>"; };
 		A1000000000000000000001A /* DislikeMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DislikeMatcher.swift; sourceTree = "<group>"; };
+		A1000000000000000000009A /* ShoppingRealism.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShoppingRealism.swift; sourceTree = "<group>"; };
 		A1000000000000000000001B /* WorkoutModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutModels.swift; sourceTree = "<group>"; };
 		A1000000000000000000001C /* WorkoutProgression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutProgression.swift; sourceTree = "<group>"; };
 		A10000000000000000000034 /* WorkoutPrescription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutPrescription.swift; sourceTree = "<group>"; };
@@ -114,6 +119,9 @@
 		A10000000000000000000036 /* NotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
 		A10000000000000000000037 /* CalendarSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarSyncService.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* GoogleCalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleCalendarService.swift; sourceTree = "<group>"; };
+		A10000000000000000000099 /* CadenceAutomation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CadenceAutomation.swift; sourceTree = "<group>"; };
+		A1000000000000000000009B /* WheelNav.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WheelNav.swift; sourceTree = "<group>"; };
+		A1000000000000000000009C /* PlaceholderPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceholderPageView.swift; sourceTree = "<group>"; };
 		A10000000000000000000039 /* PlannerSyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerSyncCoordinator.swift; sourceTree = "<group>"; };
 		A1000000000000000000003E /* TaskTitleParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskTitleParser.swift; sourceTree = "<group>"; };
 		A10000000000000000000040 /* TagCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagCatalog.swift; sourceTree = "<group>"; };
@@ -260,12 +268,14 @@
 				A1000000000000000000001F /* SideCatalog.swift */,
 				A10000000000000000000016 /* LocalMacros.swift */,
 				A1000000000000000000001A /* DislikeMatcher.swift */,
+				A1000000000000000000009A /* ShoppingRealism.swift */,
 				A1000000000000000000001C /* WorkoutProgression.swift */,
 				A10000000000000000000034 /* WorkoutPrescription.swift */,
 				A10000000000000000000035 /* PlannerPreferences.swift */,
 				A10000000000000000000036 /* NotificationScheduler.swift */,
 				A10000000000000000000037 /* CalendarSyncService.swift */,
 				A10000000000000000000038 /* GoogleCalendarService.swift */,
+				A10000000000000000000099 /* CadenceAutomation.swift */,
 				A10000000000000000000039 /* PlannerSyncCoordinator.swift */,
 				A10000000000000000000044 /* CountdownTracking.swift */,
 				A1000000000000000000003E /* TaskTitleParser.swift */,
@@ -296,8 +306,26 @@
 				C1000000000000000000000D /* Browse */,
 				C1000000000000000000000E /* Workout */,
 				C1000000000000000000000F /* Planner */,
+				C10000000000000000000010 /* Navigation */,
+				C10000000000000000000011 /* Placeholders */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000010 /* Navigation */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000009B /* WheelNav.swift */,
+			);
+			path = Navigation;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000011 /* Placeholders */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000009C /* PlaceholderPageView.swift */,
+			);
+			path = Placeholders;
 			sourceTree = "<group>";
 		};
 		C10000000000000000000008 /* Resources */ = {
@@ -593,8 +621,11 @@
 				A2000000000000000000001F /* SideCatalog.swift in Sources */,
 				A20000000000000000000016 /* LocalMacros.swift in Sources */,
 				A20000000000000000000017 /* Theme.swift in Sources */,
+				A2000000000000000000009B /* WheelNav.swift in Sources */,
+				A2000000000000000000009C /* PlaceholderPageView.swift in Sources */,
 				A20000000000000000000018 /* BrowseView.swift in Sources */,
 				A2000000000000000000001A /* DislikeMatcher.swift in Sources */,
+				A2000000000000000000009A /* ShoppingRealism.swift in Sources */,
 				A2000000000000000000001B /* WorkoutModels.swift in Sources */,
 				A2000000000000000000001C /* WorkoutProgression.swift in Sources */,
 				A20000000000000000000034 /* WorkoutPrescription.swift in Sources */,
@@ -602,6 +633,7 @@
 				A20000000000000000000036 /* NotificationScheduler.swift in Sources */,
 				A20000000000000000000037 /* CalendarSyncService.swift in Sources */,
 				A20000000000000000000038 /* GoogleCalendarService.swift in Sources */,
+				A20000000000000000000099 /* CadenceAutomation.swift in Sources */,
 				A20000000000000000000039 /* PlannerSyncCoordinator.swift in Sources */,
 				A2000000000000000000003E /* TaskTitleParser.swift in Sources */,
 				A20000000000000000000040 /* TagCatalog.swift in Sources */,
@@ -712,6 +744,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -741,6 +774,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

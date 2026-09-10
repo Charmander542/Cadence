@@ -88,6 +88,21 @@ enum WeekPlanner {
             enabledSources = profile.enabledSources
             cookingComplexity = profile.cookingComplexity
         }
+
+        init(
+            dietRaw: String = "none",
+            dietaryRestrictionsText: String = "",
+            enabledSources: [String] = [],
+            cookingComplexity: Int = 3
+        ) {
+            self.dietRaw = dietRaw
+            self.dietaryRestrictionsText = dietaryRestrictionsText
+            self.enabledSources = enabledSources
+            self.cookingComplexity = cookingComplexity
+        }
+
+        var dietKey: String? { DietProfile(rawValue: dietRaw)?.storeKey }
+        var dislikes: [String] { DislikeMatcher.parse(dietaryRestrictionsText) }
     }
 
     static func plan(
@@ -105,18 +120,42 @@ enum WeekPlanner {
         bannedIDs: Set<String>,
         days: Int = 7
     ) -> Result {
-        let diet = DietProfile(rawValue: settings.dietRaw)?.storeKey
-        let exclude = DislikeMatcher.parse(settings.dietaryRestrictionsText)
+        let diet = settings.dietKey
+        let exclude = settings.dislikes
         let sources = Set(settings.enabledSources.map { $0.lowercased() })
         let complexity = RecipeComplexity.clamped(settings.cookingComplexity)
-        var mainsPool = candidatePool(store.allRecipes(), course: "main", diet: diet, exclude: exclude, banned: bannedIDs, sources: sources, complexity: complexity, minCount: days * 4)
+        let preferredProteins = preferredCoreProteins(diet: diet)
+
+        // Prefer staying in-band; only widen one step for Simple, two for Easy.
+        var mainsPool = candidatePool(
+            store.allRecipes(),
+            course: "main",
+            diet: diet,
+            exclude: exclude,
+            banned: bannedIDs,
+            sources: sources,
+            complexity: complexity,
+            minCount: days * 3,
+            maxWiden: complexity <= 1 ? 1 : (complexity == 2 ? 2 : 4)
+        )
         if mainsPool.count < days {
-            mainsPool += candidatePool(store.allRecipes(), course: "main", diet: diet, exclude: exclude, banned: bannedIDs, sources: sources, complexity: 5, minCount: days)
+            // Last resort: still avoid dumping level-5 exotics into a Simple week.
+            let rescueLevel = min(5, complexity + (complexity <= 2 ? 2 : 4))
+            mainsPool += candidatePool(
+                store.allRecipes(),
+                course: "main",
+                diet: diet,
+                exclude: exclude,
+                banned: bannedIDs,
+                sources: sources,
+                complexity: rescueLevel,
+                minCount: days,
+                maxWiden: 0
+            )
             var seen = Set<String>()
             mainsPool = mainsPool.filter { seen.insert($0.id).inserted }
         }
         mainsPool = Array(mainsPool.prefix(800))
-        // candidatePool can re-introduce ids across fallbacks — collapse before profiling.
         do {
             var seen = Set<String>()
             mainsPool = mainsPool.filter { seen.insert($0.id).inserted }
@@ -131,21 +170,42 @@ enum WeekPlanner {
 
         var selected: [Recipe] = []
         var remaining = mainsPool
+        var cartSKUs: Set<String> = []
         for _ in 0..<min(days, remaining.count) {
-            let pick = pickNext(remaining: remaining, selected: selected, profiles: profiles, idf: idf, partners: partners, complexity: complexity)
+            let pick = pickNext(
+                remaining: remaining,
+                selected: selected,
+                profiles: profiles,
+                idf: idf,
+                partners: partners,
+                complexity: complexity,
+                preferredProteins: preferredProteins,
+                cartSKUs: cartSKUs
+            )
             selected.append(pick)
+            cartSKUs.formUnion(RecipeComplexity.shoppableItems(pick))
             remaining.removeAll { $0.id == pick.id }
         }
 
-        var sidesPool = candidatePool(store.allRecipes(), course: "side", diet: diet, exclude: exclude, banned: bannedIDs.union(Set(selected.map(\.id))), sources: sources, complexity: complexity, minCount: days * 3)
+        var sidesPool = candidatePool(
+            store.allRecipes(),
+            course: "side",
+            diet: diet,
+            exclude: exclude,
+            banned: bannedIDs.union(Set(selected.map(\.id))),
+            sources: sources,
+            complexity: complexity,
+            minCount: days * 3,
+            maxWiden: complexity <= 1 ? 1 : (complexity == 2 ? 2 : 4)
+        )
         if sidesPool.count < days {
-            // Fall back to vegetable-tagged dishes and protein-less “mains” (those are sides).
             let extra = store.allRecipes().filter { recipe in
                 if selected.contains(where: { $0.id == recipe.id }) { return false }
                 if recipe.course == "dessert" || recipe.course == "drink" || recipe.course == "sauce" { return false }
                 if looksLikeBreakfast(recipe) || looksLikeCondiment(recipe) { return false }
-                if !matchesDiet(recipe.allergens, diet: diet) { return false }
+                if !matchesDiet(recipe, diet: diet) { return false }
                 if DislikeMatcher.blocks(recipe, dislikes: exclude) { return false }
+                if !RecipeComplexity.fits(recipe, level: min(5, complexity + 1), course: "side") { return false }
                 return !isSubstantialMain(recipe)
             }
             var seen = Set(sidesPool.map(\.id) + selected.map(\.id))
@@ -162,9 +222,13 @@ enum WeekPlanner {
                 main: main,
                 used: usedSides,
                 usedKinds: usedKinds,
-                mainProfile: mainProf
+                mainProfile: mainProf,
+                exclude: exclude,
+                complexity: complexity,
+                cartSKUs: cartSKUs
             ) {
                 usedSides.insert(side.id)
+                cartSKUs.formUnion(RecipeComplexity.shoppableItems(side))
                 if let kind = SideCatalog.match(side)?.kind {
                     usedKinds.insert(kind)
                 }
@@ -185,9 +249,21 @@ enum WeekPlanner {
         profile: UserProfileEntity,
         bannedIDs: Set<String>
     ) -> Recipe? {
-        let diet = DietProfile(rawValue: profile.dietRaw)?.storeKey
-        let complexity = RecipeComplexity.clamped(profile.cookingComplexity)
-        let candidates = candidatePool(store.allRecipes(), course: "main", diet: diet, exclude: DislikeMatcher.parse(profile.dietaryRestrictionsText), banned: bannedIDs.union([current.id]), sources: Set(profile.enabledSources.map { $0.lowercased() }), complexity: complexity, minCount: 24)
+        let settings = Settings(profile)
+        let diet = settings.dietKey
+        let complexity = RecipeComplexity.clamped(settings.cookingComplexity)
+        let preferredProteins = preferredCoreProteins(diet: diet)
+        let candidates = candidatePool(
+            store.allRecipes(),
+            course: "main",
+            diet: diet,
+            exclude: settings.dislikes,
+            banned: bannedIDs.union([current.id]),
+            sources: Set(settings.enabledSources.map { $0.lowercased() }),
+            complexity: complexity,
+            minCount: 24,
+            maxWiden: complexity <= 2 ? 2 : 4
+        )
         let profiles = Dictionary(
             (keep + candidates).map { ($0.id, flavor($0)) },
             uniquingKeysWith: { first, _ in first }
@@ -196,7 +272,18 @@ enum WeekPlanner {
         let partners = partnerCounts(profiles)
         let remaining = candidates.filter { rec in !keep.contains(where: { $0.id == rec.id }) }
         guard !remaining.isEmpty else { return nil }
-        return pickNext(remaining: remaining, selected: keep, profiles: profiles, idf: idf, partners: partners, complexity: complexity)
+        var cart: Set<String> = []
+        for r in keep { cart.formUnion(RecipeComplexity.shoppableItems(r)) }
+        return pickNext(
+            remaining: remaining,
+            selected: keep,
+            profiles: profiles,
+            idf: idf,
+            partners: partners,
+            complexity: complexity,
+            preferredProteins: preferredProteins,
+            cartSKUs: cart
+        )
     }
 
     static func scale(_ recipe: Recipe, servings: Double) -> Recipe {
@@ -229,6 +316,25 @@ enum WeekPlanner {
         return Set(allergens.map { $0.lowercased() }).isDisjoint(with: blocked)
     }
 
+    /// Allergen tags are incomplete in cookbook data — also gate on detected proteins.
+    static func matchesDiet(_ recipe: Recipe, diet: String?) -> Bool {
+        guard matchesDiet(recipe.allergens, diet: diet) else { return false }
+        guard let diet else { return true }
+        let proteins = flavor(recipe).proteins
+        switch diet {
+        case "vegetarian", "vegan":
+            let animal: Set<String> = ["chicken", "beef", "pork", "lamb", "fish", "shellfish"]
+            if !proteins.isDisjoint(with: animal) { return false }
+            if diet == "vegan", proteins.contains("egg") { return false }
+            return true
+        case "pescatarian":
+            let land: Set<String> = ["chicken", "beef", "pork", "lamb"]
+            return proteins.isDisjoint(with: land)
+        default:
+            return true
+        }
+    }
+
     private static func filtered(
         _ all: [Recipe],
         course: String,
@@ -255,12 +361,20 @@ enum WeekPlanner {
             if looksLikeBreakfast(recipe) { return false }
             let minIngredients = course == "side" ? 2 : 4
             if recipe.parsedIngredients.count < minIngredients { return false }
-            if !matchesDiet(recipe.allergens, diet: diet) { return false }
+            // Missing instructions = not cookable from this DB entry.
+            if recipe.steps.isEmpty { return false }
+            if !matchesDiet(recipe, diet: diet) { return false }
             if looksLikeCondiment(recipe) { return false }
             if DislikeMatcher.blocks(recipe, dislikes: exclude) { return false }
             if !RecipeComplexity.fits(recipe, level: complexity, course: course) { return false }
             // Dinners must be substantial protein mains — light/veggie dishes are sides.
             if course == "main", !isSubstantialMain(recipe) { return false }
+            if complexity <= 2, looksLikeAdvancedTechnique(recipe) { return false }
+            if complexity <= 2, looksLikeRequiresPriorRecipe(recipe) { return false }
+            if complexity <= 2, course == "main", looksLikeOrganMeatMain(recipe) { return false }
+            if complexity <= 2, course == "main", looksLikeStarchForwardMain(recipe) { return false }
+            if complexity <= 2, course == "main", hasNicheProtein(recipe, level: complexity) { return false }
+            if complexity <= 2, course == "side", looksLikeFussySide(recipe) { return false }
             return true
         }
     }
@@ -273,21 +387,128 @@ enum WeekPlanner {
         banned: Set<String>,
         sources: Set<String>,
         complexity: Int,
-        minCount: Int
+        minCount: Int,
+        maxWiden: Int = 4
     ) -> [Recipe] {
         var level = complexity
         var result = filtered(all, course: course, diet: diet, exclude: exclude, banned: banned, sources: sources, complexity: level)
-        while result.count < minCount, level < 5 {
+        var widened = 0
+        while result.count < minCount, level < 5, widened < maxWiden {
             level += 1
+            widened += 1
             result = filtered(all, course: course, diet: diet, exclude: exclude, banned: banned, sources: sources, complexity: level)
         }
         return result
+    }
+
+    /// Proteins that feel realistic for a weekly supermarket shop under the given diet.
+    static func preferredCoreProteins(diet: String?) -> Set<String> {
+        switch diet {
+        case "vegan":
+            return ["tofu", "bean"]
+        case "vegetarian":
+            return ["tofu", "bean", "egg"]
+        case "pescatarian":
+            return ["fish", "egg", "tofu", "bean"]
+        default:
+            return ["chicken", "beef", "pork", "egg", "tofu", "bean"]
+        }
     }
 
     private static func looksLikeCondiment(_ recipe: Recipe) -> Bool {
         let name = recipe.name.lowercased()
         return ["pickle", "vinaigrette", "dressing", "marinade", "seasoning", "syrup", "stock", "broth"]
             .contains { name.contains($0) }
+    }
+
+    /// Gear / technique that a Simple/Easy once-a-week cook is unlikely to want.
+    static func looksLikeAdvancedTechnique(_ recipe: Recipe) -> Bool {
+        let blob = ([recipe.name, recipe.chapter, recipe.section] + recipe.tags + recipe.ingredients)
+            .joined(separator: " ")
+            .lowercased()
+        let needles = [
+            "sous-vide", "sous vide", "immersion circulator",
+            "pressure can", "molecular", "spherif",
+            "deep-fried", "deep fried", "deep fry", "fritur", "deep-fryer", "deep fryer",
+            "confit", "torch", "smoke gun", "cryo",
+            "wonton", "dumpling wrapper", "gyoza wrapper",
+            "tempura", "pâte à choux", "pate a choux",
+        ]
+        return needles.contains { blob.contains($0) }
+    }
+
+    /// Depends on another cookbook recipe first (Poached Chicken, Lemon Marinade, …).
+    static func looksLikeRequiresPriorRecipe(_ recipe: Recipe) -> Bool {
+        let lines = recipe.parsedIngredients.isEmpty
+            ? recipe.ingredients
+            : recipe.parsedIngredients.map { $0.item.isEmpty ? $0.raw : $0.item }
+        for line in lines {
+            let l = line.lowercased()
+            if l.range(of: #"^(poached|roasted|grilled|braised)\s+(chicken|beef|pork|turkey)\b"#, options: .regularExpression) != nil {
+                return true
+            }
+            if l.contains("marinade") && (l.contains(" or ") || l.contains(",")) { return true }
+            if l.contains("pan sauce") && l.contains(" or ") { return true }
+        }
+        let stepBlob = recipe.steps.map(\.instruction).joined(separator: " ").lowercased()
+        if stepBlob.contains("see here"), stepBlob.contains("pan sauce") { return true }
+        // Joy-of-Cooking "Have ready:" stubs with no quantities in the step itself.
+        let stubs = recipe.steps.filter {
+            let t = $0.instruction.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return t == "have ready:" || t == "season with:" || t == "pat dry:" || t.hasPrefix("have ready")
+        }
+        if stubs.count >= 2 { return true }
+        if recipe.steps.contains(where: {
+            $0.instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && $0.ingredients.isEmpty
+        }) {
+            return true
+        }
+        return false
+    }
+
+    static func looksLikeOrganMeatMain(_ recipe: Recipe) -> Bool {
+        let blob = ([recipe.name] + recipe.ingredients + recipe.parsedIngredients.map(\.item))
+            .joined(separator: " ")
+            .lowercased()
+        return ["liver", "kidney", "heart", "tongue", "tripe", "sweetbread", "gizzard", "offal"]
+            .contains { blob.contains($0) }
+    }
+
+    /// Potato bakes / cheese crisps / wonton plates that sneak through as "mains".
+    static func looksLikeStarchForwardMain(_ recipe: Recipe) -> Bool {
+        let name = recipe.name.lowercased()
+        let starchTitles = [
+            "potato bake", "scalloped potato", "au gratin", "frico", "cheese crisp",
+            "mashed potato", "french fries", "sweet potato fries", "hash brown",
+            "mac and cheese", "macaroni and cheese", "grilled cheese",
+            "egg drop soup", "shrimp salad", "tuna salad", "chicken salad",
+        ]
+        if starchTitles.contains(where: { name.contains($0) }) { return true }
+        let proteins = flavor(recipe).proteins
+        if proteins.isEmpty || proteins == ["egg"] {
+            if looksLikeStarchOrGrainSide(recipe) { return true }
+        }
+        return false
+    }
+
+    static func looksLikeFussySide(_ recipe: Recipe) -> Bool {
+        let name = recipe.name.lowercased()
+        return ["frico", "cheese crisp", "soufflé", "souffle", "puff pastry", "phyllo", "filo"]
+            .contains { name.contains($0) }
+    }
+
+    /// Shellfish / lamb / game — fine for adventurous cooks, not Simple/Easy supermarket weeks.
+    static func hasNicheProtein(_ recipe: Recipe, level: Int) -> Bool {
+        let proteins = flavor(recipe).proteins
+        if proteins.contains("shellfish") { return true }
+        if level <= 1, proteins.contains("fish") { return true }
+        if proteins.contains("lamb") { return true }
+        let blob = ([recipe.name] + recipe.parsedIngredients.map(\.item) + recipe.ingredients)
+            .joined(separator: " ")
+            .lowercased()
+        let game = ["venison", "bison", "elk", "duck", "quail", "rabbit", "goat", "cornish hen", "guinea hen"]
+        return game.contains { blob.contains($0) }
     }
 
     static func looksLikeBreakfast(_ recipe: Recipe) -> Bool {
@@ -560,13 +781,34 @@ enum WeekPlanner {
         profiles: [String: FlavorProfile],
         idf: [String: Double],
         partners: [String: Int],
-        complexity: Int
+        complexity: Int,
+        preferredProteins: Set<String> = ["chicken", "beef", "pork", "egg", "tofu", "bean"],
+        cartSKUs: Set<String> = []
     ) -> Recipe {
+        let skuBudget = RecipeComplexity.weeklySKUBudget(for: complexity)
+        let lowComplexity = complexity <= 2
+        let overlapWeight = lowComplexity ? 3.4 : 2.6
+        let varietyWeight = lowComplexity ? 0.55 : 1.0
+
         if selected.isEmpty {
             return remaining.min { a, b in
                 let pa = profiles[a.id]!, pb = profiles[b.id]!
-                let ta = (RecipeComplexity.penalty(a, level: complexity), -(partners[a.id] ?? 0), -pa.proteins.count, -pa.overlapTokens.count)
-                let tb = (RecipeComplexity.penalty(b, level: complexity), -(partners[b.id] ?? 0), -pb.proteins.count, -pb.overlapTokens.count)
+                let coreA = pa.proteins.isDisjoint(with: preferredProteins) ? 1 : 0
+                let coreB = pb.proteins.isDisjoint(with: preferredProteins) ? 1 : 0
+                let ta = (
+                    coreA,
+                    RecipeComplexity.penalty(a, level: complexity),
+                    -(partners[a.id] ?? 0),
+                    -pa.proteins.count,
+                    -pa.overlapTokens.count
+                )
+                let tb = (
+                    coreB,
+                    RecipeComplexity.penalty(b, level: complexity),
+                    -(partners[b.id] ?? 0),
+                    -pb.proteins.count,
+                    -pb.overlapTokens.count
+                )
                 return ta < tb
             } ?? remaining[0]
         }
@@ -594,14 +836,30 @@ enum WeekPlanner {
             let proteinRepeat = prof.proteins.map { proteinCounts[$0] ?? 0 }.max() ?? 0
             let familyRepeat = familyCounts[prof.dishFamily] ?? 0
             let variety = 1.0 - 0.5 * weekFlavor - 0.5 * flavorSim
+
+            let newSKUs = Set(RecipeComplexity.shoppableItems(recipe)).subtracting(cartSKUs)
+            let projected = cartSKUs.count + newSKUs.count
+            let overBudget = max(0, projected - skuBudget)
+            let skuPenalty = lowComplexity ? 0.35 * Double(overBudget) + 0.08 * Double(newSKUs.count) : 0.05 * Double(overBudget)
+
+            let coreHit = prof.proteins.isDisjoint(with: preferredProteins) ? 0.0 : 1.0
+            let specialtyProtein: Double = {
+                if complexity > 2 { return 0 }
+                let niche: Set<String> = ["lamb", "shellfish", "fish"]
+                return prof.proteins.isDisjoint(with: niche) ? 0 : 1.0
+            }()
+
             let score =
-                2.6 * overlap
-                + 1.0 * variety
+                overlapWeight * overlap
+                + varietyWeight * variety
+                + (lowComplexity ? 0.85 : 0.35) * coreHit
                 - 2.8 * sameProtein
                 - 2.5 * sameFamily
                 - 2.2 * nameSim
                 - 0.6 * Double(proteinRepeat)
                 - 0.7 * Double(familyRepeat)
+                - (lowComplexity ? 1.1 : 0.4) * specialtyProtein
+                - skuPenalty
                 - RecipeComplexity.penalty(recipe, level: complexity)
             if score > bestScore {
                 bestScore = score
@@ -616,13 +874,23 @@ enum WeekPlanner {
         main: Recipe,
         used: Set<String>,
         usedKinds: Set<SideCatalog.Entry.Kind>,
-        mainProfile: FlavorProfile
+        mainProfile: FlavorProfile,
+        exclude: [String] = [],
+        complexity: Int = 5,
+        cartSKUs: Set<String> = []
     ) -> Recipe? {
         // Produce/pantry overlap only — proteins never drive side pairing.
         let mainItems = overlapItems(in: mainProfile)
+        let skuBudget = RecipeComplexity.weeklySKUBudget(for: complexity)
         var best: Recipe?
         var bestScore = -1e9
         for side in sides where !used.contains(side.id) {
+            if DislikeMatcher.blocks(side, dislikes: exclude) { continue }
+            if !RecipeComplexity.fits(side, level: complexity, course: "side") {
+                if !RecipeComplexity.fits(side, level: min(5, complexity + 1), course: "side") {
+                    continue
+                }
+            }
             let prof = flavor(side)
             let items = overlapItems(in: prof)
             let groceryOverlap = jaccard(items, mainItems)
@@ -633,11 +901,18 @@ enum WeekPlanner {
                 usedKinds: usedKinds,
                 usedSideIDs: used
             )
+            let newSKUs = Set(RecipeComplexity.shoppableItems(side)).subtracting(cartSKUs)
+            let overBudget = max(0, cartSKUs.count + newSKUs.count - skuBudget)
+            let skuPenalty = complexity <= 2
+                ? 0.4 * Double(overBudget) + 0.12 * Double(newSKUs.count)
+                : 0.05 * Double(overBudget)
             let score =
                 2.4 * catalog
                 + 1.4 * groceryOverlap
                 - 1.6 * tooClose
                 + 0.15 * Double(min(items.count, 6))
+                - skuPenalty
+                - RecipeComplexity.penalty(side, level: complexity)
             if score > bestScore {
                 bestScore = score
                 best = side

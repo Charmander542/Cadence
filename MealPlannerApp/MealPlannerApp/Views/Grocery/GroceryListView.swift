@@ -12,16 +12,15 @@ struct GroceryListView: View {
     @State private var draftItemNames: [String: String] = [:]
     @State private var settling = Set<PersistentIdentifier>()
     @State private var showPantry = false
+    @State private var addItemCategory: String?
+    @State private var addItemName = ""
+    @FocusState private var focusedDraftCategory: String?
 
     private var canRefreshIngredients: Bool {
         !appModel.isRefreshingGrocery
             && !appModel.isBuildingShopList
             && !appModel.isGeneratingPlan
             && plans.first?.decoded() != nil
-    }
-
-    private var pantryNames: Set<String> {
-        Set(pantryItems.map { PantryMatcher.key($0.name) })
     }
 
     private var pantryKeys: Set<String> {
@@ -49,6 +48,15 @@ struct GroceryListView: View {
         }
     }
 
+    private var uncheckedCount: Int {
+        let keys = pantryKeys
+        return items.filter { item in
+            !item.isChecked
+                && !Self.isStaleBreakfastEggs(item)
+                && (item.isManual || !PantryMatcher.covers(item.ingredientName, pantryKeys: keys))
+        }.count
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -61,7 +69,7 @@ struct GroceryListView: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("Building shop list")
                     .accessibilityAddTraits(.updatesFrequently)
-                } else if grouped.isEmpty {
+                    } else if grouped.isEmpty {
                     Theme.EmptyState(
                         systemImage: "basket",
                         title: "Shop list empty",
@@ -74,6 +82,23 @@ struct GroceryListView: View {
                     }
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("Shop list empty. \(groceryEmptyMessage)")
+
+                    Section {
+                        HStack {
+                            TextField("Add item…", text: draftNameBinding(for: "produce"))
+                                .textInputAutocapitalization(.never)
+                                .focused($focusedDraftCategory, equals: "produce")
+                                .accessibilityHint("Name of item to add")
+                                .onSubmit { addManual(category: "produce") }
+                            Button("Add") { addManual(category: "produce") }
+                                .fontWeight(.semibold)
+                                .disabled(draftItemNames["produce", default: ""].trimmingCharacters(in: .whitespaces).isEmpty)
+                                .accessibilityHint("Adds typed item to Produce")
+                        }
+                    } header: {
+                        Text("Add something")
+                            .accessibilityAddTraits(.isHeader)
+                    }
                 } else {
                     ForEach(grouped, id: \.0) { category, rows in
                         Section {
@@ -96,7 +121,7 @@ struct GroceryListView: View {
                                     } label: {
                                         Label("Pantry", systemImage: "cabinet")
                                     }
-                                    .tint(.orange)
+                                    .tint(Theme.accent)
                                     .accessibilityLabel("Move \(item.ingredientName) to pantry")
                                     .accessibilityHint("Keeps item off future shop lists")
                                 }
@@ -104,6 +129,7 @@ struct GroceryListView: View {
                             HStack {
                                 TextField("Add item…", text: draftNameBinding(for: category))
                                     .textInputAutocapitalization(.never)
+                                    .focused($focusedDraftCategory, equals: category)
                                     .accessibilityHint("Name of item to add to \(category) section")
                                     .onSubmit { addManual(category: category) }
                                 Button("Add") { addManual(category: category) }
@@ -121,7 +147,7 @@ struct GroceryListView: View {
             }
             .navigationTitle("Shop")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
                         Pantry.seedIfNeeded(in: modelContext)
                         showPantry = true
@@ -129,8 +155,6 @@ struct GroceryListView: View {
                         Label("Pantry", systemImage: "cabinet")
                     }
                     .accessibilityHint("Edit staples kept off the shop list")
-                }
-                ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
                         Task { await refreshIngredients() }
                     } label: {
@@ -146,15 +170,36 @@ struct GroceryListView: View {
                     Menu {
                         ForEach(GroceryConsolidator.categoryOrder, id: \.self) { cat in
                             Button(cat.capitalized) {
-                                addManual(category: cat)
+                                beginAddItem(category: cat)
                             }
-                            .accessibilityHint("Adds custom item to \(cat) section")
+                            .accessibilityHint("Add a custom item under \(cat)")
                         }
                     } label: {
                         Label("Add item", systemImage: "plus")
                     }
-                    .accessibilityHint("Adds a custom item to a category")
+                    .accessibilityLabel("Add item")
+                    .accessibilityHint("Choose a category, then enter an item name")
                 }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                HStack {
+                    Button("Done") { dismiss() }
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Theme.cta)
+                        .accessibilityLabel("Done")
+                        .accessibilityHint("Closes shop and returns to Meals")
+                        .accessibilityIdentifier("shop-done")
+                    Spacer()
+                    if !grouped.isEmpty {
+                        Text(uncheckedCount == 0 ? "All picked up" : "\(uncheckedCount) left to shop")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(uncheckedCount == 0 ? Theme.accent : Theme.ink)
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Theme.canvas.opacity(0.95))
             }
             .overlay {
                 if appModel.isRefreshingGrocery {
@@ -163,6 +208,31 @@ struct GroceryListView: View {
             }
             .sheet(isPresented: $showPantry) {
                 PantryEditor()
+            }
+            .alert("Add item", isPresented: Binding(
+                get: { addItemCategory != nil },
+                set: { if !$0 { addItemCategory = nil; addItemName = "" } }
+            )) {
+                TextField("Item name", text: $addItemName)
+                    .textInputAutocapitalization(.never)
+                Button("Add") {
+                    if let cat = addItemCategory {
+                        draftItemNames[cat] = addItemName
+                        addManual(category: cat)
+                    }
+                    addItemCategory = nil
+                    addItemName = ""
+                }
+                .disabled(addItemName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .accessibilityHint("Adds the named item to the chosen category")
+                Button("Cancel", role: .cancel) {
+                    addItemCategory = nil
+                    addItemName = ""
+                }
+            } message: {
+                if let cat = addItemCategory {
+                    Text("Adds to \(cat.capitalized).")
+                }
             }
             .task {
                 if items.isEmpty, plans.first?.decoded() != nil {
@@ -221,6 +291,16 @@ struct GroceryListView: View {
         )
     }
 
+    private func beginAddItem(category: String) {
+        // Prefer focusing the inline field when that section already exists.
+        if grouped.contains(where: { $0.0 == category }) {
+            focusedDraftCategory = category
+            return
+        }
+        addItemName = ""
+        addItemCategory = category
+    }
+
     private func toggle(_ item: GroceryItemEntity) {
         if item.isChecked {
             appModel.taskCompletionHaptic()
@@ -252,17 +332,28 @@ struct GroceryListView: View {
     private func addManual(category: String) {
         let name = draftItemNames[category, default: ""].trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        if PantryMatcher.covers(name, pantry: pantryNames) {
+        // Explicit manual adds always land on the list (even if also in pantry).
+        let key = name.lowercased()
+        if let existing = items.first(where: { PantryMatcher.key($0.ingredientName) == PantryMatcher.key(key) }) {
+            if existing.isChecked {
+                existing.isChecked = false
+            }
+            existing.isManual = true
+            // Manual entries represent a concrete item the user typed,
+            // so they should not be labeled "to taste" just because they are "approximate".
+            existing.isApproximate = false
             draftItemNames[category] = ""
+            try? modelContext.save()
             return
         }
         let entity = GroceryItemEntity(
             from: ConsolidatedGroceryItem(
-                ingredientName: name.lowercased(),
+                ingredientName: key,
                 category: category,
                 quantity: 1,
                 unit: "count",
-                isApproximate: true,
+                // Manual adds should look like concrete quantities (not "to taste").
+                isApproximate: false,
                 note: "",
                 isChecked: false,
                 isManual: true
@@ -286,7 +377,8 @@ struct GroceryRow: View {
                 Theme.CheckGlyph(checked: item.isChecked)
                 Text(GroceryConsolidator.displayText(item.asConsolidated()))
                     .strikethrough(item.isChecked)
-                    .foregroundStyle(item.isChecked ? Theme.muted : Theme.ink)
+                    // Manual entries should stand out (blue) when unchecked.
+                    .foregroundStyle(item.isChecked ? Theme.muted : (item.isManual ? Theme.cta : Theme.ink))
                 Spacer()
                 if item.isManual {
                     Text("manual")

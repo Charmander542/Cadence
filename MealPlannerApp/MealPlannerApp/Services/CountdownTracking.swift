@@ -28,6 +28,7 @@ enum CountdownTracking {
         trackedEventID == eventID
     }
 
+    @MainActor
     static func toggle(_ eventID: UUID, in context: ModelContext) {
         if trackedEventID == eventID {
             trackedEventID = nil
@@ -38,6 +39,7 @@ enum CountdownTracking {
         WidgetSnapshotWriter.publish(in: context)
     }
 
+    @MainActor
     static func clearIfTracked(_ eventID: UUID, in context: ModelContext) {
         guard trackedEventID == eventID else { return }
         trackedEventID = nil

@@ -4,8 +4,14 @@ import UIKit
 /// Shared design language — dark-first chrome with system appearance support.
 enum Theme {
     // MARK: - Color
+    //
+    // Orange (`accent`) — navigation & context: selected tab, today badges, selection chips.
+    // Blue (`cta`) — do something: FAB, Begin/Save, primary CTAs, tappable links.
 
+    /// Orange — where you are (tab bar, today circle, drawer selection).
     static let accent = Color.accentColor
+    /// Blue — primary call-to-action buttons and links.
+    static let cta = Color("ActionColor")
     static var ink: Color { adaptive(light: .label, dark: .white) }
     static var muted: Color {
         adaptive(
@@ -47,10 +53,14 @@ enum Theme {
     static let matrixIV = Color(red: 0.35, green: 0.82, blue: 0.55)
 
     static var heroGradient: LinearGradient {
+        heroGradient(tint: cta)
+    }
+
+    static func heroGradient(tint: Color) -> LinearGradient {
         LinearGradient(
             colors: [
-                accent.opacity(0.28),
-                accent.opacity(0.08),
+                tint.opacity(0.28),
+                tint.opacity(0.08),
                 surface,
             ],
             startPoint: .topLeading,
@@ -128,13 +138,14 @@ enum Theme {
     }
 
     struct HeroPanel<Content: View>: View {
+        var tint: Color = cta
         @ViewBuilder var content: () -> Content
 
         var body: some View {
             content()
                 .padding(Space.xl)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(heroGradient, in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
+                .background(heroGradient(tint: tint), in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
         }
     }
 
@@ -180,6 +191,7 @@ enum Theme {
                 .padding(.vertical, 15)
             }
             .buttonStyle(.borderedProminent)
+            .tint(Theme.cta)
             .controlSize(.large)
             .disabled(busy)
         }
@@ -224,7 +236,7 @@ enum Theme {
         var body: some View {
             Image(systemName: checked ? "checkmark.circle.fill" : "circle")
                 .font(.title3)
-                .foregroundStyle(checked ? accent : muted)
+                .foregroundStyle(checked ? Theme.cta : muted)
                 .symbolRenderingMode(.hierarchical)
         }
     }
@@ -243,7 +255,7 @@ enum Theme {
                 Spacer(minLength: Space.xxl)
                 Image(systemName: systemImage)
                     .font(.system(size: 52, weight: .semibold, design: .rounded))
-                    .foregroundStyle(accent)
+                    .foregroundStyle(Theme.cta)
                     .symbolRenderingMode(.hierarchical)
                 Text(title)
                     .font(Theme.title(.title3))
@@ -335,14 +347,14 @@ enum Theme {
                     Text(label)
                         .font(.caption.weight(.semibold))
                     Circle()
-                        .fill(selected ? accent : sunken)
+                        .fill(selected ? Theme.cta : sunken)
                         .frame(width: 6, height: 6)
                 }
-                .foregroundStyle(selected ? accent : ink)
+                .foregroundStyle(selected ? Theme.cta : ink)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .background(
-                    Capsule().fill(selected ? accent.opacity(0.14) : Color.clear)
+                    Capsule().fill(selected ? Theme.cta.opacity(0.14) : Color.clear)
                 )
             }
             .buttonStyle(.plain)

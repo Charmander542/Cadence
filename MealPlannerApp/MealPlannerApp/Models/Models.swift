@@ -226,7 +226,8 @@ enum MealSlot: String, Codable, CaseIterable, Identifiable {
     case breakfast, lunch, dinner
     var id: String { rawValue }
     var title: String { rawValue.capitalized }
-    static var recipeSlots: [MealSlot] { [.lunch, .dinner] }
+    /// Slots the weekly generator fills. Lunch is user-managed — dinners only.
+    static var recipeSlots: [MealSlot] { [.dinner] }
 }
 
 struct PlannedMeal: Identifiable, Hashable, Codable {
@@ -497,7 +498,7 @@ enum RecipeComplexity {
 
     static func subtitle(for raw: Int) -> String {
         switch clamped(raw) {
-        case 1: return "Short lists, ingredients you’ll find at any supermarket."
+        case 1: return "One weekly supermarket trip; short ingredient lists."
         case 2: return "Weeknight cooking — maybe one specialty item."
         case 3: return "Normal cookbook dinners."
         case 4: return "Longer lists and more specialty-aisle ingredients."
@@ -505,28 +506,56 @@ enum RecipeComplexity {
         }
     }
 
+    /// Soft cap on unique non-pantry shop SKUs across a 7-dinner week (before pantry filter).
+    static func weeklySKUBudget(for raw: Int) -> Int {
+        switch clamped(raw) {
+        case 1: return 20
+        case 2: return 28
+        case 3: return 36
+        case 4: return 48
+        default: return 80
+        }
+    }
+
+    static func freshHerbCap(for raw: Int) -> Int {
+        switch clamped(raw) {
+        case 1: return 1
+        case 2: return 2
+        default: return 8
+        }
+    }
+
     static func fits(_ recipe: Recipe, level raw: Int, course: String) -> Bool {
         let level = clamped(raw)
         if level >= 5 { return true }
         let shop = shoppableCount(recipe)
-        let exotic = exoticCount(recipe, treatUnknownAsExotic: level == 1)
+        let exotic = exoticCount(recipe, treatUnknownAsExotic: level <= 2)
+        let fussy = fussyCount(recipe)
         let shopCap: Int
         let exoticCap: Int
+        let fussyCap: Int
         switch level {
         case 1:
-            shopCap = course == "side" ? 6 : 8
+            shopCap = course == "side" ? 4 : 6
             exoticCap = 0
+            fussyCap = course == "side" ? 1 : 1
         case 2:
-            shopCap = course == "side" ? 8 : 11
+            shopCap = course == "side" ? 7 : 9
             exoticCap = 1
+            fussyCap = course == "side" ? 2 : 2
         case 3:
             shopCap = course == "side" ? 12 : 15
             exoticCap = 2
+            fussyCap = 4
         default:
             shopCap = course == "side" ? 16 : 22
             exoticCap = 5
+            fussyCap = 8
         }
-        return shop <= shopCap && exotic <= exoticCap
+        if shop > shopCap || exotic > exoticCap || fussy > fussyCap { return false }
+        // Simple/Easy: reject long multi-step recipes when we have step data.
+        if level <= 2, recipe.steps.count > (level == 1 ? 8 : 12) { return false }
+        return true
     }
 
     /// Lower is simpler; used to prefer easier recipes inside the allowed band.
@@ -535,8 +564,10 @@ enum RecipeComplexity {
         if level >= 5 { return 0 }
         let shop = Double(shoppableCount(recipe))
         let exotic = Double(exoticCount(recipe, treatUnknownAsExotic: level <= 2))
-        let weight = [0, 1.2, 0.8, 0.45, 0.2, 0][level]
-        return weight * ((shop / 10.0) + 1.4 * exotic)
+        let fussy = Double(fussyCount(recipe))
+        let steps = Double(max(0, recipe.steps.count - 4))
+        let weight = [0, 1.4, 0.95, 0.45, 0.2, 0][level]
+        return weight * ((shop / 8.0) + 1.6 * exotic + 0.7 * fussy + 0.08 * steps)
     }
 
     static func shoppableCount(_ recipe: Recipe) -> Int {
@@ -560,6 +591,20 @@ enum RecipeComplexity {
         shoppableItems(recipe).filter { isExotic($0, treatUnknownAsExotic: treatUnknownAsExotic) }.count
     }
 
+    /// Produce / herbs that are common in cookbooks but annoying for a minimal weekly shop.
+    static func fussyCount(_ recipe: Recipe) -> Int {
+        shoppableItems(recipe).filter { isFussy($0) }.count
+    }
+
+    static func isFreshHerb(_ name: String) -> Bool {
+        let n = name.lowercased()
+        return freshHerbs.contains(where: { n == $0 || n.hasPrefix($0 + " ") || n.hasSuffix(" " + $0) })
+    }
+
+    static func isExoticName(_ name: String, treatUnknownAsExotic: Bool = false) -> Bool {
+        isExotic(name, treatUnknownAsExotic: treatUnknownAsExotic)
+    }
+
     private static func isExotic(_ name: String, treatUnknownAsExotic: Bool) -> Bool {
         if exoticNeedles.contains(where: { name.contains($0) }) { return true }
         if common.contains(name) { return false }
@@ -567,6 +612,13 @@ enum RecipeComplexity {
             return false
         }
         return treatUnknownAsExotic
+    }
+
+    private static func isFussy(_ name: String) -> Bool {
+        let n = name.lowercased()
+        if fussyNeedles.contains(where: { n.contains($0) }) { return true }
+        if isFreshHerb(n) { return true }
+        return false
     }
 
     private static let staples: Set<String> = [
@@ -607,5 +659,20 @@ enum RecipeComplexity {
         "coconut aminos", "black garlic", "chili crisp", "furikake", "togarashi",
         "fennel pollen", "ghee", "fish sauce", "oyster sauce", "hoisin",
         "rice wine", "nori", "kimchi", "gochugaru", "five spice", "szechuan",
+    ]
+
+    private static let fussyNeedles: [String] = [
+        "shallot", "fennel bulb", "fennel seed", "leek", "radicchio", "endive", "frisee", "watercress",
+        "microgreen", "shiitake", "oyster mushroom", "chanterelle",
+        "morel", "enoki", "bok choy", "napa cabbage", "daikon",
+        "jicama", "rutabaga", "celeriac", "kohlrabi", "rainbow chard", "swiss chard",
+        "haricot", "haricots verts", "broccolini", "romanesco", "pattypan",
+        "sun-dried tomato", "piquillo", "anaheim", "poblano", "serrano", "habanero",
+    ]
+
+    private static let freshHerbs: Set<String> = [
+        "parsley", "cilantro", "basil", "mint", "dill", "chive", "chives",
+        "rosemary", "thyme", "oregano", "sage", "tarragon", "marjoram",
+        "lemongrass", "chervil",
     ]
 }

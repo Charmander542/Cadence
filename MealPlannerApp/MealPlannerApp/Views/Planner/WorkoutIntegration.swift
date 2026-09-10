@@ -36,6 +36,7 @@ struct WorkoutDayCard: View {
 
     var date: Date = .now
     var compact = false
+    var promoted = false
 
     @State private var planEntity: WorkoutPlanEntity?
 
@@ -76,9 +77,9 @@ struct WorkoutDayCard: View {
                     HStack(spacing: 12) {
                         Image(systemName: dayLog != nil ? "checkmark.circle.fill" : "dumbbell.fill")
                             .font(compact ? .title3 : .title2)
-                            .foregroundStyle(dayLog != nil ? Color.mint : Theme.accent)
+                            .foregroundStyle(dayLog != nil ? Color.mint : Theme.cta)
                             .frame(width: 36, height: 36)
-                            .background(Theme.accent.opacity(0.15), in: Circle())
+                            .background(Theme.cta.opacity(0.15), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text(session.name)
                                 .font(compact ? .headline : .title3.weight(.bold))
@@ -121,7 +122,7 @@ struct WorkoutDayCard: View {
             }
         }
         .padding(compact ? 12 : 14)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .onAppear { planEntity = WorkoutStore.plan(in: modelContext) }
         .workoutPreviewSheet(session: $previewSession, planEntity: planEntity)
         .sheet(isPresented: $showLiftHub) {
@@ -157,6 +158,68 @@ struct WorkoutDayCard: View {
             return parts.joined(separator: ", ")
         }
         return "Rest day. Recover, or open Lift for the full program."
+    }
+
+    private var cardBackground: AnyShapeStyle {
+        promoted
+            ? AnyShapeStyle(Theme.heroGradient(tint: Theme.cta))
+            : AnyShapeStyle(Theme.surface)
+    }
+}
+
+/// Single-row workout affordance for Habits tab (no duplicate full card).
+struct WorkoutCompactBanner: View {
+    @EnvironmentObject private var appModel: AppModel
+    @Environment(\.modelContext) private var modelContext
+    @Query private var profiles: [UserProfileEntity]
+
+    var date: Date = .now
+
+    @State private var showLiftHub = false
+
+    private var workoutsEnabled: Bool {
+        profiles.first?.workoutsEnabled ?? true
+    }
+
+    private var scheduled: WorkoutSessionTemplate? {
+        WorkoutIntegration.scheduledSession(on: date, workoutsEnabled: workoutsEnabled)
+    }
+
+    var body: some View {
+        if workoutsEnabled, let session = scheduled, Calendar.current.isDateInToday(date) {
+            HStack(spacing: 10) {
+                Image(systemName: "dumbbell.fill")
+                    .foregroundStyle(Theme.cta)
+                    .frame(width: 28, height: 28)
+                    .background(Theme.cta.opacity(0.15), in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(session.name)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text(session.focus)
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Button {
+                    showLiftHub = true
+                } label: {
+                    Text("Lift")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Theme.accent)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open Lift program")
+                .accessibilityHint("Opens full workout program and history")
+            }
+            .padding(.horizontal, 16)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("\(session.name), \(session.focus). Use Lift for full program.")
+            .sheet(isPresented: $showLiftHub) {
+                WorkoutHomeView()
+            }
+        }
     }
 }
 
@@ -291,6 +354,9 @@ struct TonightMealCard: View {
     @Query private var plans: [WeeklyPlanEntity]
     @State private var selectedDay = MealPlanView.mondayBasedDayIndex()
 
+    var compact = false
+    var promoted = false
+
     private static let mealsTabIndex = 2
 
     var body: some View {
@@ -311,9 +377,9 @@ struct TonightMealCard: View {
                     HStack(spacing: 12) {
                         Image(systemName: "fork.knife")
                             .font(.title3)
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.cta)
                             .frame(width: 36, height: 36)
-                            .background(Theme.accent.opacity(0.15), in: Circle())
+                            .background(Theme.cta.opacity(0.15), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Tonight's dinner")
                                 .font(.caption.weight(.semibold))
@@ -327,8 +393,8 @@ struct TonightMealCard: View {
                         Image(systemName: "chevron.right")
                             .foregroundStyle(Theme.muted)
                     }
-                    .padding(14)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding(compact ? 10 : 14)
+                    .background(mealCardBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .combine)
@@ -341,9 +407,9 @@ struct TonightMealCard: View {
                     HStack(spacing: 12) {
                         Image(systemName: "fork.knife")
                             .font(.title3)
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.cta)
                             .frame(width: 36, height: 36)
-                            .background(Theme.accent.opacity(0.15), in: Circle())
+                            .background(Theme.cta.opacity(0.15), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Tonight's dinner")
                                 .font(.caption.weight(.semibold))
@@ -356,8 +422,8 @@ struct TonightMealCard: View {
                         Image(systemName: "chevron.right")
                             .foregroundStyle(Theme.muted)
                     }
-                    .padding(14)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding(compact ? 10 : 14)
+                    .background(mealCardBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Plan dinner, go to Meals")
@@ -365,6 +431,12 @@ struct TonightMealCard: View {
             }
         }
         .onAppear { selectedDay = MealPlanView.mondayBasedDayIndex() }
+    }
+
+    private var mealCardBackground: AnyShapeStyle {
+        promoted
+            ? AnyShapeStyle(Theme.heroGradient(tint: Theme.cta))
+            : AnyShapeStyle(Theme.surface)
     }
 
     private func tonightDinnerAccessibilityLabel(recipe: Recipe, dinner: PlannedMeal) -> String {

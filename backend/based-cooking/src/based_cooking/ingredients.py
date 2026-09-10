@@ -259,6 +259,10 @@ PREP_WORDS = {
     "heaping",
     "scant",
     "rounded",
+    "boneless",
+    "skinless",
+    "bone-in",
+    "skin-on",
 }
 
 # Color/size leftovers from "green or red cabbage" — not foods on their own.
@@ -387,9 +391,478 @@ class ParsedIngredient:
         )
 
 
+def clean_ingredient_line(line: str) -> str | None:
+    """Normalize one ingredient line for re-parse, or None to drop it."""
+    raw = _clean(line)
+    if not raw:
+        return None
+    # Bracket section markers from scraped books ("[INGREDIENTS]", "[For the Marinade]").
+    if re.match(r"^\[.+\]$", raw):
+        return None
+    # Truncated OCR stubs that are useless alone ("whole-", "sushi-", "pumpkin-").
+    if re.match(r"^[A-Za-z]{2,12}[-–—]$", raw):
+        return None
+    # Yield footnotes mis-filed as ingredients.
+    if re.search(r"\byields?\b", raw, re.I):
+        return None
+    # Instruction / variation prose mis-filed as an ingredient line.
+    if re.match(
+        r"^(add |substitute |optional:\s*for |if you (don.?t|do not)|the following options|"
+        r"up to \d+ cups of any|cooked and drained breakfast|garlic-braised|"
+        r"optional additional toppings|optional aromatic ingredients|"
+        r"optional\)\s*alcohol|about ½ teaspoon salt and|other common seasonings)\b",
+        raw,
+        re.I,
+    ):
+        return None
+    # Multi-component lines jammed into one ("For the bites 12 slices… 2 tbsp…")
+    if re.match(r"^for the \w+", raw, re.I):
+        qty_hits = len(re.findall(r"\b\d+\s*(?:g|ml|tbsp|tsp|cup|oz|slices?|liter)\b", raw, re.I))
+        if qty_hits >= 2:
+            return None
+    # Cross-recipe pointers / serving hints masquerading as ingredients.
+    if re.search(r"\b(recipe follows|hint\s*:|dressed with some of the|added to each piece|"
+                 r"added to the broth|scattered on top)\b", raw, re.I):
+        if re.search(r"\bvinaigrette\b", raw, re.I):
+            return "1/2 cup vinaigrette"
+        if re.search(r"\bedamame\b", raw, re.I):
+            return "1/2 cup edamame"
+        if re.search(r"\bwasabi\b", raw, re.I):
+            return "wasabi"
+        if re.search(r"\bmiso\b", raw, re.I):
+            return None
+        return None
+    # Metric-first amounts: "1 kilogram (about 2 pounds…) pork shoulder"
+    kg = re.match(
+        r"^([\d./¼½¾]+)\s*(?:kilograms?|kg)\b(?:\s*\([^)]*\))?\s*(.+)$",
+        raw,
+        flags=re.I,
+    )
+    if kg:
+        food = re.split(r",\s*(?:cut|trimmed|cubed)\b", kg.group(2), maxsplit=1, flags=re.I)[0]
+        food = re.sub(r"\s*\([^)]*\)", "", food)
+        return f"{kg.group(1)} kg {food.strip(' ,;')}"
+    # "2 cups (or one box) Biscuit Mix"
+    box = re.match(
+        r"^([\d./¼½¾]+)\s*cups?\s*\([^)]*box[^)]*\)\s*(.+)$",
+        raw,
+        flags=re.I,
+    )
+    if box:
+        return f"{box.group(1)} cups {box.group(2).strip()}"
+    # "Zest of 1 lemon removed…"
+    if re.match(r"^zest of\b", raw, re.I):
+        if "lemon" in raw.casefold():
+            return "zest of 1 lemon"
+        if "lime" in raw.casefold():
+            return "zest of 1 lime"
+        if "orange" in raw.casefold():
+            return "zest of 1 orange"
+    # "X using Dutch-process instead of…" — reference to another recipe.
+    if re.search(r"\busing dutch-process instead\b", raw, re.I):
+        return None
+    # "N tablespoons (½ stick or 55g) unsalted butter…"
+    tbsp_butter = re.match(
+        r"^([\d¼½¾⅓⅔./]+)\s*(tablespoons?|tbsp)\s*\([^)]*\)\s*(.+butter.*)$",
+        raw,
+        flags=re.I,
+    )
+    if tbsp_butter:
+        food = re.split(r",\s*(?:melted|browned|softened|at room)\b", tbsp_butter.group(3), maxsplit=1, flags=re.I)[0]
+        return f"{tbsp_butter.group(1)} tablespoons {food.strip(' ,;')}"
+    # "(1 stick plus 1 tablespoon) unsalted butter"
+    if re.search(r"\bstick\b", raw, re.I) and re.search(r"\bbutter\b", raw, re.I):
+        stick_m = re.search(r"([\d¼½¾⅓⅔./]+)\s*tablespoons?", raw, re.I)
+        if stick_m:
+            return f"{stick_m.group(1)} tablespoons butter"
+        return "8 tablespoons butter"
+    if re.match(r"^optional:\s", raw, re.I) and not re.search(
+        r"^optional:\s*[\d¼½¾⅓⅔⅛./]+\s*(?:cup|tbsp|tsp|oz|lb|g|ml|tablespoon|teaspoon|ounce|pound)",
+        raw,
+        re.I,
+    ):
+        # "Optional: For a touch of smokiness…" essays — not shoppable.
+        if len(raw) > 40 and not re.match(r"^optional:\s*[\d¼½¾]", raw, re.I):
+            return None
+    # Depth-of-oil frying shorthand → buyable oil amount.
+    if re.search(r"\binch(?:es)?\b", raw, re.I) and re.search(r"\boil\b", raw, re.I):
+        return "2 cups vegetable oil (for frying)"
+    # Strip cross-ref pointers but keep the food when possible.
+    raw = re.sub(r"\s*\(see here[^)]*\)", "", raw, flags=re.I)
+    raw = re.sub(r"\s*\(see below[^)]*\)", "", raw, flags=re.I)
+    raw = re.sub(r"\s*\(see notes?[^)]*\)", "", raw, flags=re.I)
+    raw = re.sub(r"\s*see here(?:\s*[–—-]\s*here)?\s*", " ", raw, flags=re.I)
+    raw = re.sub(r"\s*see below\b", " ", raw, flags=re.I)
+    raw = re.sub(r",?\s*brined or dry-brined if desired\b", "", raw, flags=re.I)
+    raw = re.sub(r",?\s*if desired\b", "", raw, flags=re.I)
+    raw = re.sub(r",?\s*as desired\b", "", raw, flags=re.I)
+    raw = re.sub(r",?\s*scrubbed(?: and peeled)?\b", "", raw, flags=re.I)
+    raw = re.sub(r",?\s*peeled(?: and (?:scrubbed|seeded|cored))?\b", "", raw, flags=re.I)
+    # Dual metric "(340 g)" / "(15 ml)" — strip so qty stays imperial and item is food-only.
+    raw = re.sub(
+        r"\s*\(\s*[\d./¼½¾⅓⅔]+\s*(?:to\s*[\d./¼½¾⅓⅔]+\s*)?(?:g|kg|ml|l|oz|ounces?)\s*"
+        r"(?:/\s*about\s+[\d./¼½¾⅓⅔]+\s*(?:ounces?|oz|g|kg|ml))?\)",
+        "",
+        raw,
+        flags=re.I,
+    )
+    raw = re.sub(
+        r"\s*\(\s*about\s+[\d./¼½¾⅓⅔]+\s*(?:g|kg|ml|l|oz|ounces?)\s*"
+        r"(?:/\s*[\d./¼½¾⅓⅔]+\s*(?:g|kg|ml|oz|ounces?))?\)",
+        "",
+        raw,
+        flags=re.I,
+    )
+    raw = re.sub(
+        r"\s*\(\s*[\d./¼½¾⅓⅔]+\s*g\s*/\s*about\s+[\d./¼½¾⅓⅔]+\s*ounces?\)",
+        "",
+        raw,
+        flags=re.I,
+    )
+    # "short- or medium-grain" → keep full grain phrase
+    raw = re.sub(
+        r"\bshort-?\s*or\s*medium-grain\b",
+        "short-grain or medium-grain",
+        raw,
+        flags=re.I,
+    )
+    # Common truncated compounds before "or" split.
+    raw = re.sub(
+        r"\bmild lemon-?\s*or\s*red wine[–—-]olive oil vinaigrette\b",
+        "vinaigrette",
+        raw,
+        flags=re.I,
+    )
+    raw = re.sub(r"\bsoft-?\s*or\s*medium-boiled eggs?\b", "eggs", raw, flags=re.I)
+    raw = re.sub(r"\bvegetable-?\s*or\s*tom yam-?quick noodles\b", "noodles", raw, flags=re.I)
+    # "4 to 8 tablespoons butter" ranges → mid-range amount.
+    range_tbsp = re.match(
+        r"^([\d¼½¾⅓⅔./]+)\s*to\s+([\d¼½¾⅓⅔./]+)\s*(tablespoons?|tbsp)\b(.+)$",
+        raw,
+        flags=re.I,
+    )
+    if range_tbsp:
+        lo = _parse_number(range_tbsp.group(1))
+        hi = _parse_number(range_tbsp.group(2))
+        mid = (lo + hi) / 2.0 if lo is not None and hi is not None else lo or hi
+        rest = range_tbsp.group(4).strip()
+        # Prefer butter over "or oil" alternatives in muffin-style lines.
+        if re.search(r"\bbutter\b", rest, re.I):
+            rest = re.sub(r"\s*\([^)]*\)", "", rest)
+            rest = re.split(r",\s*or\b|\s+or\s+(?=\d|¼|½|¾)", rest, maxsplit=1, flags=re.I)[0]
+            rest = rest.strip(" ,;")
+            if rest:
+                return f"{_format_qty(mid)} tablespoons {rest}"
+            return f"{_format_qty(mid)} tablespoons butter"
+    # Pineapple can juice/chunks.
+    if re.search(r"\bpineapple\b", raw, re.I) and re.search(r"\b(juice|chunks)\b", raw, re.I):
+        if re.search(r"\bjuice\b", raw, re.I):
+            return "1 cup pineapple juice"
+        return "1 can pineapple chunks"
+    raw = re.sub(r"\s+", " ", raw).strip(" ,;")
+    # "3 cups plus 2 tablespoons cold water" → single water line.
+    plus = re.match(
+        r"^([\d¼½¾⅓⅔./\s]+)\s*cups?\s+plus\s+([\d¼½¾⅓⅔./\s]+)\s*(?:tablespoons?|tbsp)\s+(.+)$",
+        raw,
+        flags=re.I,
+    )
+    if plus:
+        whole = _parse_number(plus.group(1).strip())
+        tbsp = _parse_number(plus.group(2).strip())
+        food = plus.group(3).strip()
+        food = re.sub(r"^(cold|hot|warm|room[- ]temperature)\s+", "", food, flags=re.I)
+        return f"{_format_qty(whole + tbsp / 16.0)} cups {food}"
+    # Flour lines with serving-style alternatives.
+    if re.search(r"\bflour\b", raw, re.I) and re.search(r"\b(for serving|potpie|casserole|pasta|toast)\b", raw, re.I):
+        m = re.match(
+            r"^([\d¼½¾⅓⅔⅛./\s]+)\s*(cups?|cup|tbsp|tablespoons?|tsp|teaspoons?)?\s*(?:all-?purpose\s+)?flour\b",
+            raw,
+            flags=re.I,
+        )
+        if m:
+            qty = (m.group(1) or "").strip()
+            unit = (m.group(2) or "cup").strip()
+            return f"{qty} {unit} all-purpose flour".strip()
+    # Pure multi-recipe sauce/marinade choosers aren't a single shoppable line.
+    if re.search(r"\b(marinade|pan sauce|glaze|vinaigrette)\b", raw, re.I):
+        if re.search(r"\bor\b", raw, re.I) and raw.count(",") >= 1:
+            return None
+    # Bare section headers without a food on the same line.
+    if re.match(r"^(for the |to serve|to make)\b", raw, re.I):
+        # "For the bites 12 slices…" — keep (has food). Pure "For the bechamel" — drop.
+        rest = re.sub(r"^(for the |to serve|to make)\s*", "", raw, flags=re.I).strip()
+        if not rest or len(rest) < 8:
+            return None
+        return raw
+    if not raw:
+        return None
+    return raw
+
+
+def polish_parsed(ing: ParsedIngredient) -> ParsedIngredient | None:
+    """Post-parse cleanup for shop/display friendliness."""
+    if not ing.item and not ing.raw:
+        return None
+    item = ing.item
+    # Drop residual hedges from the item field.
+    item = re.sub(r"\bif desired\b", "", item, flags=re.I)
+    item = re.sub(r"\bas desired\b", "", item, flags=re.I)
+    item = re.sub(r"\bscrubbed\b", "", item, flags=re.I)
+    item = re.sub(r"\bpeeled\b", "", item, flags=re.I)
+    item = re.sub(r"\bsee (?:here|below|notes?)\b.*$", "", item, flags=re.I)
+    # Leading dual-unit residue the qty parser left behind: "(340 g) chinese broccoli"
+    item = re.sub(
+        r"^\(\s*[\d./¼½¾⅓⅔]+\s*(?:to\s*[\d./¼½¾⅓⅔]+\s*)?(?:g|kg|ml|l|oz|ounces?)\s*\)\s*",
+        "",
+        item,
+        flags=re.I,
+    )
+    item = re.sub(
+        r"^\(\s*about\s+[\d./¼½¾⅓⅔]+\s*(?:g|kg|ml|l|oz|ounces?|cups?|/[^)]+)\s*\)\s*",
+        "",
+        item,
+        flags=re.I,
+    )
+    # Trailing / broken dual-unit notes: "(about 5 teaspoons/15 g" or "about 2½ ounces)"
+    item = re.sub(
+        r"\s*\(\s*about\s+[\d./¼½¾⅓⅔]+\s*(?:teaspoons?|tablespoons?|tsp|tbsp|cups?|ounces?|oz|"
+        r"g|kg|ml)?(?:\s*/\s*[\d./¼½¾⅓⅔]+\s*(?:g|kg|ml|oz|ounces?))?\s*\)?\s*$",
+        "",
+        item,
+        flags=re.I,
+    )
+    item = re.sub(r"\s*\(\s*about\s+[\d./¼½¾⅓⅔]+\s*(?:g|kg|/[^)]*)\s*$", "", item, flags=re.I)
+    # Prep glued with "and": "carrot and grated…", "shrimp and cut into…"
+    item = re.split(
+        r"\s+and\s+(?:cut|grated|minced|sliced|diced|chopped|washed|drained|trimmed|"
+        r"lightly|roughly|finely|halved|quartered|reserved|added|prepped|broken)\b",
+        item,
+        maxsplit=1,
+        flags=re.I,
+    )[0]
+    # Essay / brand blurb leftovers.
+    if re.search(r"\b(is a dried|originating from|use no more than|i.?ve found that|"
+                 r"should never have seen|works best\.|go-to alternative|"
+                 r"preferably japanese bulldog|poly-o|pre-shredded)\b", item, re.I):
+        item = re.split(r"[.;:]|i.?ve found", item, maxsplit=1, flags=re.I)[0]
+        item = re.sub(r"\s*\([^)]*(poly-o|bulldog)[^)]*\)", "", item, flags=re.I)
+    # "~8 oz shredded mozzarella …" with qty stuck in item
+    m_oz = re.match(r"^~?\s*([\d./¼½¾]+)\s*oz\s+(.+)$", item, flags=re.I)
+    if m_oz and ing.quantity is None:
+        food = m_oz.group(2).strip()
+        food = re.split(r"\bi.?ve found\b", food, maxsplit=1, flags=re.I)[0].strip(" ,;")
+        return ParsedIngredient(
+            raw=ing.raw,
+            quantity=_parse_number(m_oz.group(1)),
+            unit="oz",
+            item=_canonicalize_item(food) or food.casefold(),
+            prep="",
+            to_taste=False,
+            optional=ing.optional,
+            allergens=infer_allergens(food, ing.raw),
+            notes=ing.notes,
+        )
+    # Hummus-style: "cup … of lemon juice"
+    if re.search(r"\blemon juice\b", item, re.I):
+        item = "lemon juice"
+    if re.search(r"\bwhole-grain\b", item, re.I) and re.search(r"\bmustard\b", ing.raw, re.I):
+        item = "mustard"
+    if item in {"soft-boiled", "soft boiled"} and re.search(r"\begg", ing.raw, re.I):
+        item = "egg"
+    if re.search(r"\bmozzarella\b", item, re.I):
+        item = "mozzarella"
+    item = re.sub(r"\s+", " ", item).strip(" ,;.")
+    # Truncated hyphen compounds ("mild lemon-", "soft-", "8-") are not foods.
+    if item.endswith("-") or item.endswith("–") or re.match(r"^[a-z]{2,12}-$", item):
+        return None
+    # Common protein shortcuts.
+    if re.search(r"\bchicken breast", item, re.I):
+        item = "chicken breast"
+    elif re.search(r"\bchicken thigh", item, re.I):
+        item = "chicken thigh"
+    elif re.search(r"\bpork tenderloin", item, re.I):
+        item = "pork tenderloin"
+    elif re.search(r"\bflank steak", item, re.I):
+        item = "flank steak"
+    elif re.search(r"\bsweet potato", item, re.I):
+        item = "sweet potato"
+    elif re.search(r"\bbaking potato|\brusset", item, re.I):
+        item = "potato"
+    elif re.search(r"\bsushi rice|short-?grain|medium-?grain", item, re.I):
+        item = "sushi rice"
+    elif item.startswith("japanese short"):
+        item = "sushi rice"
+    elif re.search(r"\bpuff pastry|ready-rolled.*pastry", item, re.I):
+        item = "puff pastry"
+    elif re.search(r"\ball-purpose flour|\bunbleached all-purpose flour", item, re.I):
+        item = "flour"
+    elif re.search(r"\braisin(?:s)?\b", item, re.I) and len(item) > 20:
+        item = "raisins"
+    elif re.search(r"\bcashew", item, re.I):
+        item = "cashews"
+    elif re.search(r"\borange zest\b", item, re.I):
+        item = "orange zest"
+    elif re.search(r"\blime zest\b", item, re.I):
+        item = "lime zest"
+    elif re.search(r"\blemon zest\b", item, re.I) or re.match(r"^zest of\b", item, re.I):
+        item = "lemon zest"
+    elif re.search(r"\bwhipped cream\b", item, re.I):
+        item = "whipped cream"
+    elif re.match(r"^(sweet )?onions?\b", item, re.I):
+        item = "onion"
+    elif re.search(r"\bkale\b|\bspinach\b|\bgreens such as\b", item, re.I) and len(item) > 30:
+        item = "greens"
+    elif re.search(r"\bedamame\b", item, re.I):
+        item = "edamame"
+    elif re.search(r"\bpork shoulder\b", item, re.I):
+        item = "pork shoulder"
+    elif re.search(r"\bbiscuit mix\b|cheddar bay\b", item, re.I):
+        item = "biscuit mix"
+    elif re.search(r"\bvinaigrette\b", item, re.I):
+        item = "vinaigrette"
+    elif re.search(r"\bjalape", item, re.I):
+        item = "jalapeño"
+    elif re.search(r"\bcilantro\b", item, re.I) and len(item) > 20:
+        item = "cilantro"
+    elif re.search(r"\bbell pepper", item, re.I):
+        item = "bell pepper"
+    elif re.search(r"\bturnip", item, re.I):
+        item = "turnip"
+    elif re.search(r"\bcherry\b", item, re.I) and re.search(r"\b(spread|jam|preserve)", item, re.I):
+        item = "cherry jam"
+    elif re.search(r"\bice cream\b", item, re.I):
+        item = "ice cream"
+    elif re.search(r"\bmiso\b", item, re.I) and ("dip" in item or "here" in item):
+        return None  # cross-recipe garnish
+    elif re.search(r"\bchile paste\b|\bchili paste\b", item, re.I):
+        item = "chile paste"
+    elif re.search(r"\bcream cheese\b", item, re.I):
+        item = "cream cheese"
+    elif re.search(r"\byogurt\b|\byoghurt\b", item, re.I):
+        item = "yogurt"
+    elif re.search(r"\begg whites?\b", item, re.I):
+        item = "egg white"
+    elif re.search(r"\bcherries\b", item, re.I):
+        item = "cherries"
+    elif re.search(r"\bladyfinger|savoiardi\b", item, re.I):
+        item = "ladyfingers"
+    elif re.search(r"\bcream of chicken\b", item, re.I):
+        item = "cream of chicken soup"
+    elif re.search(r"\btopping for crispy chow mein\b|\brecipe .+ topping\b", item, re.I):
+        return None
+    elif re.search(r"\bfoie gras\b|\bpâté\b|\bpate\b", item, re.I):
+        item = "pâté"
+    elif re.search(r"\bmixed vegetables\b", item, re.I):
+        item = "mixed vegetables"
+    elif re.search(r"\bunsalted butter\b|\bbutter\b", item, re.I) and (
+        len(item) > 20 or "stick" in item or "tablespoons" in item
+    ):
+        item = "butter"
+    elif re.search(r"\bcheese\b", item, re.I) and re.search(r"\bi have made\b|~?\d+g of cheese", item, re.I):
+        item = "cheese"
+    elif re.search(r"\bstrawberr", item, re.I):
+        item = "strawberries"
+    elif re.search(r"\bmorsels\b|chocolate chips\b", item, re.I):
+        item = "chocolate chips"
+    elif re.search(r"\btomato.*juice\b|\bv8\b", item, re.I):
+        item = "tomato juice"
+    elif re.search(r"\bcoating of oil\b|more traditional\b", item, re.I):
+        return None
+    elif re.search(r"\btomato and chunky vegetable sauce\b|\bpasta sauce\b|sauce for pasta\b", item, re.I):
+        item = "pasta sauce"
+    elif re.match(r"^kilogram\b|^kg\b", item, re.I) is None and re.search(
+        r"^\(about .+\)\s*pork", item, re.I
+    ):
+        item = "pork shoulder"
+    elif re.search(r"\bfor every\b|\bgallon\b", item, re.I):
+        # Ratio recipes ("coffee for every gallon") — keep a short food name.
+        if "coffee" in item:
+            item = "coffee"
+        elif "tea" in item:
+            item = "tea"
+    elif "/" in item and item.count("/") >= 2:
+        # Panini-style slash lists — take first food.
+        item = item.split("/")[0].strip()
+    # Cut absurdly long items at the first clear prep/cut clause.
+    if len(item) > 40:
+        cut = re.split(
+            r",\s*(?:cut|peeled|trimmed|pounded|brined|chopped|diced|sliced|minced|"
+            r"washed|drained|leaves|stems|florets|for serving|for a |plus |preferably |"
+            r"such as |split |casing |rinsed |well drained|patted )\b",
+            item,
+            maxsplit=1,
+            flags=re.I,
+        )[0]
+        item = cut.strip(" ,;")
+    if re.search(r"\byields?\b", item, re.I):
+        return None
+    # Instruction-like items that slipped through.
+    if re.match(
+        r"^(add |substitute |optional|if you |the following |up to \d+ cups of any|"
+        r"and drained|garlic-braised|about ½ teaspoon salt and)\b",
+        item,
+        re.I,
+    ):
+        return None
+    # Broken "flour, pasta, or toast)" style leftovers from bad paren splits.
+    if re.search(r"\bflour\b", item) and ("pasta" in item or "toast" in item or "potpie" in item):
+        item = "flour"
+    if "salt and white" in item or item in {"salt and white", "salt and black"}:
+        item = "salt"
+        return ParsedIngredient(
+            raw=ing.raw,
+            quantity=ing.quantity,
+            unit=ing.unit,
+            item=item,
+            prep="",
+            to_taste=True,
+            optional=ing.optional,
+            allergens=[],
+            notes=ing.notes,
+        )
+    if not item or len(item) < 2:
+        return None
+    # Frying oil with bogus "inches" unit residue.
+    if "oil" in item and ing.unit in {None, "each", "count"} and re.search(r"\binch", ing.raw, re.I):
+        return ParsedIngredient(
+            raw=ing.raw,
+            quantity=2.0,
+            unit="cup",
+            item="vegetable oil",
+            prep="for frying",
+            to_taste=False,
+            optional=ing.optional,
+            allergens=list(ing.allergens),
+            notes="frying_oil",
+        )
+    prep = re.sub(r"\bif desired\b|\bas desired\b|\bscrubbed\b|\bpeeled\b", "", ing.prep, flags=re.I)
+    prep = re.sub(
+        r"\(?\s*about\s+[\d./¼½¾⅓⅔]+\s*(?:teaspoons?|tablespoons?|tsp|tbsp|cups?|ounces?|oz|g|kg|ml)"
+        r"(?:\s*/\s*[\d./¼½¾⅓⅔]+\s*(?:g|kg|ml|oz|ounces?))?\s*\)?",
+        "",
+        prep,
+        flags=re.I,
+    )
+    prep = re.sub(r"\s+", " ", prep).strip(" ,;()")
+    return ParsedIngredient(
+        raw=ing.raw,
+        quantity=ing.quantity,
+        unit=ing.unit,
+        item=item,
+        prep=prep,
+        to_taste=ing.to_taste,
+        optional=ing.optional,
+        allergens=infer_allergens(item, ing.raw),
+        notes=ing.notes,
+    )
+
+
 def parse_ingredient(line: str) -> ParsedIngredient:
     """Parse one free-text ingredient line into qty / unit / item."""
-    raw = _clean(line)
+    cleaned = clean_ingredient_line(line)
+    if cleaned is None:
+        return ParsedIngredient(raw=_clean(line), item="")
+    raw = cleaned
     if not raw:
         return ParsedIngredient(raw=line, item="")
 
@@ -442,6 +915,12 @@ def parse_ingredient(line: str) -> ParsedIngredient:
     if unit is None and re.search(r"\beggs?\b", item, re.I):
         unit = "each"
 
+    # "One 3 ½- to 4-pound chicken" — no leading qty captured; keep as each=1.
+    if qty is None and re.match(r"^(?:one|a|an)\b", working, re.I):
+        qty = 1.0
+        if unit is None and re.search(r"\b(chicken|hen|duck|turkey|roast|steak|tenderloin)\b", item, re.I):
+            unit = "each"
+
     allergens = infer_allergens(item, raw)
 
     # If we only got noise, keep a cleaned item from raw
@@ -452,7 +931,7 @@ def parse_ingredient(line: str) -> ParsedIngredient:
     if vague_unit:
         notes = f"from_{vague_unit}"
 
-    return ParsedIngredient(
+    parsed = ParsedIngredient(
         raw=raw,
         quantity=qty,
         unit=unit,
@@ -463,10 +942,25 @@ def parse_ingredient(line: str) -> ParsedIngredient:
         allergens=allergens,
         notes=notes,
     )
+    polished = polish_parsed(parsed)
+    if polished is None:
+        return ParsedIngredient(raw=raw, item="")
+    return polished
 
 
 def parse_ingredients(lines: list[str]) -> list[ParsedIngredient]:
-    return [parse_ingredient(line) for line in lines if _clean(line)]
+    out: list[ParsedIngredient] = []
+    for line in lines:
+        cleaned = clean_ingredient_line(line)
+        if cleaned is None:
+            continue
+        if not _clean(cleaned):
+            continue
+        parsed = parse_ingredient(cleaned)
+        if not parsed.item and not parsed.to_taste:
+            continue
+        out.append(parsed)
+    return out
 
 
 def infer_allergens(item: str, raw: str = "") -> list[str]:
@@ -619,15 +1113,26 @@ def _split_item_prep(text: str) -> tuple[str, str]:
 
     item = " ".join(tokens).strip(" ,.")
     # Cut at "or" alternatives for canonical item: keep first *food*, not a color leftover
+    # But keep "short- or medium-grain" / "olive or vegetable oil" style pairs.
     if re.search(r"\bor\b", item, re.I):
-        left, right = re.split(r"\bor\b", item, maxsplit=1, flags=re.I)
-        if _is_modifier_phrase(left):
-            item = right.strip(" ,/")
+        if re.search(r"\b(short|medium|long)[- ]?(grain)?\s*or\s*(short|medium|long)", item, re.I):
+            pass  # keep grain range
+        elif re.search(r"\b(olive|vegetable|canola|neutral)\s+or\s+(olive|vegetable|canola|neutral|other)", item, re.I):
+            item = "oil"
         else:
-            item = left.strip(" ,/")
+            left, right = re.split(r"\bor\b", item, maxsplit=1, flags=re.I)
+            left_s, right_s = left.strip(" ,/"), right.strip(" ,/")
+            # "mild lemon- or red wine…" / "8- or 10-ounce" — left is an incomplete hyphen compound.
+            if left_s.endswith(("-", "–", "—")):
+                item = f"{left_s} or {right_s}"
+            elif _is_modifier_phrase(left_s):
+                item = right_s
+            else:
+                item = left_s
     # Parenthetical notes after the food ("cabbage (about 1 pound)")
     item = re.sub(r"\s*\([^)]*\)\s*$", "", item).strip()
     item = re.sub(r"\s*\([^)]*$", "", item).strip()
+    # Mid-item dual units left after qty split: "chinese broccoli (gai lan)" keep; bare grams drop earlier.
 
     merged_prep = ", ".join(p for p in [" ".join(leading_prep), prep, " ".join(trailing_prep)] if p)
     return item.casefold(), merged_prep
@@ -651,7 +1156,10 @@ def _clean_prep(text: str) -> str:
 
 def _canonicalize_item(item: str) -> str:
     item = _clean(item).casefold().strip(" .,;")
+    item = re.sub(r"\bif desired\b|\bas desired\b", "", item, flags=re.I)
+    item = re.sub(r"\bscrubbed\b|\bpeeled\b", "", item, flags=re.I)
     item = re.sub(r"\s*\([^)]*$", "", item).strip()
+    item = re.sub(r"\s+", " ", item).strip(" .,;")
     # Keep "ground meat" / "ground beef" — stripping "ground" leaves a useless "meat".
     if not GROUND_MEAT_RE.match(item):
         item = re.sub(r"^(fresh|dried|frozen|ground|whole)\s+", "", item)
