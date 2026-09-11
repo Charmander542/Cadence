@@ -4,12 +4,36 @@ import AppIntents
 import UIKit
 
 private enum WidgetTheme {
+    enum Space {
+        static let xs: CGFloat = 4
+        static let sm: CGFloat = 8
+        static let md: CGFloat = 12
+        static let lg: CGFloat = 16
+    }
+
     static var surface: Color {
         Color(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark
-                ? UIColor(red: 0.14, green: 0.14, blue: 0.14, alpha: 1)
+                ? UIColor(red: 0.125, green: 0.125, blue: 0.13, alpha: 1)
                 : .secondarySystemGroupedBackground
         })
+    }
+
+    static var hairline: Color {
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor.white.withAlphaComponent(0.09)
+                : UIColor.separator.withAlphaComponent(0.35)
+        })
+    }
+
+    static var accent: Color { Color("AccentColor") }
+
+    static var chromeBackground: some View {
+        surface.overlay {
+            RoundedRectangle(cornerRadius: 0)
+                .strokeBorder(hairline, lineWidth: 1)
+        }
     }
 }
 
@@ -91,18 +115,25 @@ struct TodayTasksWidgetView: View {
     }
 
     private var tasksBody: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Today")
-                    .font(.headline)
+        VStack(alignment: .leading, spacing: WidgetTheme.Space.sm) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("TODAY")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.8)
+                        .foregroundStyle(.secondary)
+                    Text("Tasks")
+                        .font(.headline)
+                }
                 Spacer()
                 Text("\(openCount)")
-                    .font(.caption.weight(.semibold))
+                    .font(.caption.weight(.bold).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
             if entry.snapshot.tasks.isEmpty && entry.snapshot.habits.isEmpty {
-                Text("All clear")
-                    .font(.subheadline)
+                Text("ALL CLEAR")
+                    .font(.caption.weight(.bold))
+                    .tracking(0.5)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(entry.snapshot.tasks.prefix(rowLimit)) { task in
@@ -114,7 +145,7 @@ struct TodayTasksWidgetView: View {
             }
         }
         .containerBackground(for: .widget) {
-            WidgetTheme.surface
+            WidgetTheme.chromeBackground
         }
     }
 
@@ -130,7 +161,7 @@ struct TodayTasksWidgetView: View {
                             .font(.system(size: 8))
                     }
                 } else if family == .accessoryInline {
-                    HStack(spacing: 4) {
+                    HStack(spacing: WidgetTheme.Space.xs) {
                         Image(systemName: "timer")
                         Text(event.title)
                         Text(timerInterval: .now...event.startAt, countsDown: true)
@@ -147,12 +178,14 @@ struct TodayTasksWidgetView: View {
                     }
                 }
             } else {
-                Text("No upcoming")
-                    .font(.caption)
+                Text("NO UPCOMING")
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.6)
+                    .foregroundStyle(.secondary)
             }
         }
         .containerBackground(for: .widget) {
-            WidgetTheme.surface
+            WidgetTheme.chromeBackground
         }
     }
 
@@ -193,12 +226,14 @@ struct TodayTasksWidgetView: View {
     }
 
     private func rowLabel(_ title: String, done: Bool, overdue: Bool) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: WidgetTheme.Space.sm) {
             Image(systemName: done ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(done ? .orange : (overdue ? .red : .secondary))
+                .foregroundStyle(done ? WidgetTheme.accent : (overdue ? .red : .secondary))
                 .font(.caption)
             Text(title)
                 .font(.subheadline)
+                .strikethrough(done)
+                .foregroundStyle(done ? .secondary : .primary)
                 .lineLimit(1)
                 .strikethrough(done)
         }
@@ -248,9 +283,10 @@ struct CountdownWidgetView: View {
 
     var body: some View {
         if let event = entry.snapshot.nextEvent, event.startAt > .now {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Up next")
-                    .font(.caption)
+            VStack(alignment: .leading, spacing: WidgetTheme.Space.sm - 2) {
+                Text("UP NEXT")
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.7)
                     .foregroundStyle(.secondary)
                 Text(event.title)
                     .font(.headline)
@@ -260,22 +296,23 @@ struct CountdownWidgetView: View {
                     .foregroundStyle(.secondary)
                 Text(timerInterval: .now...event.startAt, countsDown: true)
                     .font(.title2.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(WidgetTheme.accent)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .containerBackground(for: .widget) {
-                WidgetTheme.surface
+                WidgetTheme.chromeBackground
             }
         } else {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Up next")
-                    .font(.caption)
+            VStack(alignment: .leading, spacing: WidgetTheme.Space.xs) {
+                Text("UP NEXT")
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.7)
                     .foregroundStyle(.secondary)
                 Text("Star an event to track")
                     .font(.headline)
             }
             .containerBackground(for: .widget) {
-                WidgetTheme.surface
+                WidgetTheme.chromeBackground
             }
         }
     }

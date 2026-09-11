@@ -32,7 +32,7 @@ struct MatrixView: View {
     /// Locked after first layout so keyboard / Quick Add never shrinks the quadrants.
     @State private var lockedGridHeight: CGFloat = 0
 
-    private let matrixFABClearance: CGFloat = 78
+    private let matrixFABClearance: CGFloat = 110
 
     private var openTasks: [PlannerTaskEntity] { tasks }
 
@@ -43,12 +43,12 @@ struct MatrixView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             PlannerTitleHeader(title: "Matrix", onMenu: onOpenDrawer)
-                .padding(.bottom, 14)
+                .padding(.bottom, Theme.Space.md + 2)
 
             GeometryReader { geo in
-                let gap: CGFloat = 10
+                let gap: CGFloat = Theme.Space.sm + 2
                 let contentHeight = lockedGridHeight > 0 ? lockedGridHeight : geo.size.height
-                let w = (geo.size.width - 32 - gap) / 2
+                let w = (geo.size.width - Theme.Space.lg * 2 - gap) / 2
                 let h = max(160, (contentHeight - gap - matrixFABClearance) / 2)
                 VStack(spacing: gap) {
                     HStack(spacing: gap) {
@@ -60,7 +60,7 @@ struct MatrixView: View {
                         quadrant(.notUrgentUnimportant, width: w, height: h)
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Theme.Space.lg)
                 .padding(.bottom, matrixFABClearance)
             }
             .frame(height: lockedGridHeight > 0 ? lockedGridHeight : nil)
@@ -85,16 +85,18 @@ struct MatrixView: View {
                         UndoFAB(accessibilityHint: "Marks the last matrix task incomplete again") {
                             performUndo()
                         }
-                        .padding(.leading, 22)
                         .transition(.move(edge: .leading).combined(with: .opacity))
                     }
                 }
                 .animation(.easeInOut(duration: 0.22), value: pendingUndo != nil)
             },
-            fab: {
-                OrangeFAB { showQuickAdd = true }
-            }
+            fab: { EmptyView() }
         )
+        .onChange(of: appModel.requestedFABAction) { _, action in
+            guard action == .matrixQuickAdd else { return }
+            showQuickAdd = true
+            appModel.requestedFABAction = nil
+        }
         .sheet(isPresented: $showQuickAdd) {
             QuickAddSheet()
         }
@@ -105,41 +107,64 @@ struct MatrixView: View {
 
     private func quadrant(_ q: MatrixQuadrant, width: CGFloat, height: CGFloat) -> some View {
         let items = tasksByQuadrant[q, default: []]
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: Theme.Space.sm) {
             HStack {
                 Text("\(q.roman). \(q.title)")
-                    .font(.caption.weight(.semibold))
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.4)
                     .foregroundStyle(q.tint)
                     .lineLimit(2)
                     .minimumScaleFactor(0.85)
                 Spacer()
                 Text("\(items.count)")
-                    .font(.caption2.weight(.bold))
+                    .font(.caption.weight(.bold).monospacedDigit())
                     .foregroundStyle(q.tint)
+                    .padding(.horizontal, Theme.Space.sm - 1)
+                    .padding(.vertical, Theme.Space.xs - 1)
+                    .background(q.tint.opacity(0.16), in: Capsule())
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(matrixQuadrantHeaderLabel(q, count: items.count))
             .accessibilityAddTraits(.isHeader)
             if items.isEmpty {
+                // Todoist-style empty priority slot: muted caps cue, dashed drop target.
+                Spacer(minLength: 0)
+                Text("DROP HERE")
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.8)
+                    .foregroundStyle(Theme.muted)
+                    .padding(.horizontal, Theme.Space.sm + 2)
+                    .padding(.vertical, Theme.Space.sm)
+                    .frame(maxWidth: .infinity)
+                    .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                            .strokeBorder(
+                                Theme.muted.opacity(0.45),
+                                style: StrokeStyle(lineWidth: 1, dash: [5, 4])
+                            )
+                    )
+                    .accessibilityLabel("Drop tasks here")
                 Spacer(minLength: 0)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: Theme.Space.sm) {
                         ForEach(items) { task in
-                            matrixTaskRow(task)
+                            matrixTaskRow(task, tint: q.tint)
                         }
                     }
                 }
                 .scrollIndicators(.never)
             }
         }
-        .padding(10)
+        .padding(Theme.Space.sm + 2)
         .frame(width: width, height: height, alignment: .topLeading)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(q.tint.opacity(0.35), lineWidth: 1)
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                .strokeBorder(q.tint.opacity(0.4), lineWidth: 1)
         )
+        .shadow(color: Theme.cardShadow, radius: 8, y: 3)
         .dropDestination(for: String.self) { items, _ in
             moveTask(items, to: q)
         }
@@ -152,8 +177,11 @@ struct MatrixView: View {
         "\(q.roman). \(q.title), \(count) open task\(count == 1 ? "" : "s")"
     }
 
-    private func matrixTaskRow(_ task: PlannerTaskEntity) -> some View {
-        HStack(alignment: .top, spacing: 8) {
+    private func matrixTaskRow(_ task: PlannerTaskEntity, tint: Color) -> some View {
+        HStack(alignment: .top, spacing: Theme.Space.sm) {
+            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                .fill(tint)
+                .frame(width: 3, height: 28)
             TaskCheckbox(
                 completed: completingTaskID == task.id,
                 overdue: task.isOverdue
@@ -165,9 +193,10 @@ struct MatrixView: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.ink)
                 if let due = task.dueAt {
-                    Text(PlannerDate.shortDue(due))
-                        .font(.caption2)
-                        .foregroundStyle(task.isOverdue ? Theme.danger : Theme.accent)
+                    Theme.MetaPill(
+                        text: PlannerDate.shortDue(due),
+                        tone: task.isOverdue ? .danger : .accent
+                    )
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

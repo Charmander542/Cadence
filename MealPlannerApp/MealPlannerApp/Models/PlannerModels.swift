@@ -134,9 +134,12 @@ enum TaskRecurrence: String, Codable, CaseIterable, Identifiable, Hashable {
 }
 
 enum CalendarScope: String, CaseIterable, Identifiable, Hashable {
-    case year, month, week, threeDay, day
+    case threeDay, week, day, month, year
 
     var id: String { rawValue }
+
+    /// Focus views first — matches the default Cadence calendar chrome.
+    static var focusOrdered: [CalendarScope] { [.threeDay, .week, .day, .month, .year] }
 
     var title: String {
         switch self {

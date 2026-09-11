@@ -9,14 +9,14 @@ struct TaskTagChips: View {
 
     var body: some View {
         if !tags.isEmpty {
-            HStack(spacing: 4) {
+            HStack(spacing: Theme.Space.xs) {
                 ForEach(tags, id: \.self) { tag in
                     let color = colorMap[tag] ?? Theme.accent
                     Text("#\(tag)")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
+                        .padding(.horizontal, Theme.Space.sm - 2)
+                        .padding(.vertical, Theme.Space.xs / 2)
                         .background(color.opacity(0.85), in: Capsule())
                 }
             }
@@ -31,16 +31,12 @@ struct SmartTitleHints: View {
     var body: some View {
         let hasHints = parsed.dueDate != nil || !parsed.tags.isEmpty
         if hasHints {
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.Space.sm) {
                 if let due = parsed.dueDate {
-                    Label(PlannerDate.shortDue(due), systemImage: "calendar")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Theme.danger)
+                    Theme.MetaPill(text: PlannerDate.shortDue(due), tone: .danger)
                 }
                 ForEach(parsed.tags, id: \.self) { tag in
-                    Text("#\(tag)")
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(tagColors[tag] ?? Theme.accent)
+                    Theme.MetaPill(text: "#\(tag)", tone: .accent)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -78,7 +74,7 @@ struct PriorityFlagLabel: View {
     var showMatrixHint: Bool = true
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Theme.Space.sm + 2) {
             PriorityFlagIcon(priority: priority)
             VStack(alignment: .leading, spacing: 1) {
                 Text(priority.title)
@@ -122,7 +118,7 @@ struct ColorSwatchGrid: View {
     var swatchNamePrefix: String = "Color"
 
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: columns), spacing: 10) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Theme.Space.sm + 2), count: columns), spacing: Theme.Space.sm + 2) {
             ForEach(Array(PlannerColor.palette.enumerated()), id: \.element) { index, hex in
                 Button {
                     selectedHex = hex
@@ -167,6 +163,7 @@ struct DueDatePickerSheet: View {
         NavigationStack {
             DatePicker("Date", selection: $date, displayedComponents: .date)
                 .datePickerStyle(.graphical)
+                .tint(Theme.cta)
                 .padding()
                 .background(Theme.canvas)
                 .accessibilityLabel(dueDateAccessibilityLabel)
@@ -176,11 +173,12 @@ struct DueDatePickerSheet: View {
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("No date") { hasDue = false; dismiss() }
+                            .foregroundStyle(Theme.muted)
                             .accessibilityHint("Clears due date for this task")
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") { hasDue = true; dismiss() }
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(Theme.cta)
                             .accessibilityHint("Sets due date to selected day")
                     }
                 }
@@ -296,6 +294,9 @@ struct PlannerDateTimeRow: View {
                     .foregroundStyle(Theme.ink)
                 Spacer()
                 Text(formatted)
+                    .foregroundStyle(Theme.cta)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.muted)
             }
         }
@@ -399,8 +400,8 @@ struct LocationField: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
+            HStack(spacing: Theme.Space.sm) {
                 TextField("Location", text: $text)
                     .focused($focused)
                     .onChange(of: text) { _, value in
@@ -442,14 +443,14 @@ struct LocationField: View {
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, Theme.Space.sm)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(LocationSearchCompleter.displayString(for: item))
                         .accessibilityHint("Uses this Maps place for location")
                     }
                 }
-                .padding(.horizontal, 4)
+                .padding(.horizontal, Theme.Space.xs)
             }
         }
     }
@@ -465,19 +466,32 @@ struct TagManagerSheet: View {
         NavigationStack {
             List {
                 if tags.isEmpty {
-                    Text("Tags appear when you use #tag in a task title, or add one below.")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.muted)
-                        .listRowBackground(Color.clear)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("No tags yet. Tags appear when you use hash tag in a task title, or add one below.")
-                        .accessibilityAddTraits(.isStaticText)
+                    VStack(spacing: Theme.Space.md) {
+                        Theme.IconWell(systemImage: "number", tint: Theme.muted, size: 48)
+                        Text("NO TAGS")
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.6)
+                            .foregroundStyle(Theme.muted)
+                        Text("Create your first tag")
+                            .font(Theme.display(.headline))
+                            .foregroundStyle(Theme.ink)
+                        Text("Tags appear when you use #tag in a task title, or tap Add.")
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.muted)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Theme.Space.xxl)
+                    .listRowBackground(Color.clear)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("No tags yet. Tags appear when you use hash tag in a task title, or add one below.")
+                    .accessibilityAddTraits(.isStaticText)
                 }
                 ForEach(tags) { tag in
                     Button {
                         editingTag = tag
                     } label: {
-                        HStack(spacing: 12) {
+                        HStack(spacing: Theme.Space.md) {
                             Circle()
                                 .fill(PlannerColor.from(hex: tag.colorHex))
                                 .frame(width: 28, height: 28)
@@ -503,7 +517,7 @@ struct TagManagerSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.cta)
                         .accessibilityHint("Closes tag manager")
                 }
                 ToolbarItem(placement: .primaryAction) {
@@ -551,7 +565,10 @@ struct TagEditorSheet: View {
                         .accessibilityValue(name.isEmpty ? "Empty" : name)
                         .accessibilityHint("Tag name used when typing #tag in tasks")
                 } header: {
-                    Text("Name")
+                    Text("NAME")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.6)
+                        .foregroundStyle(Theme.muted)
                         .accessibilityAddTraits(.isHeader)
                 }
                 Section {
@@ -561,7 +578,10 @@ struct TagEditorSheet: View {
                         swatchNamePrefix: "Tag color"
                     )
                 } header: {
-                    Text("Color")
+                    Text("COLOR")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.6)
+                        .foregroundStyle(Theme.muted)
                         .accessibilityAddTraits(.isHeader)
                 }
             }
@@ -603,7 +623,11 @@ struct ListSettingsSheet: View {
                         .font(.headline)
                         .accessibilityLabel("List name, \(list.name)")
                 } header: {
-                    Text("List")
+                    Text("LIST")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.8)
+                        .foregroundStyle(Theme.muted)
+                        .textCase(nil)
                         .accessibilityAddTraits(.isHeader)
                 }
 
@@ -615,15 +639,23 @@ struct ListSettingsSheet: View {
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
                         .accessibilityAddTraits(.isStaticText)
+                } header: {
+                    Text("VISIBILITY")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.8)
+                        .foregroundStyle(Theme.muted)
+                        .textCase(nil)
+                        .accessibilityAddTraits(.isHeader)
                 }
 
                 if !list.isSystem {
                     Section {
-                        Button("Delete list", role: .destructive) {
+                        Button("DELETE LIST", role: .destructive) {
                             modelContext.delete(list)
                             try? modelContext.save()
                             dismiss()
                         }
+                        .font(.subheadline.weight(.bold))
                         .accessibilityHint("Permanently removes this list and its tasks")
                     }
                 }
@@ -634,10 +666,13 @@ struct ListSettingsSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button("DONE") {
                         try? modelContext.save()
                         dismiss()
                     }
+                    .font(.caption.weight(.bold))
+                    .tracking(0.5)
+                    .foregroundStyle(Theme.cta)
                     .accessibilityHint("Saves list settings and closes")
                 }
             }

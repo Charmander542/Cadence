@@ -75,8 +75,8 @@ struct MuscleTagRow: View {
                     Text(tag)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(Theme.muted)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, Theme.Space.sm)
+                        .padding(.vertical, Theme.Space.xs)
                         .background(Theme.sunken, in: Capsule())
                 }
             }
@@ -93,6 +93,6 @@ struct WorkoutInputField: View {
             .font(.body.monospacedDigit().weight(.semibold))
             .foregroundStyle(Theme.ink)
             .frame(width: width, height: 36)
-            .background(Theme.sunken, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
     }
 }

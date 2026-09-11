@@ -33,32 +33,93 @@ struct BrowseView: View {
     var body: some View {
         List {
             Section {
-                Picker("Course", selection: $course) {
-                    ForEach(courses, id: \.self) { Text($0.capitalized).tag($0) }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Theme.Space.sm) {
+                        ForEach(courses, id: \.self) { c in
+                            Button {
+                                course = c
+                            } label: {
+                                Text(c.capitalized)
+                                    .font(.subheadline.weight(course == c ? .bold : .semibold))
+                                    .foregroundStyle(course == c ? Color.white : Theme.ink)
+                                    .padding(.horizontal, Theme.Space.md + 2)
+                                    .padding(.vertical, Theme.Space.sm)
+                                    .background(
+                                        Capsule().fill(course == c ? Theme.accent : Theme.sunken)
+                                    )
+                                    .overlay(
+                                        Capsule().strokeBorder(
+                                            course == c ? Theme.accent.opacity(0.2) : Theme.hairline,
+                                            lineWidth: 1
+                                        )
+                                    )
+                                    .shadow(
+                                        color: course == c ? Theme.accent.opacity(0.28) : .clear,
+                                        radius: 6,
+                                        y: 2
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(c.capitalized) course filter")
+                            .accessibilityAddTraits(course == c ? [.isButton, .isSelected] : .isButton)
+                        }
+                        // Recime: Clear all beside active filters.
+                        if course != "all" || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Button {
+                                course = "all"
+                                query = ""
+                                searchQuery = ""
+                                displayLimit = pageSize
+                            } label: {
+                                Text("CLEAR ALL")
+                                    .font(.caption.weight(.bold))
+                                    .tracking(0.6)
+                                    .foregroundStyle(Theme.cta)
+                                    .padding(.horizontal, Theme.Space.sm)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Clear all filters")
+                            .accessibilityHint("Resets course filter and search")
+                        }
+                    }
+                    .padding(.vertical, Theme.Space.xs)
                 }
-                .pickerStyle(.menu)
-                .accessibilityLabel("Course filter, \(course.capitalized)")
-                .accessibilityValue(course.capitalized)
-                .accessibilityHint("Filters recipes by course type")
+                .listRowInsets(EdgeInsets(top: Theme.Space.sm, leading: Theme.Space.lg, bottom: Theme.Space.sm, trailing: Theme.Space.lg))
+                .listRowBackground(Color.clear)
             } footer: {
                 Text("Search above by recipe name or ingredient.")
                     .accessibilityAddTraits(.isStaticText)
             }
             if filtered.isEmpty {
                 Section {
-                    VStack(spacing: 8) {
+                    VStack(spacing: Theme.Space.md) {
+                        Theme.IconWell(systemImage: "magnifyingglass", tint: Theme.muted, size: 48)
+                        Text("NO MATCHES")
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.8)
+                            .foregroundStyle(Theme.muted)
                         Text("No recipes match")
-                            .font(.headline)
+                            .font(Theme.display(.headline))
                             .foregroundStyle(Theme.ink)
                         Text("Try another course filter or search term.")
                             .font(.subheadline)
                             .foregroundStyle(Theme.muted)
                             .multilineTextAlignment(.center)
+                        Button {
+                            course = "all"
+                            query = ""
+                            searchQuery = ""
+                            displayLimit = pageSize
+                        } label: {
+                            Theme.MetaPill(text: "CLEAR FILTERS", tone: .cta)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Clear filters")
+                        .accessibilityHint("Resets course filter and search")
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("No recipes match. Try another course filter or search term.")
+                    .padding(.vertical, Theme.Space.xxl)
+                    .accessibilityElement(children: .contain)
                 }
             } else {
             ForEach(results) { recipe in
@@ -71,20 +132,32 @@ struct BrowseView: View {
                         calories: recipe.caloriesPerServing
                     )
                 } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(Theme.recipeDisplayName(recipe.name)).font(.body.weight(.medium))
-                        HStack(spacing: 8) {
-                            Theme.Pill(text: recipe.course.isEmpty ? "recipe" : recipe.course)
-                            Text(recipe.sourceCitation)
-                                .font(.caption)
-                                .foregroundStyle(Theme.muted)
-                            if recipe.webLink != nil {
-                                Image(systemName: "link")
+                    HStack(spacing: Theme.Space.md) {
+                        Theme.IconWell(
+                            systemImage: courseIcon(recipe.course),
+                            tint: Theme.cta,
+                            size: 40
+                        )
+                        VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
+                            Text(Theme.recipeDisplayName(recipe.name)).font(.body.weight(.semibold))
+                            HStack(spacing: Theme.Space.sm) {
+                                Theme.MetaPill(
+                                    text: recipe.course.isEmpty ? "recipe" : recipe.course,
+                                    tone: .accent
+                                )
+                                Text(recipe.sourceCitation)
                                     .font(.caption)
-                                    .foregroundStyle(.tint)
+                                    .foregroundStyle(Theme.muted)
+                                    .lineLimit(1)
+                                if recipe.webLink != nil {
+                                    Image(systemName: "link")
+                                        .font(.caption)
+                                        .foregroundStyle(Theme.cta)
+                                }
                             }
                         }
                     }
+                    .padding(.vertical, Theme.Space.xs / 2)
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel(browseRecipeRowLabel(recipe))
@@ -95,6 +168,7 @@ struct BrowseView: View {
                     displayLimit += pageSize
                 }
                 .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.cta)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .accessibilityLabel("Show more recipes")
                 .accessibilityHint("Loads \(min(pageSize, filtered.count - displayLimit)) more of \(filtered.count) matching recipes")
@@ -110,6 +184,15 @@ struct BrowseView: View {
         }
         .onChange(of: course) { _, _ in displayLimit = pageSize }
         .onDisappear { searchDebounceTask?.cancel() }
+    }
+
+    private func courseIcon(_ course: String) -> String {
+        switch course.lowercased() {
+        case "main": return "fork.knife"
+        case "side": return "leaf"
+        case "dessert": return "birthday.cake"
+        default: return "book"
+        }
     }
 
     private func scheduleSearchQuery(_ newValue: String) {

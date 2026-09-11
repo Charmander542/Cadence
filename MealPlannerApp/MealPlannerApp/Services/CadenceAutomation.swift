@@ -24,8 +24,18 @@ enum CadenceAutomation {
                 appModel.requestedMainTab = index
             } else if let index = tabNames[token] {
                 appModel.requestedMainTab = index
+            } else if WheelDestination(rawValue: token) != nil {
+                appModel.requestedWheelId = token
             }
             log("tab", token)
+
+        case "wheel":
+            guard parts.count >= 2 else { return }
+            let token = parts[1].lowercased()
+            if WheelDestination(rawValue: token) != nil {
+                appModel.requestedWheelId = token
+                log("wheel", token)
+            }
 
         case "open":
             guard parts.count >= 2 else { return }
@@ -39,6 +49,15 @@ enum CadenceAutomation {
             case "shop":
                 appModel.requestedOpenShop = true
                 log("open", "shop")
+            case "spend":
+                appModel.requestedWheelId = WheelDestination.spend.rawValue
+                log("open", "spend")
+            case "health":
+                appModel.requestedWheelId = WheelDestination.health.rawValue
+                log("open", "health")
+            case "news":
+                appModel.requestedWheelId = WheelDestination.news.rawValue
+                log("open", "news")
             case "drawer":
                 appModel.requestedOpenDrawer = true
                 log("open", "drawer")

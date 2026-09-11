@@ -37,9 +37,9 @@ struct WorkoutKeypadEditor: View {
 
     var body: some View {
         keypad
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color.black.ignoresSafeArea(edges: .bottom))
+            .padding(.horizontal, Theme.Space.sm + 2)
+            .padding(.vertical, Theme.Space.sm)
+            .background(Theme.canvas.ignoresSafeArea(edges: .bottom))
     }
 
     private var parsedDouble: Double {
@@ -47,17 +47,17 @@ struct WorkoutKeypadEditor: View {
     }
 
     private var rirBarInline: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.Space.sm) {
             ForEach([0, 1, 2, 3, 4], id: \.self) { value in
                 rirChip(value, color: RIRPalette.color(for: value), compact: true)
             }
             rirChip(5, label: "5+", color: RIRPalette.color(for: 5), compact: true, capsAtOrAbove: true)
-            rirChip(-1, label: "?", color: Color(white: 0.22), compact: true)
+            rirChip(-1, label: "?", color: Theme.sunken, compact: true)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 54)
-        .padding(.horizontal, 6)
-        .background(Color(white: 0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.horizontal, Theme.Space.sm - 2)
+        .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
     }
 
     private func rirChip(
@@ -79,7 +79,7 @@ struct WorkoutKeypadEditor: View {
                 .foregroundStyle(.white)
                 .frame(width: size, height: size)
                 .background(color, in: Circle())
-                .overlay(Circle().stroke(Color.white, lineWidth: selected ? 2.5 : 0))
+                .overlay(Circle().stroke(Theme.ink, lineWidth: selected ? 2.5 : 0))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(rirAccessibilityLabel(value: value, display: display, capsAtOrAbove: capsAtOrAbove, selected: selected))
@@ -105,8 +105,8 @@ struct WorkoutKeypadEditor: View {
     }
 
     private var keypad: some View {
-        HStack(alignment: .top, spacing: 6) {
-            VStack(spacing: 6) {
+        HStack(alignment: .top, spacing: Theme.Space.sm - 2) {
+            VStack(spacing: Theme.Space.sm - 2) {
                 if mode == .weight {
                     PlateCalculatorInline(weightLb: parsedDouble)
                         .frame(height: 54)
@@ -118,7 +118,7 @@ struct WorkoutKeypadEditor: View {
                 numRow(["1", "2", "3"])
                 numRow(["4", "5", "6"])
                 numRow(["7", "8", "9"])
-                HStack(spacing: 6) {
+                HStack(spacing: Theme.Space.sm - 2) {
                     if mode == .weight {
                         numKey(".")
                     } else if mode == .reps {
@@ -128,12 +128,12 @@ struct WorkoutKeypadEditor: View {
                     }
                     numKey("0")
                     Button(action: backspace) {
-                        Image(systemName: "delete.left")
+            Image(systemName: "delete.left")
                             .font(.title3)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Theme.ink)
                             .frame(maxWidth: .infinity)
                             .frame(height: 54)
-                            .background(Color(white: 0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Delete")
@@ -141,7 +141,7 @@ struct WorkoutKeypadEditor: View {
                 }
             }
 
-            VStack(spacing: 6) {
+            VStack(spacing: Theme.Space.sm - 2) {
                 actionKey(systemImage: "keyboard.chevron.compact.down", accessibilityLabel: "Hide keypad", accessibilityHint: "Closes keypad without saving", action: onDismiss)
                 actionKey(systemImage: "minus", accessibilityLabel: "Decrease", accessibilityHint: nudgeHint) { nudge(-1) }
                 actionKey(systemImage: "plus", accessibilityLabel: "Increase", accessibilityHint: nudgeHint) { nudge(1) }
@@ -152,7 +152,7 @@ struct WorkoutKeypadEditor: View {
     }
 
     private func numRow(_ keys: [String]) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Theme.Space.sm - 2) {
             ForEach(keys, id: \.self) { numKey($0) }
         }
     }
@@ -161,10 +161,10 @@ struct WorkoutKeypadEditor: View {
         Button { append(title) } label: {
             Text(title)
                 .font(.title.weight(.regular))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)
-                .background(Color(white: 0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(title == "." && draft.contains("."))
@@ -210,10 +210,10 @@ struct WorkoutKeypadEditor: View {
                     Image(systemName: systemImage).font(.body.weight(.semibold))
                 }
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Theme.ink)
             .frame(maxWidth: .infinity)
             .frame(height: 54)
-            .background(Color(white: 0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel ?? label ?? systemImage ?? "Action")
@@ -225,10 +225,10 @@ struct WorkoutKeypadEditor: View {
             Button { failureMode = true } label: {
                 Text("F")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(failureMode ? .black : .white)
+                    .foregroundStyle(failureMode ? Theme.canvas : Theme.ink)
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .background(failureMode ? Color.white : Color(white: 0.14))
+                    .background(failureMode ? Theme.ink : Theme.surface)
             }
             .accessibilityLabel(failureMode ? "Failure set, selected" : "Failure set")
             .accessibilityHint("Marks set as taken to failure")
@@ -236,16 +236,16 @@ struct WorkoutKeypadEditor: View {
             Button { failureMode = false } label: {
                 Text("P")
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(!failureMode ? .black : .white)
+                    .foregroundStyle(!failureMode ? Theme.canvas : Theme.ink)
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .background(!failureMode ? Color.white : Color(white: 0.14))
+                    .background(!failureMode ? Theme.ink : Theme.surface)
             }
             .accessibilityLabel(!failureMode ? "Partial reps, selected" : "Partial reps")
             .accessibilityHint("Marks set as partial reps")
             .accessibilityAddTraits(!failureMode ? [.isButton, .isSelected] : .isButton)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         .buttonStyle(.plain)
     }
 
@@ -253,10 +253,11 @@ struct WorkoutKeypadEditor: View {
         Button(action: onConfirm) {
             Image(systemName: "arrow.right")
                 .font(.title2.weight(.bold))
-                .foregroundStyle(.black)
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 114)
-                .background(Color.white, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(Theme.cta, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .shadow(color: Theme.cta.opacity(0.35), radius: 8, y: 3)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Confirm")
@@ -328,13 +329,13 @@ struct PlateCalculatorInline: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: Theme.Space.sm + 2) {
             leftSideBarbell(plates: platesPerSide)
                 .frame(width: 96, height: 54, alignment: .center)
 
             VStack(alignment: .leading, spacing: 2) {
                 if !platesPerSide.isEmpty {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.Space.sm) {
                         ForEach(groupedLegend(platesPerSide), id: \.label) { item in
                             HStack(spacing: 3) {
                                 RoundedRectangle(cornerRadius: 2)
@@ -342,22 +343,22 @@ struct PlateCalculatorInline: View {
                                     .frame(width: 8, height: 8)
                                 Text(item.label)
                                     .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(Color(white: 0.55))
+                                    .foregroundStyle(Theme.muted)
                             }
                         }
                     }
                 }
                 Text(summaryText)
                     .font(.system(size: 10))
-                    .foregroundStyle(Color(white: 0.45))
+                    .foregroundStyle(Theme.muted.opacity(0.85))
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Theme.Space.sm)
         .frame(maxHeight: .infinity, alignment: .center)
-        .background(Color(white: 0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(summaryText)
         .accessibilityHint("Plate loading for entered weight")
@@ -452,12 +453,12 @@ struct WorkoutEditableField: View {
         ZStack(alignment: .bottomTrailing) {
             Text(text.isEmpty ? "—" : text)
                 .font(.body.monospacedDigit().weight(.semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.ink)
                 .frame(width: width, height: 44)
-                .background(Color(white: 0.16), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(focused ? Color.white : Color.clear, lineWidth: 2)
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .stroke(focused ? Theme.cta : Theme.hairline.opacity(0.6), lineWidth: focused ? 2 : 1)
                 )
             if let rir {
                 RIRBadge(value: rir)
@@ -486,8 +487,9 @@ struct SetTypeBadge: View {
     var body: some View {
         Text(label)
             .font(.caption.weight(.bold))
-            .foregroundStyle(dimmed ? Color(white: 0.45) : .white)
+            .foregroundStyle(dimmed ? Theme.muted : .white)
             .frame(width: 28, height: 28)
-            .background(Color(white: 0.18), in: Circle())
+            .background(Theme.sunken, in: Circle())
+            .overlay(Circle().strokeBorder(Theme.hairline, lineWidth: 1))
     }
 }

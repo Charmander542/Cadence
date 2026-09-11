@@ -23,8 +23,16 @@ struct MealPlannerApp: App {
             PlannerTagEntity.self,
             HabitEntity.self,
             HabitLogEntity.self,
+            SpendEnrollmentEntity.self,
+            SpendTransactionEntity.self,
+            SpendTrackedItemEntity.self,
+            SpendUseLogEntity.self,
+            HealthDaySnapshotEntity.self,
+            NewsArticleEntity.self,
+            NewsBriefingEntity.self,
         ])
-        let config = ModelConfiguration("musclemeal-v3", isStoredInMemoryOnly: false)
+        // v6: News daily digest (RSS + optional AI briefs).
+        let config = ModelConfiguration("musclemeal-v6", isStoredInMemoryOnly: false)
         do {
             return try ModelContainer(for: schema, configurations: [config])
         } catch {
@@ -50,7 +58,7 @@ struct MealPlannerApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(appModel)
-                .tint(Color.accentColor)
+                .tint(Theme.accent)
                 .onOpenURL { url in
                     CadenceAutomation.handle(url, appModel: appModel)
                 }
@@ -59,6 +67,9 @@ struct MealPlannerApp: App {
                     let context = sharedModelContainer.mainContext
                     PlannerStore.seedIfNeeded(in: context)
                     Pantry.seedIfNeeded(in: context)
+                    SpendStore.seedDemoIfNeeded(in: context)
+                    HealthStore.ensureDemoSnapshot(in: context)
+                    NewsStore.seedDemoIfNeeded(in: context)
                     WidgetSnapshotWriter.applyPendingToggles(in: context)
                     appModel.refreshGroceryFromSavedPlanIfNeeded(modelContext: context)
                     WidgetSnapshotWriter.publishImmediately(in: context)

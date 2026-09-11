@@ -2,6 +2,8 @@ import SwiftUI
 import UIKit
 
 /// Shared design language — dark-first chrome with system appearance support.
+/// Visual system refined from polished production apps (dark fitness + task + meal patterns):
+/// pure canvas, elevated charcoal cards with hairlines, orange for place, blue for action.
 enum Theme {
     // MARK: - Color
     //
@@ -9,14 +11,16 @@ enum Theme {
     // Blue (`cta`) — do something: FAB, Begin/Save, primary CTAs, tappable links.
 
     /// Orange — where you are (tab bar, today circle, drawer selection).
-    static let accent = Color.accentColor
+    /// Use the AccentColor asset explicitly — `Color.accentColor` tracks the view
+    /// tint (often CTA blue), which collapses nav vs action semantics.
+    static let accent = Color("AccentColor")
     /// Blue — primary call-to-action buttons and links.
     static let cta = Color("ActionColor")
     static var ink: Color { adaptive(light: .label, dark: .white) }
     static var muted: Color {
         adaptive(
             light: .secondaryLabel,
-            dark: UIColor.white.withAlphaComponent(0.55)
+            dark: UIColor.white.withAlphaComponent(0.52)
         )
     }
     static let danger = Color(red: 1, green: 0.32, blue: 0.32)
@@ -25,20 +29,33 @@ enum Theme {
     static var surface: Color {
         adaptive(
             light: .secondarySystemGroupedBackground,
-            dark: UIColor(red: 0.14, green: 0.14, blue: 0.14, alpha: 1)
+            dark: UIColor(red: 0.125, green: 0.125, blue: 0.13, alpha: 1)
         )
     }
     static var sunken: Color {
         adaptive(
             light: .tertiarySystemGroupedBackground,
-            dark: UIColor(red: 0.18, green: 0.18, blue: 0.18, alpha: 1)
+            dark: UIColor(red: 0.17, green: 0.17, blue: 0.175, alpha: 1)
         )
     }
     /// Calendar grid lines and subtle separators — visible in light and dark mode.
     static var gridDivider: Color {
         adaptive(
             light: UIColor.separator.withAlphaComponent(0.55),
-            dark: UIColor.white.withAlphaComponent(0.06)
+            dark: UIColor.white.withAlphaComponent(0.07)
+        )
+    }
+    /// Soft card rim — reads as elevation without heavy shadows.
+    static var hairline: Color {
+        adaptive(
+            light: UIColor.separator.withAlphaComponent(0.35),
+            dark: UIColor.white.withAlphaComponent(0.09)
+        )
+    }
+    static var cardShadow: Color {
+        adaptive(
+            light: UIColor.black.withAlphaComponent(0.08),
+            dark: UIColor.black.withAlphaComponent(0.45)
         )
     }
     static let flagHigh = Color(red: 0.95, green: 0.28, blue: 0.32)
@@ -118,7 +135,7 @@ enum Theme {
         static let sm: CGFloat = 10
         static let md: CGFloat = 14
         static let lg: CGFloat = 18
-        static let xl: CGFloat = 22
+        static let xl: CGFloat = 24
         static let pill: CGFloat = 999
     }
 
@@ -127,6 +144,7 @@ enum Theme {
     struct Card<Content: View>: View {
         var padding: CGFloat = Space.lg
         var radius: CGFloat = Radius.lg
+        var elevated = true
         @ViewBuilder var content: () -> Content
 
         var body: some View {
@@ -134,6 +152,11 @@ enum Theme {
                 .padding(padding)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(surface, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(hairline, lineWidth: 1)
+                )
+                .shadow(color: elevated ? cardShadow : .clear, radius: elevated ? 10 : 0, y: elevated ? 4 : 0)
         }
     }
 
@@ -146,24 +169,116 @@ enum Theme {
                 .padding(Space.xl)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(heroGradient(tint: tint), in: RoundedRectangle(cornerRadius: Radius.xl, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.xl, style: .continuous)
+                        .strokeBorder(tint.opacity(0.22), lineWidth: 1)
+                )
+                .shadow(color: tint.opacity(0.18), radius: 16, y: 6)
         }
     }
 
     struct Pill: View {
         let text: String
         var emphasized = false
+        var tint: Color? = nil
+
+        private var fill: Color {
+            if let tint { return tint.opacity(0.16) }
+            return emphasized ? accent.opacity(0.18) : Color.secondary.opacity(0.12)
+        }
+
+        private var foreground: Color {
+            if let tint { return tint }
+            return emphasized ? accent : muted
+        }
 
         var body: some View {
             Text(text.uppercased())
                 .font(.caption2.weight(.bold))
                 .tracking(0.7)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
+                .padding(.horizontal, Space.sm + 2)
+                .padding(.vertical, Space.xs + 1)
+                .background(fill, in: Capsule())
+                .foregroundStyle(foreground)
+        }
+    }
+
+    /// Compact metadata chip under task / recipe titles (Todoist / Attio pattern).
+    struct MetaPill: View {
+        let text: String
+        var tone: MetaTone = .neutral
+
+        enum MetaTone {
+            case neutral, accent, danger, cta
+        }
+
+        private var colors: (fg: Color, bg: Color) {
+            switch tone {
+            case .neutral: return (Theme.muted, Theme.sunken)
+            case .accent: return (Theme.accent, Theme.accent.opacity(0.14))
+            case .danger: return (Theme.danger, Theme.danger.opacity(0.14))
+            case .cta: return (Theme.cta, Theme.cta.opacity(0.14))
+            }
+        }
+
+        var body: some View {
+            Text(text)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(colors.fg)
+                .padding(.horizontal, Space.sm)
+                .padding(.vertical, Space.xs)
+                .background(colors.bg, in: Capsule())
+        }
+    }
+
+    struct CountBadge: View {
+        let count: Int
+        var emphasized = false
+
+        var body: some View {
+            Text("\(count)")
+                .font(.caption.weight(.bold).monospacedDigit())
+                .foregroundStyle(emphasized ? Theme.accent : Theme.muted)
+                .padding(.horizontal, Space.sm)
+                .padding(.vertical, Space.xs - 1)
                 .background(
-                    emphasized ? accent.opacity(0.18) : Color.secondary.opacity(0.12),
+                    (emphasized ? Theme.accent.opacity(0.16) : Theme.sunken),
                     in: Capsule()
                 )
-                .foregroundStyle(emphasized ? accent : muted)
+        }
+    }
+
+    /// Tinted glyph well for settings / empty-state iconography (Tonal / Letterboxd).
+    struct IconWell: View {
+        let systemImage: String
+        var tint: Color = accent
+        var size: CGFloat = 36
+
+        var body: some View {
+            Image(systemName: systemImage)
+                .font(.system(size: size * 0.42, weight: .semibold, design: .rounded))
+                .foregroundStyle(tint)
+                .frame(width: size, height: size)
+                .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
+        }
+    }
+
+    struct ProgressTrack: View {
+        var progress: Double
+        var tint: Color = cta
+        var height: CGFloat = 4
+
+        var body: some View {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(sunken)
+                    Capsule()
+                        .fill(tint)
+                        .frame(width: max(height, geo.size.width * min(max(progress, 0), 1)))
+                }
+            }
+            .frame(height: height)
+            .accessibilityHidden(true)
         }
     }
 
@@ -184,15 +299,16 @@ enum Theme {
                     } else if let systemImage {
                         Image(systemName: systemImage)
                     }
-                    Text(busy ? "Working…" : title)
+                    Text(busy ? "WORKING…" : title)
                         .font(.headline)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 15)
+                .padding(.vertical, Space.md + 3)
+                .foregroundStyle(.white)
+                .background(Theme.cta, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .shadow(color: Theme.cta.opacity(0.35), radius: 10, y: 4)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Theme.cta)
-            .controlSize(.large)
+            .buttonStyle(.plain)
             .disabled(busy)
         }
     }
@@ -212,10 +328,15 @@ enum Theme {
                         .font(.subheadline.weight(.semibold))
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, Space.md + 1)
+                .foregroundStyle(Theme.ink)
+                .background(sunken, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+                        .strokeBorder(hairline, lineWidth: 1)
+                )
             }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
+            .buttonStyle(.plain)
         }
     }
 
@@ -227,6 +348,10 @@ enum Theme {
                 .padding(.horizontal, Space.md)
                 .padding(.vertical, Space.sm + 2)
                 .background(sunken, in: RoundedRectangle(cornerRadius: Radius.sm, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.sm, style: .continuous)
+                        .strokeBorder(hairline, lineWidth: 1)
+                )
         }
     }
 
@@ -245,6 +370,7 @@ enum Theme {
         let systemImage: String
         let title: String
         let message: String
+        var meta: [String] = []
         var cta: String? = nil
         var ctaHint: String? = nil
         var busy = false
@@ -253,10 +379,7 @@ enum Theme {
         var body: some View {
             VStack(spacing: Space.lg) {
                 Spacer(minLength: Space.xxl)
-                Image(systemName: systemImage)
-                    .font(.system(size: 52, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Theme.cta)
-                    .symbolRenderingMode(.hierarchical)
+                IconWell(systemImage: systemImage, tint: Theme.cta, size: 64)
                 Text(title)
                     .font(Theme.title(.title3))
                     .multilineTextAlignment(.center)
@@ -266,6 +389,15 @@ enum Theme {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, Space.xxl)
                     .accessibilityAddTraits(.isStaticText)
+                if !meta.isEmpty {
+                    HStack(spacing: Space.sm) {
+                        ForEach(meta, id: \.self) { item in
+                            MetaPill(text: item, tone: .cta)
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(meta.joined(separator: ", "))
+                }
                 if let cta, let action {
                     Group {
                         if let ctaHint {
@@ -294,9 +426,13 @@ enum Theme {
                     .fill(.ultraThinMaterial)
                     .ignoresSafeArea()
                 VStack(spacing: Space.md) {
+                    Text("WORKING")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.8)
+                        .foregroundStyle(muted)
                     ProgressView()
                         .controlSize(.large)
-                        .tint(accent)
+                        .tint(cta)
                     Text(title)
                         .font(.subheadline.weight(.semibold))
                         .accessibilityAddTraits(.isStaticText)
@@ -309,6 +445,12 @@ enum Theme {
                     }
                 }
                 .padding(Space.xl)
+                .background(surface.opacity(0.92), in: RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
+                        .strokeBorder(hairline, lineWidth: 1)
+                )
+                .shadow(color: cardShadow, radius: 12, y: 4)
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(detail.map { "\(title). \($0)" } ?? title)
@@ -319,48 +461,127 @@ enum Theme {
     struct SectionHeader: View {
         let title: String
         var subtitle: String? = nil
+        var count: Int? = nil
 
         var body: some View {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(Theme.title(.headline))
-                if let subtitle {
-                    Text(subtitle)
-                        .font(Theme.body(.caption))
-                        .foregroundStyle(muted)
+            HStack(alignment: .firstTextBaseline, spacing: Space.sm) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.6)
+                        .textCase(.uppercase)
+                        .foregroundStyle(ink)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(Theme.body(.caption))
+                            .foregroundStyle(muted)
+                    }
                 }
+                if let count {
+                    CountBadge(count: count)
+                }
+                Spacer(minLength: 0)
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
-            .accessibilityLabel(subtitle.map { "\(title). \($0)" } ?? title)
+            .accessibilityLabel({
+                var parts = [title]
+                if let subtitle { parts.append(subtitle) }
+                if let count { parts.append("\(count) items") }
+                return parts.joined(separator: ". ")
+            }())
         }
     }
 
+    /// Day picker chip — filled capsule when selected (meal week strip).
     struct DayChip: View {
         let label: String
         var selected: Bool
+        var isToday: Bool = false
         var action: () -> Void
 
         var body: some View {
             Button(action: action) {
-                VStack(spacing: 4) {
-                    Text(label)
-                        .font(.caption.weight(.semibold))
-                    Circle()
-                        .fill(selected ? Theme.cta : sunken)
-                        .frame(width: 6, height: 6)
-                }
-                .foregroundStyle(selected ? Theme.cta : ink)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule().fill(selected ? Theme.cta.opacity(0.14) : Color.clear)
-                )
+                Text(label)
+                    .font(.subheadline.weight(selected ? .bold : .semibold))
+                    .tracking(0.3)
+                    .foregroundStyle(selected ? Color.white : (isToday ? Theme.accent : ink))
+                    .frame(minWidth: 44)
+                    .padding(.vertical, Space.sm + 2)
+                    .background(
+                        Capsule().fill(selected ? Theme.accent : (isToday ? Theme.accent.opacity(0.12) : sunken))
+                    )
+                    .overlay {
+                        if selected {
+                            Capsule().strokeBorder(Theme.accent.opacity(0.25), lineWidth: 1)
+                        } else if isToday {
+                            Capsule().strokeBorder(Theme.accent.opacity(0.4), lineWidth: 1.2)
+                        } else {
+                            Capsule().strokeBorder(Theme.hairline, lineWidth: 1)
+                        }
+                    }
+                    .shadow(
+                        color: selected ? Theme.accent.opacity(0.28) : .clear,
+                        radius: 6,
+                        y: 2
+                    )
             }
             .buttonStyle(.plain)
             .accessibilityLabel(selected ? "\(label), selected" : label)
             .accessibilityHint(selected ? "Currently showing meals for this day" : "Shows meal plan for this day")
             .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        }
+    }
+
+    /// Week-strip day cell with weekday + number + selection circle (Habits / Lift / Runna pattern).
+    struct SoftDayCell: View {
+        let weekday: String
+        let dayNumber: String
+        var selected: Bool
+        var isToday: Bool = false
+        var badge: String? = nil
+        var action: () -> Void
+
+        var body: some View {
+            Button(action: action) {
+                VStack(spacing: Space.xs + 1) {
+                    Text(weekday)
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.4)
+                        .foregroundStyle(selected || isToday ? Theme.accent : muted)
+                    Text(dayNumber)
+                        .font(.subheadline.weight(selected ? .bold : .semibold))
+                        .foregroundStyle(selected ? Color.white : ink)
+                        .frame(width: 34, height: 34)
+                        .background(
+                            Circle().fill(selected ? Theme.accent : (isToday ? Theme.accent.opacity(0.14) : Color.clear))
+                        )
+                        .overlay {
+                            if selected {
+                                // Orange nav fill — distinct from CTA blue actions nearby.
+                                Circle().strokeBorder(Color.white.opacity(0.28), lineWidth: 1)
+                            } else if isToday {
+                                Circle().strokeBorder(Theme.accent.opacity(0.45), lineWidth: 1.5)
+                            }
+                        }
+                        .shadow(
+                            color: selected ? Theme.accent.opacity(0.35) : .clear,
+                            radius: 5,
+                            y: 1
+                        )
+                    if let badge {
+                        Text(badge)
+                            .font(.system(size: 8, weight: .bold))
+                            .tracking(0.4)
+                            .foregroundStyle(Theme.accent)
+                            .lineLimit(1)
+                    } else {
+                        Color.clear.frame(height: 10)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -392,7 +613,7 @@ struct PlanGeneratingOverlay: View {
                     ForEach(0..<3, id: \.self) { ring in
                         Circle()
                             .stroke(
-                                Theme.accent.opacity(0.2 - Double(ring) * 0.04),
+                                Theme.cta.opacity(0.22 - Double(ring) * 0.05),
                                 lineWidth: 1.5
                             )
                             .frame(
@@ -409,7 +630,7 @@ struct PlanGeneratingOverlay: View {
                     }
                     Image(systemName: "fork.knife.circle.fill")
                         .font(.system(size: 40, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.cta)
                         .symbolRenderingMode(.hierarchical)
                         .scaleEffect(pulse ? 1.05 : 0.95)
                         .animation(
@@ -420,12 +641,16 @@ struct PlanGeneratingOverlay: View {
                 .frame(height: 180)
 
                 VStack(spacing: Theme.Space.sm) {
+                    Text("BUILDING WEEK")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.8)
+                        .foregroundStyle(Theme.muted)
                     Text("Planning your week")
                         .font(Theme.title(.title2))
                     TimelineView(.periodic(from: .now, by: 1.5)) { context in
                         let idx = Int(context.date.timeIntervalSinceReferenceDate / 1.5)
                             % max(flavorLines.count, 1)
-                        VStack(spacing: 6) {
+                        VStack(spacing: Theme.Space.sm - 2) {
                             Text(appModel.generatingStatus)
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(Theme.muted)

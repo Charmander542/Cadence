@@ -25,43 +25,77 @@ enum PlannerChromeMetrics {
     /// Reserved bottom inset so page layout stays put while the dial draws larger on top.
     static let dialLayoutHeight: CGFloat = 72
     static let dialFABTrailingPadding: CGFloat = 22
-    /// Distance from the physical bottom edge to the FAB bottom — shared by every page with +.
-    /// Negative pulls + down into the dial band (Today’s tight lower placement).
-    static let dialFABBottomPadding: CGFloat = -20
+    /// Gap above the dial inset so + sits clearly clear of the wheel icons.
+    static let dialFABBottomPadding: CGFloat = 28
 }
 
-/// Pins + (and optional leading undo) to the same bottom-trailing spot as the dial overlay.
-struct DialFABBar<Leading: View, FAB: View>: View {
+enum FABAction: Equatable {
+    case todayQuickAdd
+    case matrixQuickAdd
+    case addEvent
+    case addHabit
+    case addSpendItem
+    case healthCheckIn
+    case refreshNews
+
+    var accessibilityLabel: String {
+        switch self {
+        case .todayQuickAdd, .matrixQuickAdd: return "Add task"
+        case .addEvent: return "Add event"
+        case .addHabit: return "Add habit"
+        case .addSpendItem: return "Add tracked purchase"
+        case .healthCheckIn: return "Open recovery check-in"
+        case .refreshNews: return "Refresh news digest"
+        }
+    }
+
+    var accessibilityHint: String {
+        switch self {
+        case .todayQuickAdd, .matrixQuickAdd: return "Opens quick add"
+        case .addEvent: return "Opens new calendar event"
+        case .addHabit: return "Opens new habit form"
+        case .addSpendItem: return "Opens cost-per-use tracker form"
+        case .healthCheckIn: return "Opens recovery detail"
+        case .refreshNews: return "Fetches today’s top stories and AI briefs"
+        }
+    }
+}
+
+/// Leading undo chip above the dial inset (optional helper).
+struct DialUndoBar<Leading: View>: View {
     @ViewBuilder var leading: () -> Leading
-    @ViewBuilder var fab: () -> FAB
 
     var body: some View {
-        HStack(alignment: .center, spacing: 0) {
-            leading()
-            Spacer(minLength: 0)
-            fab()
-                .padding(.trailing, PlannerChromeMetrics.dialFABTrailingPadding)
-        }
-        .padding(.bottom, PlannerChromeMetrics.dialFABBottomPadding)
-        // Same coordinate space as the dial (ignores bottom safe area / page inset).
-        .ignoresSafeArea(edges: .bottom)
+        leading()
+            .padding(.leading, 22)
+            .padding(.bottom, PlannerChromeMetrics.dialFABBottomPadding)
     }
 }
 
 extension View {
+    /// Undo chip only — bottom-leading, no full-width plate over the dial.
+    func dialUndoChrome<Leading: View>(
+        @ViewBuilder leading: @escaping () -> Leading
+    ) -> some View {
+        overlay(alignment: .bottomLeading) {
+            leading()
+                .padding(.leading, 22)
+                .padding(.bottom, PlannerChromeMetrics.dialFABBottomPadding)
+        }
+    }
+
+    /// Pages keep undo via leading; trailing + is hosted above the dial in RootView.
     func dialFABChrome<Leading: View, FAB: View>(
         @ViewBuilder leading: @escaping () -> Leading,
         @ViewBuilder fab: @escaping () -> FAB
     ) -> some View {
-        overlay(alignment: .bottom) {
-            DialFABBar(leading: leading, fab: fab)
-        }
+        dialUndoChrome(leading: leading)
     }
 
     func dialFABChrome<FAB: View>(
         @ViewBuilder fab: @escaping () -> FAB
     ) -> some View {
-        dialFABChrome(leading: { EmptyView() }, fab: fab)
+        self
     }
 }
 
@@ -79,7 +113,9 @@ struct OrangeFAB: View {
                 .foregroundStyle(.white)
                 .frame(width: 58, height: 58)
                 .background(Theme.cta, in: Circle())
-                .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
+                .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
+                .shadow(color: Theme.cta.opacity(0.4), radius: 14, y: 5)
+                .shadow(color: .black.opacity(0.28), radius: 4, y: 2)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
@@ -92,19 +128,20 @@ struct OrangeFAB: View {
 }
 
 struct UndoFAB: View {
-    var label: String = "Undo"
+    var label: String = "UNDO"
     var accessibilityHint: String = "Restores the last completed task"
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.Space.sm - 2) {
                 Image(systemName: "arrow.uturn.backward")
                 Text(label)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.caption.weight(.bold))
+                    .tracking(0.5)
             }
             .foregroundStyle(.black)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Theme.Space.lg)
             .frame(height: 52)
             .background(Theme.flagMedium, in: Capsule())
         }
@@ -152,17 +189,17 @@ struct PlannerDrawer: View {
                     .accessibilityLabel("Close menu")
                     .accessibilityHint("Closes planner drawer")
                 }
-                .padding(.horizontal, 18)
-                .padding(.top, 18)
-                .padding(.bottom, 12)
+                .padding(.horizontal, Theme.Space.lg + 2)
+                .padding(.top, Theme.Space.lg + 2)
+                .padding(.bottom, Theme.Space.md)
 
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xs) {
                         drawerSectionHeader("Views")
                         drawerRow("Today", icon: "sun.max", dest: .today, hint: "Shows today’s tasks and habits")
                         drawerRow("Next 7 Days", icon: "calendar", dest: .next7, hint: "Shows tasks due in the next week")
                         drawerRow("Inbox", icon: "tray", dest: .inbox, hint: "Shows tasks without a due date")
-                        Divider().overlay(Theme.gridDivider).padding(.vertical, 8)
+                        Divider().overlay(Theme.gridDivider).padding(.vertical, Theme.Space.sm)
                         drawerSectionHeader("Lists")
                         ForEach(navigableLists) { list in
                             listDrawerRow(list)
@@ -170,28 +207,34 @@ struct PlannerDrawer: View {
                         Button {
                             showNewList = true
                         } label: {
-                            Label("New list", systemImage: "plus.circle")
+                            Label("NEW LIST", systemImage: "plus.circle")
+                                .font(.caption.weight(.bold))
+                                .tracking(0.5)
                                 .foregroundStyle(Theme.cta)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
+                                .padding(.horizontal, Theme.Space.md)
+                                .padding(.vertical, Theme.Space.sm + 2)
                         }
                         .buttonStyle(.plain)
                         .accessibilityHint("Creates a custom task list")
-                        Divider().overlay(Theme.gridDivider).padding(.vertical, 8)
+                        Divider().overlay(Theme.gridDivider).padding(.vertical, Theme.Space.sm)
                         drawerSectionHeader("More")
-                        drawerRow("Shop", icon: "basket", dest: .shop, hint: "Opens grocery shop list on Meals tab")
+                        if CadenceAppsPreferences.isVisible(.shop) {
+                            drawerRow("Shop", icon: "basket", dest: .shop, hint: "Opens grocery shop list on Meals tab")
+                        }
                         Button(action: onManageTags) {
-                            Label("Manage tags", systemImage: "number")
+                            Label("MANAGE TAGS", systemImage: "number")
+                                .font(.caption.weight(.bold))
+                                .tracking(0.5)
                                 .foregroundStyle(Theme.cta)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 10)
+                                .padding(.horizontal, Theme.Space.md)
+                                .padding(.vertical, Theme.Space.sm + 2)
                         }
                         .buttonStyle(.plain)
                         .accessibilityHint("Edit task tag names and colors")
                     }
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, Theme.Space.sm + 2)
                 }
 
                 Spacer(minLength: 0)
@@ -199,18 +242,29 @@ struct PlannerDrawer: View {
                 VStack(spacing: 0) {
                     Divider().overlay(Theme.gridDivider)
                     Button(action: onSearch) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Label("Search", systemImage: "magnifyingglass")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(Theme.ink)
-                            Text("Tasks, habits, events, recipes, shop, and settings")
-                                .font(.caption2)
-                                .foregroundStyle(Theme.muted)
-                                .accessibilityAddTraits(.isStaticText)
+                        HStack(spacing: Theme.Space.md) {
+                            Theme.IconWell(systemImage: "magnifyingglass", tint: Theme.cta, size: 32)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Search")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(Theme.ink)
+                                Text("Tasks, habits, events, recipes, shop, and settings")
+                                    .font(.caption2)
+                                    .foregroundStyle(Theme.muted)
+                                    .accessibilityAddTraits(.isStaticText)
+                            }
+                            Spacer(minLength: 0)
                         }
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, Theme.Space.md + 2)
+                        .padding(.vertical, Theme.Space.sm)
+                        .background(Theme.surface.opacity(0.55), in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                .strokeBorder(Theme.hairline, lineWidth: 1)
+                        )
+                        .padding(.horizontal, Theme.Space.sm + 2)
+                        .padding(.vertical, Theme.Space.sm - 2)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Search. Tasks, habits, events, recipes, shop, and settings")
@@ -218,11 +272,26 @@ struct PlannerDrawer: View {
                     .accessibilityIdentifier("global-search-drawer")
                     Divider().overlay(Theme.gridDivider)
                     Button(action: onSettings) {
-                        Label("Settings", systemImage: "gearshape")
-                            .foregroundStyle(Theme.ink)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
+                        HStack(spacing: Theme.Space.md) {
+                            Theme.IconWell(systemImage: "gearshape", tint: Theme.cta, size: 32)
+                            Text("Settings")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(Theme.ink)
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(Theme.muted)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .padding(.horizontal, Theme.Space.md + 2)
+                        .padding(.vertical, Theme.Space.sm)
+                        .background(Theme.surface.opacity(0.55), in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                .strokeBorder(Theme.hairline, lineWidth: 1)
+                        )
+                        .padding(.horizontal, Theme.Space.sm + 2)
+                        .padding(.vertical, Theme.Space.sm - 2)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Settings")
@@ -232,6 +301,11 @@ struct PlannerDrawer: View {
             .frame(width: 300, alignment: .leading)
             .frame(maxHeight: .infinity)
             .background(Theme.surface)
+            .overlay(alignment: .trailing) {
+                Rectangle()
+                    .fill(Theme.hairline)
+                    .frame(width: 1)
+            }
         }
         .alert("New list", isPresented: $showNewList) {
             TextField("List name", text: $newListName)
@@ -254,9 +328,11 @@ struct PlannerDrawer: View {
     private func drawerSectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
             .font(.caption2.weight(.bold))
+            .tracking(0.8)
             .foregroundStyle(Theme.muted)
-            .padding(.horizontal, 12)
-            .padding(.top, 4)
+            .textCase(nil)
+            .padding(.horizontal, Theme.Space.md)
+            .padding(.top, Theme.Space.sm - 4)
             .accessibilityAddTraits(.isHeader)
     }
 
@@ -267,7 +343,12 @@ struct PlannerDrawer: View {
                 onSelect(.list(list.id))
             } label: {
                 HStack {
-                    Label(list.name, systemImage: "list.bullet")
+                    Theme.IconWell(
+                        systemImage: "list.bullet",
+                        tint: selected ? Theme.accent : Theme.muted,
+                        size: 28
+                    )
+                    Text(list.name)
                         .font(.body.weight(selected ? .semibold : .regular))
                         .foregroundStyle(selected ? Theme.accent : Theme.ink)
                     Spacer()
@@ -278,9 +359,9 @@ struct PlannerDrawer: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(selected ? Theme.accent.opacity(0.14) : Color.clear, in: RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, Theme.Space.md)
+                .padding(.vertical, Theme.Space.sm + 2)
+                .background(selected ? Theme.accent.opacity(0.14) : Color.clear, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(selected ? "\(list.name) list, selected" : "\(list.name) list")
@@ -305,13 +386,31 @@ struct PlannerDrawer: View {
         return Button {
             onSelect(dest)
         } label: {
-            Label(title, systemImage: icon)
-                .font(.body.weight(selected ? .semibold : .regular))
-                .foregroundStyle(selected ? Theme.accent : Theme.ink)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(selected ? Theme.accent.opacity(0.14) : Color.clear, in: RoundedRectangle(cornerRadius: 10))
+            // Superlist/Fabric: accent “where you are” + trailing chevron when selected.
+            HStack(spacing: Theme.Space.md) {
+                Theme.IconWell(
+                    systemImage: icon,
+                    tint: selected ? Theme.accent : Theme.muted,
+                    size: 32
+                )
+                Text(title)
+                    .font(.body.weight(selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? Theme.accent : Theme.ink)
+                Spacer(minLength: 0)
+                if selected {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.accent.opacity(0.75))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Theme.Space.sm + 2)
+            .padding(.vertical, Theme.Space.sm)
+            .background(selected ? Theme.accent.opacity(0.14) : Color.clear, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .strokeBorder(selected ? Theme.accent.opacity(0.28) : Color.clear, lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
         .accessibilityLabel(selected ? "\(title), selected" : title)
@@ -351,8 +450,8 @@ struct GlobalSearchButton: View {
                     Label("Search", systemImage: "magnifyingglass")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.cta)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, Theme.Space.sm + 2)
+                        .padding(.vertical, Theme.Space.sm - 2)
                         .background(Theme.surface, in: Capsule())
                 } else {
                     Label("Search", systemImage: "magnifyingglass")
@@ -429,8 +528,9 @@ struct PlannerScreenHeader<Trailing: View>: View {
             trailing()
                 .layoutPriority(1)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
+        .padding(.horizontal, Theme.Space.lg)
+        .padding(.top, Theme.Space.sm + 2)
+        .padding(.bottom, Theme.Space.xs)
     }
 }
 
@@ -465,8 +565,9 @@ struct PlannerTitleHeader: View {
                 .minimumScaleFactor(0.85)
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
+        .padding(.horizontal, Theme.Space.lg)
+        .padding(.top, Theme.Space.sm + 2)
+        .padding(.bottom, Theme.Space.xs)
     }
 }
 
@@ -491,9 +592,9 @@ struct PlannerTopBar: View {
                 GlobalSearchButton()
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 4)
-        .padding(.bottom, 4)
+        .padding(.horizontal, Theme.Space.lg)
+        .padding(.top, Theme.Space.xs)
+        .padding(.bottom, Theme.Space.xs)
     }
 }
 
@@ -672,6 +773,9 @@ struct CountdownTrackButton: View {
                 .font(.body.weight(.semibold))
                 .foregroundStyle(isTracked ? Theme.accent : Theme.muted.opacity(0.55))
                 .frame(width: 32, height: 32)
+                .background(
+                    Circle().fill(isTracked ? Theme.accent.opacity(0.14) : Theme.sunken.opacity(0.5))
+                )
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isTracked ? "Countdown tracked" : "Track countdown")
@@ -704,6 +808,14 @@ struct GlobalSearchSheet: View {
     @State private var searchRecents: [String] = PlannerPreferences.searchRecents()
 
     private let searchDebounceMs = 350
+
+    private func searchSectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.caption2.weight(.bold))
+            .tracking(0.6)
+            .foregroundStyle(Theme.muted)
+            .accessibilityAddTraits(.isHeader)
+    }
 
     private var tokens: [String] {
         searchQuery.lowercased().split(separator: " ").map(String.init).filter { $0.count > 1 }
@@ -819,17 +931,30 @@ struct GlobalSearchSheet: View {
         NavigationStack {
             List {
                 Section {
-                    TextField("Search tasks, habits, events, recipes, shop, and settings…", text: $query)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .focused($searchFieldFocused)
-                        .accessibilityIdentifier("global-search-field")
-                        .accessibilityHint("Search across tasks, habits, events, recipes, shop items, and settings")
+                    HStack(spacing: Theme.Space.sm + 2) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(Theme.muted)
+                        TextField("Search tasks, habits, events, recipes, shop, and settings…", text: $query)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .focused($searchFieldFocused)
+                            .accessibilityIdentifier("global-search-field")
+                            .accessibilityHint("Search across tasks, habits, events, recipes, shop items, and settings")
+                    }
+                    .padding(.horizontal, Theme.Space.md)
+                    .padding(.vertical, Theme.Space.sm + 2)
+                    .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                            .strokeBorder(Theme.hairline, lineWidth: 1)
+                    )
+                    .listRowInsets(EdgeInsets(top: Theme.Space.sm, leading: Theme.Space.lg, bottom: Theme.Space.sm, trailing: Theme.Space.lg))
+                    .listRowBackground(Color.clear)
                 }
                 if query.trimmingCharacters(in: .whitespaces).isEmpty {
                     searchEmptyState
                 } else if isSearching {
-                    HStack(spacing: 8) {
+                    HStack(spacing: Theme.Space.sm) {
                         ProgressView()
                             .controlSize(.small)
                         Text("Searching…")
@@ -838,10 +963,43 @@ struct GlobalSearchSheet: View {
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("Searching")
                 } else if !hasAnyResults {
-                    Text("No results for “\(searchQuery)”")
-                        .foregroundStyle(Theme.muted)
-                        .accessibilityLabel("No results for \(searchQuery)")
-                        .accessibilityAddTraits(.isStaticText)
+                    // Revolut/Meta: clear recovery CTA for empty search.
+                    VStack(spacing: Theme.Space.md) {
+                        Theme.IconWell(systemImage: "magnifyingglass", tint: Theme.muted, size: 48)
+                        Text("NO RESULTS")
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.6)
+                            .foregroundStyle(Theme.muted)
+                        Text("No results found")
+                            .font(Theme.display(.headline))
+                            .foregroundStyle(Theme.ink)
+                            .multilineTextAlignment(.center)
+                        Text("No matches for “\(searchQuery)”. Try another term.")
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.muted)
+                            .multilineTextAlignment(.center)
+                        Button {
+                            query = ""
+                            searchQuery = ""
+                            searchFieldFocused = true
+                        } label: {
+                            Text("CLEAR SEARCH")
+                                .font(.caption.weight(.bold))
+                                .tracking(0.6)
+                                .foregroundStyle(Color.white)
+                                .padding(.horizontal, Theme.Space.lg)
+                                .padding(.vertical, Theme.Space.sm + 2)
+                                .background(Theme.cta, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Clear search")
+                        .accessibilityHint("Clears the search field")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Theme.Space.xl + Theme.Space.sm)
+                    .listRowBackground(Color.clear)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("No results for \(searchQuery)")
                 } else {
                     if !matchingTasks.isEmpty {
                         Section {
@@ -849,23 +1007,28 @@ struct GlobalSearchSheet: View {
                                 Button {
                                     editingTask = task
                                 } label: {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(task.title)
-                                            .foregroundStyle(Theme.ink)
-                                        if let due = task.dueAt {
-                                            Text(PlannerDate.shortDue(due))
-                                                .font(.caption)
-                                                .foregroundStyle(Theme.muted)
+                                    HStack(spacing: Theme.Space.md) {
+                                        Theme.IconWell(systemImage: "checkmark.circle", tint: Theme.cta, size: 32)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(task.title)
+                                                .foregroundStyle(Theme.ink)
+                                            if let due = task.dueAt {
+                                                Theme.MetaPill(
+                                                    text: PlannerDate.shortDue(due),
+                                                    tone: task.isOverdue ? .danger : .neutral
+                                                )
+                                            }
                                         }
+                                        Spacer(minLength: 0)
                                     }
+                                    .padding(.vertical, Theme.Space.xs)
                                 }
                                 .accessibilityElement(children: .combine)
                                 .accessibilityLabel(globalSearchTaskLabel(task))
                                 .accessibilityHint("Opens task editor")
                             }
                         } header: {
-                            Text("Tasks")
-                                .accessibilityAddTraits(.isHeader)
+                            searchSectionHeader("Tasks")
                         }
                     }
                     if !matchingEvents.isEmpty {
@@ -876,16 +1039,21 @@ struct GlobalSearchSheet: View {
                                     Button {
                                         editingEvent = EventSheetContext(task: event, startDate: event.dueAt ?? .now)
                                     } label: {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(event.title)
-                                                .foregroundStyle(Theme.ink)
-                                            if let due = event.dueAt {
-                                                Text(PlannerDate.shortDue(due))
-                                                    .font(.caption)
-                                                    .foregroundStyle(Theme.muted)
+                                        HStack(spacing: Theme.Space.md) {
+                                            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                                                .fill(PlannerColor.from(hex: event.colorHex.isEmpty ? PlannerColor.palette[0] : event.colorHex))
+                                                .frame(width: 3, height: 32)
+                                            Theme.IconWell(systemImage: "calendar", tint: Theme.accent, size: 32)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(event.title)
+                                                    .foregroundStyle(Theme.ink)
+                                                if let due = event.dueAt {
+                                                    Theme.MetaPill(text: PlannerDate.shortDue(due), tone: .neutral)
+                                                }
                                             }
+                                            .frame(maxWidth: .infinity, alignment: .leading)
                                         }
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.vertical, Theme.Space.xs)
                                     }
                                     .accessibilityElement(children: .combine)
                                     .accessibilityLabel(globalSearchEventLabel(event))
@@ -893,8 +1061,7 @@ struct GlobalSearchSheet: View {
                                 }
                             }
                         } header: {
-                            Text("Events")
-                                .accessibilityAddTraits(.isHeader)
+                            searchSectionHeader("Events")
                         }
                     }
                     if !matchingHabits.isEmpty {
@@ -903,15 +1070,18 @@ struct GlobalSearchSheet: View {
                                 Button {
                                     editingHabit = habit
                                 } label: {
-                                    Text(habit.name)
-                                        .foregroundStyle(Theme.ink)
+                                    HStack(spacing: Theme.Space.md) {
+                                        Theme.IconWell(systemImage: "repeat", tint: Theme.accent, size: 32)
+                                        Text(habit.name)
+                                            .foregroundStyle(Theme.ink)
+                                        Spacer(minLength: 0)
+                                    }
                                 }
                                 .accessibilityLabel("\(habit.name), habit")
                                 .accessibilityHint("Opens habit editor")
                             }
                         } header: {
-                            Text("Habits")
-                                .accessibilityAddTraits(.isHeader)
+                            searchSectionHeader("Habits")
                         }
                     }
                     if !matchingRecipes.isEmpty {
@@ -926,15 +1096,18 @@ struct GlobalSearchSheet: View {
                                         calories: recipe.caloriesPerServing
                                     )
                                 } label: {
-                                    Text(recipeDisplayName(recipe.name))
+                                    HStack(spacing: Theme.Space.md) {
+                                        Theme.IconWell(systemImage: "fork.knife", tint: Theme.cta, size: 32)
+                                        Text(recipeDisplayName(recipe.name))
+                                        Spacer(minLength: 0)
+                                    }
                                 }
                                 .accessibilityElement(children: .combine)
                                 .accessibilityLabel(globalSearchRecipeLabel(recipe))
                                 .accessibilityHint("Opens recipe details")
                             }
                         } header: {
-                            Text("Recipes")
-                                .accessibilityAddTraits(.isHeader)
+                            searchSectionHeader("Recipes")
                         }
                     }
                     if !matchingGroceries.isEmpty {
@@ -945,12 +1118,16 @@ struct GlobalSearchSheet: View {
                                     appModel.requestedMainTab = 2
                                     appModel.requestedOpenShop = true
                                 } label: {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(item.ingredientName)
-                                            .foregroundStyle(Theme.ink)
-                                        Text(item.category)
-                                            .font(.caption)
-                                            .foregroundStyle(Theme.muted)
+                                    HStack(spacing: Theme.Space.md) {
+                                        Theme.IconWell(systemImage: "basket", tint: Theme.accent, size: 32)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(item.ingredientName)
+                                                .foregroundStyle(Theme.ink)
+                                            Text(item.category)
+                                                .font(.caption)
+                                                .foregroundStyle(Theme.muted)
+                                        }
+                                        Spacer(minLength: 0)
                                     }
                                 }
                                 .accessibilityElement(children: .combine)
@@ -958,8 +1135,7 @@ struct GlobalSearchSheet: View {
                                 .accessibilityHint("Opens shop list on Meals tab")
                             }
                         } header: {
-                            Text("Shop")
-                                .accessibilityAddTraits(.isHeader)
+                            searchSectionHeader("Shop")
                         }
                     }
                     if !matchingSettings.isEmpty {
@@ -970,12 +1146,16 @@ struct GlobalSearchSheet: View {
                                     appModel.showSettingsSheet = true
                                     dismiss()
                                 } label: {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(match.title)
-                                            .foregroundStyle(Theme.ink)
-                                        Text(match.subtitle)
-                                            .font(.caption)
-                                            .foregroundStyle(Theme.muted)
+                                    HStack(spacing: Theme.Space.md) {
+                                        Theme.IconWell(systemImage: "gearshape", tint: Theme.muted, size: 32)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(match.title)
+                                                .foregroundStyle(Theme.ink)
+                                            Text(match.subtitle)
+                                                .font(.caption)
+                                                .foregroundStyle(Theme.muted)
+                                        }
+                                        Spacer(minLength: 0)
                                     }
                                 }
                                 .accessibilityElement(children: .combine)
@@ -983,8 +1163,7 @@ struct GlobalSearchSheet: View {
                                 .accessibilityHint("Opens this settings screen")
                             }
                         } header: {
-                            Text("Settings")
-                                .accessibilityAddTraits(.isHeader)
+                            searchSectionHeader("Settings")
                         }
                     }
                 }
@@ -995,6 +1174,7 @@ struct GlobalSearchSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
+                        .foregroundStyle(Theme.cta)
                         .accessibilityIdentifier("global-search-close")
                         .accessibilityHint("Closes search")
                 }
@@ -1040,26 +1220,28 @@ struct GlobalSearchSheet: View {
                         .accessibilityHint("Runs this search again")
                     }
                 } header: {
-                    Text("Recent")
-                        .accessibilityAddTraits(.isHeader)
+                    searchSectionHeader("Recent")
                 }
             }
             Section {
-                searchQuickJump("Tonight's dinner", icon: "fork.knife") {
-                    if let recipe = tonightRecipeName {
-                        query = recipe
-                        searchQuery = recipe
-                    } else {
+                if CadenceAppsPreferences.isVisible(.meals) {
+                    searchQuickJump("Tonight's dinner", icon: "fork.knife") {
+                        if let recipe = tonightRecipeName {
+                            query = recipe
+                            searchQuery = recipe
+                        } else {
+                            dismiss()
+                            appModel.requestedMainTab = 2
+                        }
+                    }
+                    searchQuickJump("Shop list", icon: "basket") {
                         dismiss()
                         appModel.requestedMainTab = 2
+                        appModel.requestedOpenShop = true
                     }
                 }
-                searchQuickJump("Shop list", icon: "basket") {
-                    dismiss()
-                    appModel.requestedMainTab = 2
-                    appModel.requestedOpenShop = true
-                }
-                if let workout = WorkoutIntegration.scheduledSession(on: .now, workoutsEnabled: true) {
+                if CadenceAppsPreferences.isVisible(.workout),
+                   let workout = WorkoutIntegration.scheduledSession(on: .now, workoutsEnabled: true) {
                     searchQuickJump("\(workout.name) workout", icon: "dumbbell") {
                         query = workout.name
                         searchQuery = workout.name
@@ -1069,9 +1251,13 @@ struct GlobalSearchSheet: View {
                     appModel.showSettingsSheet = true
                     dismiss()
                 }
+                searchQuickJump("Customize apps", icon: "square.grid.2x2") {
+                    appModel.pendingSettingsRoute = .apps
+                    appModel.showSettingsSheet = true
+                    dismiss()
+                }
             } header: {
-                Text("Quick jumps")
-                    .accessibilityAddTraits(.isHeader)
+                searchSectionHeader("Quick jumps")
             } footer: {
                 Text("Tasks, habits, events, recipes, shop, and settings")
                     .foregroundStyle(Theme.muted)
@@ -1091,8 +1277,12 @@ struct GlobalSearchSheet: View {
 
     private func searchQuickJump(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Label(title, systemImage: icon)
-                .foregroundStyle(Theme.ink)
+            HStack(spacing: Theme.Space.md) {
+                Theme.IconWell(systemImage: icon, tint: Theme.cta, size: 32)
+                Text(title)
+                    .foregroundStyle(Theme.ink)
+                Spacer(minLength: 0)
+            }
         }
         .accessibilityHint("Opens \(title.lowercased())")
     }

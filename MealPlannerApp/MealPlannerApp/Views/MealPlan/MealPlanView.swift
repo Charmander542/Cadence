@@ -90,8 +90,9 @@ struct MealPlanView: View {
                                 ProgressView()
                                     .frame(width: 36, height: 36)
                             } else {
-                                Text(plans.isEmpty ? "Plan week" : "New week")
-                                    .font(.subheadline.weight(.semibold))
+                                Text(plans.isEmpty ? "PLAN WEEK" : "NEW WEEK")
+                                    .font(.caption.weight(.bold))
+                                    .tracking(0.6)
                                     .foregroundStyle(Theme.cta)
                                     .lineLimit(1)
                                     .fixedSize(horizontal: true, vertical: false)
@@ -150,10 +151,12 @@ struct MealPlanView: View {
     }
 
     private var emptyState: some View {
+        // Oura/Garmin empty meals: muted caps cue via meta pills + clear primary CTA.
         Theme.EmptyState(
             systemImage: "fork.knife.circle.fill",
-            title: "Your week, already decided",
-            message: "Seven protein dinners with plate-ready sides. Shop list builds itself.",
+            title: "No meals this week",
+            message: "Build seven protein dinners with sides. Your shop list fills in automatically.",
+            meta: ["7 DINNERS", "AUTO SHOP"],
             cta: "Build this week",
             ctaHint: "Generates weekly meal plan and shop list",
             busy: appModel.isGeneratingPlan
@@ -161,7 +164,7 @@ struct MealPlanView: View {
             Task { await generate() }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Your week, already decided. Seven protein dinners with plate-ready sides. Shop list builds itself.")
+        .accessibilityLabel("No meals this week. Build seven protein dinners with sides. Your shop list fills in automatically.")
     }
 
     private func weekScroll(plan: WeeklyPlan, recipes: [String: Recipe]) -> some View {
@@ -171,7 +174,7 @@ struct MealPlanView: View {
                     Text(plan.rationaleSummary)
                         .font(Theme.body(.subheadline))
                         .foregroundStyle(Theme.muted)
-                        .padding(.horizontal, 4)
+                        .padding(.horizontal, Theme.Space.xs)
                         .accessibilityAddTraits(.isStaticText)
                 }
 
@@ -196,11 +199,17 @@ struct MealPlanView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Theme.Space.sm) {
                 ForEach(0..<7, id: \.self) { day in
-                    Theme.DayChip(label: dayLabel(day), selected: day == safeSelectedDay) {
+                    Theme.DayChip(
+                        label: dayLabel(day),
+                        selected: day == safeSelectedDay,
+                        isToday: day == todayIndex
+                    ) {
                         selectedDay = day
                     }
                 }
             }
+            .padding(.horizontal, Theme.Space.xs / 2)
+            .padding(.vertical, Theme.Space.xs / 2)
         }
     }
 
@@ -223,30 +232,28 @@ struct MealPlanView: View {
                 NavigationLink {
                     RecipeDetailView(recipe: recipe, scaledServings: dinner.scaledServings, reason: dinner.reason, proteinG: plate.proteinG, calories: plate.calories, side: side)
                 } label: {
-                    Theme.Card {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text("Dinner · cook once")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(Theme.muted)
+                    Theme.HeroPanel(tint: Theme.cta) {
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: Theme.Space.sm) {
+                                Theme.Pill(text: "Dinner · cook once", tint: Theme.cta)
                                 Text(Theme.recipeDisplayName(recipe.name))
                                     .font(Theme.title(.title3))
                                     .foregroundStyle(Theme.ink)
                                 Text(recipe.sourceCitation)
                                     .font(Theme.body(.subheadline))
                                     .foregroundStyle(Theme.muted)
-                                if recipe.webLink != nil {
-                                    Text("Link available")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(Theme.accent)
+                                HStack(spacing: 8) {
+                                    Theme.MetaPill(text: MealNutrition.formatEstimate(plate), tone: .neutral)
+                                    if recipe.webLink != nil {
+                                        Theme.MetaPill(text: "Link", tone: .accent)
+                                    }
                                 }
-                                Text(MealNutrition.formatEstimate(plate))
-                                    .font(Theme.mono(.caption, weight: .medium))
-                                    .foregroundStyle(Theme.muted)
                             }
-                            Spacer()
+                            Spacer(minLength: 8)
                             Image(systemName: "chevron.right")
+                                .font(.body.weight(.semibold))
                                 .foregroundStyle(Theme.muted)
+                                .padding(.top, Theme.Space.xs)
                         }
                     }
                 }
@@ -283,6 +290,11 @@ struct MealPlanView: View {
                             Theme.surface,
                             in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                         )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                .strokeBorder(Theme.hairline, lineWidth: 1)
+                        )
+                        .shadow(color: Theme.cardShadow, radius: 8, y: 3)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open side, \(side.name)")
@@ -306,12 +318,19 @@ struct MealPlanView: View {
                     .accessibilityHint("Picks a different dinner recipe for this day")
                 }
             } else {
+                // Garmin/Oura empty meal: icon + title + muted cue + primary CTAs.
                 Theme.Card {
-                    VStack(spacing: 12) {
-                        Text("No dinner planned for this day.")
+                    VStack(spacing: Theme.Space.md) {
+                        Theme.IconWell(systemImage: "fork.knife", tint: Theme.muted, size: 40)
+                        Text("No dinner planned")
+                            .font(Theme.display(.headline))
+                            .foregroundStyle(Theme.ink)
+                            .multilineTextAlignment(.center)
+                        Text("Pick a recipe or swap one in.")
+                            .font(.subheadline)
                             .foregroundStyle(Theme.muted)
                             .multilineTextAlignment(.center)
-                        HStack(spacing: 10) {
+                        HStack(spacing: Theme.Space.sm + 2) {
                             Button {
                                 swappingDay = day
                                 Task {
@@ -322,23 +341,22 @@ struct MealPlanView: View {
                                 if swappingDay == day {
                                     ProgressView()
                                 } else {
-                                    Label("Swap in dinner", systemImage: "arrow.triangle.2.circlepath")
+                                    Label("SWAP IN DINNER", systemImage: "arrow.triangle.2.circlepath")
+                                        .font(.subheadline.weight(.bold))
+                                        .tracking(0.3)
                                 }
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(Theme.accent)
+                            .tint(Theme.cta)
                             .accessibilityHint("Picks a new dinner recipe for this day")
-                            Button {
+                            Theme.SecondaryButton(title: "BROWSE", systemImage: "book") {
                                 showBrowse = true
-                            } label: {
-                                Label("Browse", systemImage: "book")
                             }
-                            .buttonStyle(.bordered)
                             .accessibilityHint("Browse cookbook to assign a recipe")
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, Theme.Space.sm)
                     .accessibilityElement(children: .combine)
                     .accessibilityLabel("No dinner planned for \(day == todayIndex ? "tonight" : dayLabel(day)). Swap in dinner or browse cookbooks.")
                     .accessibilityHint("Choose an action below")
@@ -351,22 +369,42 @@ struct MealPlanView: View {
         let dinner = plan.meal(day: day, slot: .dinner)
         let recipe = dinner.flatMap { recipes[$0.recipeID] }
         return Button { selectedDay = day } label: {
-            HStack {
+            HStack(spacing: Theme.Space.md) {
                 Text(dayLabel(day))
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(day == todayIndex ? Theme.accent : Theme.ink)
                     .frame(width: 40, alignment: .leading)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(recipe.map { Theme.recipeDisplayName($0.name) } ?? "—")
-                        .font(.subheadline)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(recipe.map { Theme.recipeDisplayName($0.name) } ?? "No dinner")
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.ink)
-                    Text(recipe?.sourceCitation ?? "—")
-                        .font(.caption)
-                        .foregroundStyle(Theme.muted)
+                    if let recipe {
+                        Text(recipe.sourceCitation)
+                            .font(.caption)
+                            .foregroundStyle(Theme.muted)
+                            .lineLimit(1)
+                    } else {
+                        Theme.MetaPill(text: "TAP TO PLAN", tone: .cta)
+                    }
                 }
-                Spacer()
+                Spacer(minLength: 0)
+                if day == todayIndex {
+                    Theme.Pill(text: "Today", emphasized: true)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.muted)
             }
-            .padding(12)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(Theme.Space.md)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .strokeBorder(
+                        day == todayIndex ? Theme.accent.opacity(0.35) : Theme.hairline,
+                        lineWidth: 1
+                    )
+            )
+            .shadow(color: Theme.cardShadow, radius: 8, y: 3)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
@@ -477,7 +515,12 @@ struct RecipeDetailView: View {
                 SourceCitationView(recipe: active)
             }
 
-            Section("Plate") {
+            Section {
+                HStack(spacing: Theme.Space.sm) {
+                    Theme.MetaPill(text: MealNutrition.formatEstimate(macros), tone: .neutral)
+                    Theme.MetaPill(text: "Batch · \(MealNutrition.formatEstimate(batch))", tone: .cta)
+                }
+                .listRowInsets(EdgeInsets(top: Theme.Space.sm + 2, leading: Theme.Space.lg, bottom: Theme.Space.sm - 2, trailing: Theme.Space.lg))
                 LabeledContent("Per serving", value: MealNutrition.formatEstimate(macros))
                 LabeledContent("This batch", value: MealNutrition.formatEstimate(batch))
                 Stepper("Servings: \(servings)", value: $servings, in: 1...12)
@@ -487,18 +530,32 @@ struct RecipeDetailView: View {
                     Text(reason).font(.footnote).foregroundStyle(Theme.muted)
                         .accessibilityAddTraits(.isStaticText)
                 }
+            } header: {
+                Text("PLATE")
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.8)
+                    .foregroundStyle(Theme.muted)
+                    .textCase(nil)
+                    .accessibilityAddTraits(.isHeader)
             }
 
             ingredientSections(scaled)
 
             if !active.steps.isEmpty {
-                Section("Steps") {
+                Section {
                     ForEach(active.steps) { step in
                         RecipeStepRow(
                             step: step,
                             scaleFactor: Double(servings) / Double(max(active.baseServings, 1))
                         )
                     }
+                } header: {
+                    Text("STEPS")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.8)
+                        .foregroundStyle(Theme.muted)
+                        .textCase(nil)
+                        .accessibilityAddTraits(.isHeader)
                 }
             }
         }
@@ -508,12 +565,12 @@ struct RecipeDetailView: View {
         .safeAreaInset(edge: .top) {
             if side != nil {
                 Picker("Recipe", selection: $pane) {
-                    Text("Main").tag(CookPane.main)
-                    Text("Side").tag(CookPane.side)
+                    Text("MAIN").tag(CookPane.main)
+                    Text("SIDE").tag(CookPane.side)
                 }
                 .pickerStyle(.segmented)
-                .padding(.horizontal)
-                .padding(.vertical, 8)
+                .padding(.horizontal, Theme.Space.lg)
+                .padding(.vertical, Theme.Space.sm)
                 .background(.bar)
                 .accessibilityLabel(cookPaneAccessibilityLabel)
                 .accessibilityHint("Switch between main dish and side recipe")
@@ -534,28 +591,71 @@ struct RecipeDetailView: View {
                     ingredientButton(row)
                 }
             } header: {
-                Text(group.title ?? "Ingredients")
+                Text((group.title ?? "Ingredients").uppercased())
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.8)
+                    .foregroundStyle(Theme.muted)
+                    .textCase(nil)
+                    .accessibilityAddTraits(.isHeader)
             }
         }
     }
 
     private func ingredientButton(_ row: IngredientRow) -> some View {
         let isOn = checked.contains(row.id)
+        let ing = row.ingredient
         return Button {
             toggleIngredient(row.id)
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Theme.CheckGlyph(checked: isOn)
-                Text(row.ingredient.display(includePrep: true))
-                    .strikethrough(isOn)
-                    .foregroundStyle(isOn ? Theme.muted : Theme.ink)
-                Spacer()
+                ingredientColoredLabel(ing, checked: isOn)
+                Spacer(minLength: 0)
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(row.ingredient.display(includePrep: true))
+        .accessibilityLabel(ing.display(includePrep: true))
         .accessibilityValue(isOn ? "Checked off" : "Not checked")
         .accessibilityHint("Double tap to toggle while cooking")
+    }
+
+    @ViewBuilder
+    private func ingredientColoredLabel(_ ing: ParsedIngredient, checked: Bool) -> some View {
+        let ink = checked ? Theme.muted : Theme.ink
+        let qty = checked ? Theme.muted : Theme.cta
+        if ing.toTaste, ing.quantity == nil {
+            Text("\((ing.item.isEmpty ? ing.raw : ing.item)) to taste")
+                .strikethrough(checked)
+                .foregroundStyle(ink)
+        } else {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                if let quantity = ing.quantity {
+                    Text(ParsedIngredient.formatQty(quantity))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(qty)
+                        .strikethrough(checked)
+                    if let unit = ing.unit, unit != "each" {
+                        Text(unit)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(qty)
+                            .strikethrough(checked)
+                    }
+                }
+                Text(ing.item.isEmpty ? ing.raw : ing.item)
+                    .foregroundStyle(ink)
+                    .strikethrough(checked)
+                if !ing.prep.isEmpty {
+                    Text(", \(ing.prep)")
+                        .foregroundStyle(Theme.muted)
+                        .strikethrough(checked)
+                }
+                if ing.toTaste, ing.quantity != nil {
+                    Text("(to taste)")
+                        .foregroundStyle(Theme.muted)
+                        .strikethrough(checked)
+                }
+            }
+        }
     }
 
     private func toggleIngredient(_ id: String) {
@@ -624,11 +724,14 @@ private struct RecipeStepRow: View {
     let scaleFactor: Double
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text("\(step.stepNumber).")
-                .foregroundStyle(Theme.muted)
-                .frame(width: 24, alignment: .trailing)
-            VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .top, spacing: Theme.Space.md) {
+            Text("\(step.stepNumber)")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Color.white)
+                .frame(width: 26, height: 26)
+                .background(Theme.cta, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
                 if !step.instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(step.instruction)
                         .fixedSize(horizontal: false, vertical: true)
@@ -636,12 +739,13 @@ private struct RecipeStepRow: View {
                 ForEach(Array(step.ingredients.enumerated()), id: \.offset) { _, line in
                     Text(ServingScaler.scaleLine(line, by: scaleFactor))
                         .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Theme.cta)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.leading, 4)
+                        .padding(.leading, Theme.Space.xs / 2)
                 }
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, Theme.Space.xs)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(stepAccessibilityLabel)
     }
@@ -661,10 +765,9 @@ struct SourceCitationView: View {
     let recipe: Recipe
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "book")
-                    .foregroundStyle(.tint)
+        VStack(alignment: .leading, spacing: Theme.Space.sm + 2) {
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Space.md) {
+                Theme.IconWell(systemImage: "book", tint: Theme.accent, size: 36)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(recipe.cookbookTitle)
                         .font(.headline)
@@ -684,16 +787,17 @@ struct SourceCitationView: View {
                     Label("Open original recipe", systemImage: "arrow.up.right.square")
                         .font(.body.weight(.semibold))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, Theme.Space.sm + 2)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(Theme.cta)
                 .accessibilityHint("Opens recipe in Safari")
                 Text(url.host?.replacingOccurrences(of: "www.", with: "") ?? url.absoluteString)
                     .font(.caption)
                     .foregroundStyle(Theme.muted)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Theme.Space.xs)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(sourceCitationLabel)
         .accessibilityHint(recipe.webLink != nil ? "Open link below for original recipe" : "Recipe source citation")

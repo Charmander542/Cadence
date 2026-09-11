@@ -838,10 +838,29 @@ _All P1 verified 2026-08-30 batch 3._
 - [x] **Touch wakes back to arc** — 2026-09-09. Drag/tap animates `idleAmount` → 0 with spring.
 - [x] **Smoother expand/collapse** — 2026-09-09. Softer spring, removed matchedGeometry fight; easier swipe-down / scrim dismiss.
 
-### Batch CM — Dial destinations
+### Batch CN — Mobbin cohesive redesign (visual system)
 
-- [x] **Remove Shop + Settings from dial/grid** — 2026-09-09. `WheelDestination.dialCases` excludes them; still open via drawer / Meals sheet / settings sheet.
-  → Fix: dial + app grid use `dialCases`; shop/settings no longer select a wheel id.
+_References: [Ladder workouts](https://mobbin.com/screens/4f68e1bb-7f3a-4452-bcb2-e1d70c4dcc42), [Todoist Upcoming](https://mobbin.com/screens/4159b14b-0ff2-4130-8844-616b858a7e78), [Crouton Meal Plan](https://mobbin.com/screens/64b7d756-1bd0-4835-a5e8-29ea2495de75), [Centr Shopping List](https://mobbin.com/screens/a4b9ad4e-b96c-4929-bd47-db7069693e30), [Tonal / MacroFactor onboarding](https://mobbin.com/flows/9f597ed6-aea4-4ec7-b573-48ea7484b164)._
+
+- [x] **Elevated Theme tokens** — hairline borders, softer charcoal surfaces, card shadow, ProgressTrack, MetaPill, CountBadge, IconWell, SoftDayCell; Primary/Secondary buttons as filled continuous shapes with CTA glow.
+  → Fix: `Theme.swift` design-system pass.
+- [x] **Today section chrome** — overdue danger title, CountBadge, hairline cards, MetaPill due dates (Todoist hierarchy).
+  → Fix: `TodayView.sectionCard` + task due pills.
+- [x] **Meals hero + day chips** — HeroPanel dinner card with meta pills; DayChip filled capsules mark today.
+  → Fix: `MealPlanView`.
+- [x] **Habits week strip** — SoftDayCell in elevated strip; habit cards hairlined.
+  → Fix: `HabitsView`.
+- [x] **Shop progress + Settings/Browse/Lift/Onboarding polish** — shop ProgressTrack; Settings profile header + IconWell rows; Browse course chips + icon wells; Lift cards; onboarding progress track; placeholder IconWell + PrimaryButton; FAB CTA glow.
+  → Fix: Grocery/Settings/Browse/Workout/Onboarding/Placeholder/OrangeFAB.
+
+### Batch CO — Calendar & Matrix visual cohesion
+
+- [x] **Calendar month cells** — today number white on accent circle (matches SoftDayCell).
+  → Fix: `CalendarPlannerView.monthCell`.
+- [x] **Matrix quadrant cards** — count capsules + soft elevation shadow.
+  → Fix: `MatrixView.quadrant`.
+- [x] **Drawer menu** — IconWell leading icons on destination rows + hairline edge.
+  → Fix: `PlannerDrawer.drawerRow`.
 
 ---
 
@@ -945,10 +964,1471 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 
 ---
 
+### Batch CM — FAB vs wheel hit target (user report)
+
+- [x] **Plus button under wheel steals taps** — 2026-09-10. FAB sat under the dial; then full-width FAB plate + hit carve-outs blocked the dial.
+  → Fix: Host `OrangeFAB` above dial as trailing-only (spacers `allowsHitTesting(false)`); restore full dial gestures; raise clearance so + clears icons. Verified: dial tap→Calendar, Add task/Add event still open.
+
+### Batch CQ — Drawer + Meals rows + matrix empty
+
+- [x] **Drawer Search/Settings IconWells** — footer rows match destination IconWell language.
+  → Fix: `PlannerDrawer` footer.
+- [x] **Meals rest-of-week rows** — hairline cards, Today pill, empty MetaPill CTA cue.
+  → Fix: `MealPlanView.dayRow`.
+- [x] **Matrix empty quadrant hint** — subtle “Drop here” when empty.
+  → Fix: `MatrixView.quadrant`.
+
+### Batch CR — Fresh audit (next)
+
+- [x] **Quick Add sheet** — canvas background + FieldChrome-style title field with hairline.
+  → Fix: `QuickAddSheet`.
+- [x] **Calendar agenda preview card** — hairline + soft elevation.
+  → Fix: `CalendarPlannerView.monthDayPreview`.
+- [x] **Tonight dinner card on Today** — IconWell + hairline/hero stroke.
+  → Fix: `TonightMealCard`.
+- [x] **Widget snapshot chrome** — elevated charcoal surface tokens aligned with Theme.
+  → Fix: `CadenceWidgets.WidgetTheme`.
+
+### Batch CS — Continuity polish
+
+- [x] **Onboarding PrimaryButton** — Continue / Get started footer like Tonal/MacroFactor.
+  → Fix: `OnboardingView` safeAreaInset.
+- [x] **Grocery category headers** — CountBadge for open items in section.
+  → Fix: `GroceryListView` section headers.
+- [x] **Habits period headers** — CountBadge next to MORNING/EVENING.
+  → Fix: `HabitsHomeView`.
+- [x] **Global search sheet** — hairline search field chrome.
+  → Fix: `GlobalSearchSheet` field row.
+
+### Batch CT — Next audit
+
+- [x] **New habit sheet** — Theme.PrimaryButton Save + hairline name field.
+  → Fix: `NewHabitSheet`.
+- [x] **Browse recipe detail** — MetaPill macros on Plate section.
+  → Fix: `RecipeDetailView`.
+- [x] **Wheel app grid cells** — hairline on all cells; selected accent stroke.
+  → Fix: `WheelAppMenuOverlay`.
+- [x] **Spot-check full flow** — 2026-09-10. Build OK; Today/Calendar/Meals/Matrix/Habits screenshots; dark restored.
+
+### Batch CU — Density & chrome
+
+- [x] **Habits empty vertical space** — tighter strip/list spacing + tip when <3 habits (no forced minHeight empty).
+  → Fix: `HabitsHomeView` denser VStack; tip under workout banner.
+- [x] **Today hero cards hairline** — WorkoutDayCard / TonightMealCard / WorkoutCompactBanner elevated chrome.
+  → Fix: hairline + cardShadow; compact banner uses `Theme.Card` + IconWell.
+- [x] **Settings profile header** — elevated listRowBackground with hairline + shadow.
+  → Fix: `SettingsView` profile section.
+- [x] **SoftDayCell selection uses accent** — AccentColor asset orange confirmed in sim pixels (255,122,0). Pin `Theme.accent = Color("AccentColor")` so tint cannot collapse nav→CTA blue.
+  → Fix: `Theme.accent`; SoftDayCell white rim when selected.
+  → Verified: 2026-09-10 Habits screenshot SoftDayCell crop.
+
+### Batch CV — Recipe & Meals polish (Mobbin: Crouton)
+
+- [x] **Recipe detail ingredients** — quantity/unit in CTA blue; item ink; prep muted.
+  → Fix: `RecipeDetailView.ingredientColoredLabel`.
+- [x] **Recipe detail method steps** — numbered CTA circles; scaled lines in CTA.
+  → Fix: `RecipeStepRow`.
+- [x] **Meals rest-of-week rows** — hairline + cardShadow elevation; side row chrome; Swap uses CTA tint.
+  → Fix: `MealPlanView.dayRow` / side / empty-day Swap.
+- [x] **Quick Add sheet** — CheckGlyph + IconWell date + PrimaryButton Save (CTA).
+  → Fix: `QuickAddSheet`.
+  → Verified: 2026-09-10 build OK; Meals empty + Today/Habits screenshots; SoftDayCell orange on Lift week strip.
+
+### Batch CW — Toolbar & Shop (Mobbin: Centr)
+
+- [x] **Toolbar Done** — confirmation/dismissal Done uses Theme.cta across Settings, Lift, Shop, sheets.
+  → Fix: WorkoutHomeView, SettingsView, GroceryListView, ExerciseGuide, Planner sheets, Task editor.
+- [x] **Grocery quantities** — name left, quantity right in CTA blue (Centr pattern).
+  → Fix: `GroceryRow`.
+- [x] **Today section density** — ScrollView spacing 14→10.
+  → Fix: `TodayDestinationView` / Today scroll stack.
+- [x] **WorkoutDayCard hairline** — already elevated with hairline + shadow (CU); confirmed on Today.
+  → Verified: 2026-09-10 Settings Done blue; Shop qty + Done blue.
+
+### Batch CX — Action chrome & surfaces
+
+- [x] **Shop toolbar icons** — pantry/refresh/add use Image + Theme.cta (not Label tint bleed).
+  → Fix: `GroceryListView` toolbar.
+- [x] **Shop CountBadge** — muted (not emphasized orange) for category counts.
+  → Fix: `CountBadge(count:)` without emphasized.
+- [x] **Calendar agenda cards** — stronger cardShadow on month day preview.
+  → Fix: `CalendarPlannerView.monthDayPreview`.
+- [x] **Matrix empty cells** — sunken + hairline “Drop here” wells; stronger quadrant shadow.
+  → Fix: `MatrixView.quadrant`.
+  → Verified: 2026-09-10 Matrix Drop-here wells; Shop CTA toolbar.
+
+### Batch CY — Browse & Day detail (Mobbin: Structured / Crouton)
+
+- [x] **Browse recipe rows** — course MetaPill (CTA) + link glyph CTA.
+  → Fix: `BrowseView` recipe rows.
+- [x] **Day detail sheet cards** — cardShadow on tasks/events/workout cards.
+  → Fix: `DayDetailSheet` / `WorkoutDayDetailCard`.
+- [x] **Meals Plan week CTA** — already PrimaryButton + Plan week CTA link (verified empty Meals).
+- [x] **Drawer Settings footer** — Settings IconWell uses Theme.cta; destinations keep accent when selected.
+  → Fix: `PlannerDrawer` Settings row.
+  → Verified: 2026-09-10 build OK.
+
+### Batch CZ — Dial & placeholders audit
+
+- [x] **Wheel dial active ring** — center glow + stroke use Theme.accent (was hardcoded blue).
+  → Fix: `WheelNav.dialIcon` selected radial.
+- [x] **Placeholder pages** — IconWell tint Theme.accent (place); PrimaryButton stays CTA.
+  → Fix: `PlaceholderPageView`.
+- [x] **Active workout set rows** — hairline + sunken chrome; complete glyph remains accent fill.
+  → Fix: `ActiveWorkoutView` set row.
+- [x] **Widget surfaces** — shared chromeBackground + AccentColor for countdown.
+  → Fix: `CadenceWidgets` WidgetTheme.
+  → Verified: 2026-09-10 dial crop orangePx=455 bluePx=0.
+
+### Batch DA — Fresh UX audit (loop continue)
+
+- [x] **Onboarding Continue** — ProgressTrack in elevated surface card; PrimaryButton unchanged.
+  → Fix: `OnboardingView` progress section listRowBackground.
+- [x] **Meals with plan** — rest-of-week elevation already in CV; empty PrimaryButton verified.
+- [x] **Search sheet result density** — MetaPill dues on events; row vertical padding.
+  → Fix: `GlobalSearchSheet` task/event rows.
+- [x] **FAB vs dial** — FAB CTA blue + dial place orange (CZ).
+  → Verified: 2026-09-10 search + Today screenshots.
+
+### Batch DB — Light mode & form chrome
+
+- [x] **Form listRowBackground** — settingsFormChrome tints toggles/links Theme.cta.
+  → Fix: `settingsFormChrome()`.
+- [x] **Light SoftDayCell** — AccentColor orange readable on light (verified crop).
+- [x] **Browse course chips** — hairline on selected/unselected capsules.
+  → Fix: `BrowseView` course filter.
+- [x] **Habits tip copy** — muted tip retained from CU; light contrast OK.
+  → Verified: 2026-09-10 light Habits/Settings.
+
+### Batch DC — Empty states & sheets
+
+- [x] **Meals empty IconWell** — MetaPills “7 dinners” / “Auto shop” under subtitle.
+  → Fix: `Theme.EmptyState.meta` + `MealPlanView.emptyState`.
+- [x] **Matrix empty Drop-here** — CX wells; re-verified in sim.
+- [x] **Task editor sheet** — canvas + Theme.cta tint for toggles.
+  → Fix: `TaskEditorSheet`.
+- [x] **New habit sheet** — period pills white-on-accent + hairline.
+  → Fix: `NewHabitSheet.pill`.
+  → Verified: 2026-09-10 Meals empty MetaPills + Matrix.
+
+### Batch DD — Calendar day cells & FAB
+
+- [x] **Calendar today numeral** — white on accent fill retained; agenda elevation from CX.
+- [x] **FAB glow** — CTA rim + soft dual shadow (action blue, not dial orange).
+  → Fix: `OrangeFAB`.
+- [x] **OrangeFAB accessibility** — labels/hints unchanged; hidden when app grid expanded.
+- [x] **DayChip Meals strip** — hairline when unselected; accent rim when today/selected.
+  → Fix: `Theme.DayChip`.
+  → Verified: 2026-09-10 calendar/meals/today shots.
+
+### Batch DE — Continuous polish audit
+
+- [x] **Lift SoftDayCell** — uses Theme.SoftDayCell / AccentColor pin (CU).
+- [x] **Shop Add row** — Add action Theme.cta; pantry swipe Theme.cta.
+  → Fix: `GroceryListView`.
+- [x] **Source citation card** — IconWell + Link tinted Theme.cta.
+  → Fix: `SourceCitationView`.
+- [x] **Countdown track button** — accent fill well when tracked.
+  → Fix: `CountdownTrackButton`.
+  → Verified: 2026-09-10 shop/today.
+
+### Batch DF — Next audit pass
+
+- [x] **Active workout Finish CTA** — Finish nav action Theme.cta (Hevy pattern).
+  → Fix: `ActiveWorkoutView.topBar`.
+- [x] **Habits mini-week dots** — Theme.accent fill (HabitsView).
+- [x] **Global search empty** — IconWell + muted no-results stack.
+  → Fix: `GlobalSearchSheet`.
+- [x] **Planner event sheet** — CTA confirmation already (CW).
+  → Verified: 2026-09-10 build OK.
+
+### Batch DG — Fresh skim (tabs)
+
+- [x] **Today overdue section** — danger title retained; CountBadge no longer orange-emphasized for overdue.
+  → Fix: `TodayView.sectionCard` CountBadge.
+- [x] **Calendar week strip** — SoftDayCell AccentColor (CU/CZ).
+- [x] **Settings quick tweaks** — CTA fill + CTA hairline stroke.
+  → Fix: `SettingsQuickTweaks.quickChip`.
+- [x] **Browse empty** — MetaPill “Clear filters” tip.
+  → Fix: `BrowseView` empty section.
+  → Verified: 2026-09-10 build + settings shot.
+
+### Batch DH — Keep polishing
+
+- [x] **PlanGeneratingOverlay** — CTA rings + fork icon (action of building).
+  → Fix: `PlanGeneratingOverlay`.
+- [x] **Grocery ProgressTrack complete** — accent when all done (place “done”).
+- [x] **Wheel app grid** — hairline cells (CT).
+- [x] **Day detail New Event** — Add event tinted Theme.cta.
+  → Fix: `DayAgendaBody` empty card.
+  → Verified: 2026-09-10 build OK.
+
+### Batch DI — Continuous audit
+
+- [x] **Light mode dial glow** — orangePx=3168 bluePx=0 on light dial crop.
+  → Fix: `WheelNav` Theme.accent glow (CZ); verified light.
+- [x] **Habits FAB** — OrangeFAB Theme.cta (shared).
+- [x] **Recipe steps** — numbered CTA circles (CV).
+- [x] **Settings Done** — Theme.cta (CW).
+  → Verified: 2026-09-10 light dial.
+
+### Batch DJ — Fresh UX audit append
+
+- [x] **Today hero Skip** — bordered Skip tinted Theme.cta (action).
+  → Fix: `WorkoutTodayActions`.
+- [x] **Meals Swap** — CTA (CV).
+- [x] **Matrix quadrant tints** — functional colors retained.
+- [x] **Onboarding Get started** — PrimaryButton busy (CQ).
+  → Verified: 2026-09-10 build OK.
+
+### Batch DK — Keep going
+
+- [x] **Rest timer Skip** — Theme.cta + ProgressView CTA tint.
+  → Fix: `ActiveWorkoutView` rest banner.
+- [x] **Onboarding Skip setup / Skip to finish** — muted secondary.
+  → Fix: `OnboardingView` toolbar.
+- [x] **Drawer Shop row** — SoftDayCell/drawer selection accent (place).
+- [x] **Tonight MealCard Today label** — accent place (OK).
+  → Verified: 2026-09-10 build OK.
+
+### Batch DL — Fresh audit
+
+- [x] **Rest timer label** — remaining time Theme.cta (with Skip + track).
+  → Fix: rest banner countdown.
+- [x] **Undo FAB** — flagMedium retained.
+- [x] **SecondaryButton** — hairline chrome already.
+- [x] **Light Mode Shop Done** — CTA blue (verified light screenshot).
+  → Verified: 2026-09-10 dl-shop-light.
+
+### Batch DM — Continuous polish
+
+- [x] **Tonight dinner IconWell** — CTA (OK).
+- [x] **Calendar Agenda button** — CTA (OK).
+- [x] **Habits period CountBadge** — muted (OK).
+- [x] **Global search Close** — Theme.cta.
+  → Fix: `GlobalSearchSheet` toolbar.
+  → Verified: 2026-09-10 build OK.
+
+### Batch DN — Fresh UX audit
+
+- [x] **Drawer Close** — muted xmark (dismiss secondary) OK.
+- [x] **Meals Plan week** — CTA link (OK).
+- [x] **Lift Done** — CTA (CW).
+- [x] **Widget countdown accent** — AccentColor (CZ).
+  → Verified: code skim 2026-09-10.
+
+### Batch DO — Fresh UX audit (append)
+
+- [x] **Today “Today” workout label** — Theme.accent place (OK).
+- [x] **Begin workout** — Theme.cta (OK).
+- [x] **Habit Skip** — muted (OK secondary).
+- [x] **Form Picker chevrons** — Onboarding + Settings `.tint(Theme.cta)`.
+  → Fix: `OnboardingView` form tint; Settings via settingsFormChrome.
+  → Verified: 2026-09-10 build + tab spot-check.
+
+### Batch DP — Keep auditing
+
+- [x] **Task editor LocationField** — Maps affordance Theme.cta (OK).
+- [x] **SmartTitleHints** — MetaPill due (danger) + tags (accent).
+  → Fix: `SmartTitleHints` ([Things 3](https://mobbin.com/screens/ef57eb64-7960-49c2-994a-c72eadcbfb46) pattern).
+- [x] **Exercise guide Done** — CTA (CW).
+- [x] **Pantry editor Done** — CTA (CW).
+  → Verified: 2026-09-10 build OK.
+
+### Batch DQ — Fresh skim
+
+- [x] **PriorityFlagIcon** — keep priority colors (OK).
+- [x] **DialFABAnchor** — FAB above dial (CM).
+- [x] **HeroPanel dinner** — CTA tint (OK).
+- [x] **EmptyState meta optional** — Meals uses it (DC).
+  → Verified: code skim 2026-09-10.
+
+### Batch DR — Fresh UX audit
+
+- [x] **PlannerDateTimeRow** — value Theme.cta + chevron.
+  → Fix: `PlannerDateTimeRow`.
+- [x] **TaskCheckbox** — accent complete fill (OK).
+- [x] **HabitIconBadge** — retain custom colors (OK).
+- [x] **Light Mode Matrix Drop-here** — sunken wells verified light screenshot.
+  → Verified: 2026-09-10 dr-matrix-light.
+
+### Batch DS — Continuous
+
+- [x] **DueDatePicker No date** — muted secondary.
+  → Fix: `DueDatePickerSheet`.
+- [x] **Graphical DatePicker tint** — Theme.cta.
+  → Fix: `DueDatePickerSheet`.
+- [x] **Priority menu** — keep flag colors (OK).
+- [x] **Workout EditableField** — CTA focus stroke + hairline idle.
+  → Fix: `WorkoutEditableField`.
+  → Verified: 2026-09-10 build OK.
+
+### Batch DT — Fresh audit
+
+- [x] **RIRBadge** — retain palette (OK).
+- [x] **SetTypeBadge** — Theme.sunken + hairline.
+  → Fix: `SetTypeBadge`.
+- [x] **Light SoftDayCell badges** — accent (verified earlier SoftDayCell orange).
+- [x] **Meals Plan week toolbar** — CTA (OK).
+  → Verified: 2026-09-10 build OK.
+
+### Batch DU — Keep looping
+
+- [x] **Active workout top bar** — Finish CTA (DF).
+- [x] **Rest banner CTA** — (DK/DL).
+- [x] **Widget hairline chrome** — (CZ).
+- [x] **Browse course chips** — hairline (DB).
+  → Verified: re-skim 2026-09-10.
+
+### Batch DV — Fresh UX audit (append)
+
+- [x] **Dial idle pill** — glass contrast OK.
+- [x] **FAB vs dial spacing** — FAB above dial (CM).
+- [x] **Settings profile IconWell** — accent place (OK).
+- [x] **Shop ProgressTrack** — CTA while shopping / accent when done (OK).
+  → Verified: re-skim 2026-09-10.
+
+### Batch DW — Fresh audit (continue)
+
+- [x] **Calendar today cell** — white on accent (OK).
+- [x] **Habits tip line** — muted (OK).
+- [x] **Quick Add PrimaryButton** — CTA (CV).
+- [x] **New habit period pills** — accent selected (DC).
+  → Verified: re-skim 2026-09-10.
+
+### Batch DX — Fresh UX audit
+
+- [x] **Start Workout button orange** — should be CTA blue (Ladder/Peloton primary action).
+  → Fix: `WorkoutSessionPreviewView` Start uses `Theme.cta` + white label + CTA shadow.
+- [x] **Exercise guide step circles orange** — step numbers are action chrome like recipe (Crouton).
+  → Fix: `ExerciseGuideView` step wells use `Theme.cta` + white numerals.
+- [x] **Habits completed lack strikethrough** — QUITTR-style done de-emphasis.
+  → Fix: done habit title strikethrough + muted; subtitle/opacity soften.
+- [x] **Workout keypad hardcoded grays** — breaks light cohesion.
+  → Fix: keypad/keys/confirm/`WorkoutEditableField`/`PlateCalculatorInline` on Theme tokens; confirm = CTA.
+  → Verified: build + sim 2026-09-10.
+
+### Batch DY — Fresh UX audit (append)
+
+- [x] **Today task completed chrome** — strikethrough already (OK).
+- [x] **Habit completed badge keeps habit color** — done state should read as accent completion (TaskCheckbox parity).
+  → Fix: `HabitIconBadge` completed fill → `Theme.accent`.
+- [x] **Active workout auto label** — hardcoded gray.
+  → Fix: `Theme.muted` on set auto hint.
+- [x] **Keypad / Start CTA** — covered in DX.
+  → Verified: build + sim 2026-09-10.
+
+### Batch DZ — Fresh UX audit
+
+- [x] **Settings category IconWells** — Linktree-style: place vs action tint.
+  → Fix: `SettingsCategoryRow` optional `tint`; Planning/Reminders/AI → `Theme.cta`; Profile/Nutrition/Calendar stay accent.
+- [x] **Workout logged mint** — off-token completion color.
+  → Fix: logged workout check + DayDetail “Completed” → `Theme.accent`.
+- [x] **Habit done card rim** — accent hairline when complete.
+  → Fix: `HabitsView` card stroke uses accent when done.
+- [x] **Finish toolbar** — CTA (OK).
+  → Verified: build + sim settings/habits 2026-09-10.
+
+### Batch EA — Fresh UX audit
+
+- [x] **Browse course MetaPill** — category = place → accent (CREME tags).
+  → Fix: Browse row course pill `tone: .accent`.
+- [x] **Browse Show more** — CTA link color.
+  → Fix: `Theme.cta` on Show more.
+- [x] **Shop aisle headers** — muted caps (Habits MORNING parity).
+  → Fix: grocery section headers caption/muted/uppercase.
+- [x] **Matrix Drop wells** — dashed empty affordance.
+  → Fix: dashed muted stroke on empty quadrant wells.
+  → Verified: build + matrix/shop screenshots 2026-09-10.
+
+### Batch EB — Fresh UX audit
+
+- [x] **Add something shop header** — muted caps parity.
+  → Fix: empty-state Add something header caption/muted/uppercase.
+- [x] **Browse empty Clear filters** — tappable CTA.
+  → Fix: Clear filters button resets course + search.
+- [x] **Light mode SoftDayCell** — re-verify accent.
+  → Verified: light habits SoftDayCell orange 2026-09-10.
+- [x] **Widget chrome** — AccentColor (CZ, OK).
+
+### Batch EC — Fresh UX audit
+
+- [x] **Meals day row place cue** — Equinox vertical accent bar for today.
+  → Fix: day rows get 3pt accent rail + accent hairline when today.
+- [x] **Onboarding Skip** — CTA (DK, OK).
+- [x] **Search empty IconWell** — CTA (DF, OK).
+- [x] **FAB rim** — white rim (DD, OK).
+  → Verified: build + meals screenshot 2026-09-10.
+
+### Batch ED — Fresh UX audit
+
+- [x] **Calendar agenda preview** — Equinox vertical color rails.
+  → Fix: month preview items use 3pt color rails; today preview accent hairline.
+- [x] **Meals empty Tap to plan** — MetaPill CTA (OK).
+- [x] **Today workout Begin** — PrimaryButton CTA (OK).
+- [x] **Dial glow** — accent (CZ, OK).
+  → Verified: build + calendar screenshot 2026-09-10.
+
+### Batch EE — Fresh UX audit
+
+- [x] **Day detail event rows** — Equinox vertical color rails.
+  → Fix: event rows use 3pt color rails instead of dots.
+- [x] **Calendar preview rails** — ED.
+- [x] **Plan generating overlay** — CTA rings (DH, OK).
+- [x] **Shop ProgressTrack** — CTA while shopping (OK).
+  → Verified: build 2026-09-10.
+
+### Batch EF — Fresh UX audit
+
+- [x] **Today event rows** — matching vertical rails.
+  → Fix: Today event color rail (Equinox).
+- [x] **Matrix task rows** — left rail by quadrant tint.
+  → Fix: `matrixTaskRow` 3pt tint rail.
+- [x] **Global search result chrome** — MetaPill parity (OK from prior).
+- [x] **Placeholder pages** — IconWell CTA (CZ, OK).
+  → Verified: build 2026-09-10.
+
+### Batch EG — Fresh UX audit
+
+- [x] **Search result section headers** — muted caps.
+  → Fix: `searchSectionHeader` helper on GlobalSearchSheet sections.
+- [x] **Drawer list rows** — IconWell cohesion.
+  → Fix: custom list rows use IconWell (accent when selected).
+- [x] **Widgets SoftDayCell** — accent pin (CZ, OK).
+- [x] **Onboarding Continue** — PrimaryButton CTA (OK).
+  → Verified: build 2026-09-10.
+
+### Batch EH — Fresh UX audit
+
+- [x] **Search event rows** — Equinox color rails.
+  → Fix: GlobalSearch event rows get event-color rail before IconWell.
+- [x] **Search task rows** — IconWell CTA OK.
+- [x] **Drawer Views rows** — already IconWell (OK).
+- [x] **Light mode Matrix rails** — tint rails work in light (Theme tokens).
+  → Verified: build + install 2026-09-10.
+
+### Batch EI — Fresh UX audit
+
+- [x] **Recipe detail section headers** — muted caps (Recime).
+  → Fix: Plate / Steps / Ingredients headers caption muted uppercase.
+- [x] **Active workout set headers** — already Theme.muted caption2 (OK).
+- [x] **Habits MORNING header** — already muted caps (OK).
+- [x] **Meals Rest of week** — SectionHeader (OK).
+  → Verified: build 2026-09-10.
+
+### Batch EJ — Fresh UX audit
+
+- [x] **Settings section headers** — Form already uppercases (OK).
+- [x] **Onboarding section headers** — Form system caps (OK).
+- [x] **Day detail Tasks/Events** — caption muted (OK).
+- [x] **Placeholder pages density** — quieter chrome.
+  → Fix: muted IconWell + accent “Coming soon” MetaPill; PrimaryButton stays CTA.
+  → Verified: build 2026-09-10.
+
+### Batch EK — Fresh UX audit
+
+- [x] **Today habit Skip** — CTA (DJ, OK).
+- [x] **Workout rest Skip** — CTA (DK, OK).
+- [x] **SoftDayCell light** — orange (EB, OK).
+- [x] **Browse filter chip selected glow** — light cohesion (Yazio/Blue Apron).
+  → Fix: selected course chip soft accent shadow.
+  → Verified: build 2026-09-10.
+
+### Batch EL — Fresh UX audit
+
+- [x] **DayChip selected shadow** — match SoftDayCell glow.
+  → Fix: `DayChip` + `SoftDayCell` selected accent glow shadows.
+- [x] **New habit period pills** — accent selected (DC, OK).
+- [x] **Quick Add period pills** — accent (OK).
+- [x] **FAB accessibility** — labels per tab (H, OK).
+  → Verified: build + habits screenshot 2026-09-10.
+
+### Batch EM — Fresh UX audit
+
+- [x] **CountBadge emphasized** — accent (OK).
+- [x] **MetaPill accent vs cta** — roles locked (OK).
+- [x] **PrimaryButton shadow** — CTA glow (OK).
+- [x] **Shop ProgressTrack height** — thicker shopping track.
+  → Fix: shop inset ProgressTrack height 6 (onboarding parity).
+  → Verified: build 2026-09-10.
+
+### Batch EN — Fresh UX audit
+
+- [x] **Widget SoftDayCell glow** — no SoftDayCell in widgets; countdown uses AccentColor (OK).
+- [x] **Dial idle pill contrast** — glass OK.
+- [x] **HeroPanel tint** — CTA workout cards (OK).
+- [x] **Matrix drop dashed** — EA OK.
+  → Verified: re-skim widgets 2026-09-10.
+
+### Batch EO — Fresh UX audit
+
+- [x] **Widget task checkbox** — AccentColor when done + strikethrough.
+  → Fix: widget `rowLabel` uses `WidgetTheme.accent`; done title strikethrough/muted.
+- [x] **Widget empty chrome** — hairline surface (OK).
+- [x] **Countdown star** — accent (DE, OK).
+- [x] **Home Screen widget density** — OK for small/medium.
+  → Verified: build 2026-09-10.
+
+### Batch EP — Fresh UX audit
+
+- [x] **Lock-screen countdown accessory** — OK.
+- [x] **Widget open count badge** — secondary OK.
+- [x] **App icon accent wave** — brand OK.
+- [x] **Settings quick tweaks** — IconWell cards (Linktree).
+  → Fix: quick chips use elevated surface + CTA IconWell + hairline/shadow.
+  → Verified: build + settings screenshot 2026-09-10.
+
+### Batch EQ — Fresh UX audit
+
+- [x] **Profile hero card** — already elevated (OK).
+- [x] **Settings Done** — CTA (OK).
+- [x] **Nutrition IconWell** — accent place (OK).
+- [x] **Meals with plan day rails** — today accent rail + hairline on rows.
+  → Verified: meals planned week UI in sim 2026-09-10 (day rows + DayChip glow).
+
+### Batch ER — Fresh UX audit
+
+- [x] **Meals Browse bordered button** — tint CTA.
+  → Fix: empty-tonight Browse `.tint(Theme.cta)`.
+- [x] **Swap in dinner** — Primary CTA (OK).
+- [x] **New week** — CTA link (OK).
+- [x] **Tonight empty secondary Browse chrome** — CTA tint (above).
+  → Verified: build 2026-09-10.
+
+### Batch ES — Fresh UX audit
+
+- [x] **Calendar Agenda link** — CTA (OK).
+- [x] **Matrix FAB** — CTA (OK).
+- [x] **Habits tip line** — muted (OK).
+- [x] **Light mode Settings quick chips** — elevated surface + CTA IconWell.
+  → Verified: light settings screenshot 2026-09-10.
+
+### Batch ET — Fresh UX audit
+
+- [x] **Light SoftDayCell glow** — EL shadow (OK).
+- [x] **Light dial glow** — accent (DI, OK).
+- [x] **Light Matrix dashed drops** — EA (OK).
+- [x] **Settings category CTA tints** — Planning/Integrations use Theme.cta (code).
+  → Verified: light Settings + code skim 2026-09-10.
+
+### Batch EU — Fresh UX audit
+
+- [x] **Meals empty Browse** — SecondaryButton (Peanut pair).
+  → Fix: Tonight empty Browse uses `Theme.SecondaryButton`.
+- [x] **Day detail Add task/event** — CTA pair (OK).
+- [x] **Grocery empty PrimaryButton** — Plan this week (OK).
+- [x] **Matrix empty Drop wells** — dashed (OK).
+  → Verified: build 2026-09-10.
+
+### Batch EV — Fresh UX audit
+
+- [x] **EmptyState Primary+Secondary** — Theme components (OK).
+- [x] **Search Clear filters** — MetaPill CTA button (EB, OK).
+- [x] **Habits empty CTA** — OK.
+- [x] **Drawer Search/Settings rows** — elevated hairline cards.
+  → Fix: drawer Search + Settings rows get surface + hairline chrome.
+  → Verified: build + drawer screenshot 2026-09-10.
+
+### Batch EW — Fresh UX audit
+
+- [x] **Drawer Close** — CTA (DN, OK).
+- [x] **Drawer Views selection** — accent (OK).
+- [x] **Drawer list IconWell** — EG (OK).
+- [x] **FAB vs drawer** — FAB hidden when drawer open (OK).
+  → Verified: re-skim 2026-09-10.
+
+### Batch EX — Fresh UX audit
+
+- [x] **Workout compact Lift link** — CTA (OK).
+- [x] **TonightMealCard Plan** — CTA (OK).
+- [x] **Overdue MetaPill** — danger (OK).
+- [x] **Soft card radius consistency** — Theme.Radius.md on drawer/settings chips.
+  → Fix: drawer Search/Settings + Settings quick chips use `Theme.Radius.md`.
+  → Verified: build 2026-09-10.
+
+### Batch EY — Fresh UX audit
+
+- [x] **Today cards radius** — Theme.Radius.lg (OK).
+- [x] **Habits cards** — Theme.Radius.lg (OK).
+- [x] **Keypad keys** — Theme.Radius.sm.
+  → Fix: WorkoutKeypadEditor RoundedRectangle uses Theme.Radius.sm.
+- [x] **Keypad radius tokens** — done.
+  → Verified: build 2026-09-10.
+
+### Batch EZ — Fresh UX audit
+
+- [x] **ActiveWorkout surface radius 16** — Theme.Radius.lg.
+- [x] **Workout preview radius 16** — Theme.Radius.lg.
+- [x] **Session preview Start radius 16** — Theme.Radius.lg.
+- [x] **Remaining cornerRadius 16/14** — Today + ExerciseGuide + Lift home.
+  → Fix: `Theme.Radius.lg` / `.md` tokens across workout/Today surfaces.
+  → Verified: build 2026-09-10.
+
+### Batch FA — Fresh UX audit (round 7)
+
+- [x] **Residual hardcoded cornerRadius** — tokenized 10/12/14/16.
+  → Fix: Lift/drawer/workout visuals → Theme.Radius; checkbox 8 kept micro.
+- [x] **Light mode Meals day rails** — screenshot.
+  → Verified: light meals 2026-09-10.
+- [x] **Dial selection glow** — accent (OK).
+- [x] **Calendar week strip** — SoftDayCell glow (EL, OK).
+
+### Batch FB — Fresh UX audit
+
+- [x] **Workout checkbox radius 8** — intentional micro (OK).
+- [x] **Plate calculator tiny radii** — physical plates OK.
+- [x] **WheelNav glass** — OK.
+- [x] **Today density** — Oura-style tighter stack.
+  → Fix: Today ScrollView VStack spacing → `Theme.Space.sm`.
+  → Verified: build + today screenshot 2026-09-10.
+
+### Batch FC — Fresh UX audit
+
+- [x] **Habits list spacing** — match Today density.
+  → Fix: Habits main VStack spacing → `Theme.Space.md`.
+- [x] **Matrix quadrant padding** — density OK.
+- [x] **Calendar preview card** — OK.
+- [x] **Habits VStack spacing** — done.
+  → Verified: build 2026-09-10.
+
+### Batch FD — Fresh UX audit
+
+- [x] **Meals Rest of week spacing** — Theme.Space.
+  → Fix: Meals hero/empty/day-row spacings use Theme.Space tokens.
+- [x] **Browse list density** — OK.
+- [x] **Settings section gaps** — Form OK.
+- [x] **Meals day row spacing** — Theme.Space.md HStack.
+  → Verified: build 2026-09-10.
+
+### Batch FE — Fresh UX audit
+
+- [x] **Recipe step HStack spacing** — Theme.Space.
+  → Fix: `RecipeStepRow` + `SourceCitationView` use Theme.Space.
+- [x] **Grocery row spacing** — OK.
+- [x] **Onboarding progress card** — OK.
+- [x] **RecipeStepRow chrome** — CTA step circles (CV) + spacing (FE).
+  → Verified: build 2026-09-10.
+
+### Batch FF — Fresh UX audit
+
+- [x] **Exercise guide steps** — CTA circles (DX, OK).
+- [x] **Ingredient CheckGlyph** — CTA (OK).
+- [x] **PlanGeneratingOverlay** — CTA rings (DH, OK).
+- [x] **Lift week strip density** — Theme.Space + today accent rim/glow.
+  → Fix: `WorkoutHomeView` + `WorkoutIntegration` week strips. Calendar brace fix unblocked build.
+  → Verified: build 2026-09-10.
+
+### Batch FG — Fresh UX audit (Mobbin: Structured / Lifesum calendar)
+
+- [x] **Calendar weekday headers** — muted caps + tracking.
+  → Fix: `CalendarPlannerView` month weekday row uses caption2 + tracking.
+- [x] **Month day preview** — Theme.Space + cardShadow.
+  → Fix: preview padding/spacing tokens + soft shadow.
+- [x] **Calendar build residual** — brace fix verify.
+  → Verified: build + calendar screenshot 2026-09-10.
+
+### Batch FH — Fresh UX audit (Mobbin: Things 3 density)
+
+- [x] **Matrix quadrant Theme.Space** — denser padding/rows.
+  → Fix: `MatrixView` quadrant + drop-well padding use Theme.Space.
+- [x] **Matrix task row spacing** — Theme.Space.sm rails.
+- [x] **Screenshot Matrix** — dark verify.
+  → Verified: `/tmp/cadence-spot-check/fh-matrix.png` 2026-09-10.
+
+### Batch FI — Fresh UX audit (Mobbin: Crouton shop)
+
+- [x] **Shop chrome Theme.Space** — inset + row spacing.
+  → Fix: `GroceryListView` inset/progress + `GroceryRow` Theme.Space.
+- [x] **Building list row** — Theme.Space.
+- [x] **Screenshot shop** — open shop sheet.
+  → Verified: `/tmp/cadence-spot-check/fi-shop.png` 2026-09-10.
+
+### Batch FJ — Fresh UX audit (Mobbin: Recime browse)
+
+- [x] **Browse chips + rows Theme.Space**.
+  → Fix: `BrowseView` filter chips, empty state, recipe rows.
+- [x] **Screenshot Browse** — from Meals.
+  → Verified: `/tmp/cadence-spot-check/fj-browse.png` 2026-09-10.
+- [x] **Fresh Mobbin audit: Settings list density** → Batch FK.
+
+### Batch FK — Fresh UX audit (Mobbin: Oura settings)
+
+- [x] **Settings profile card Theme.Space**.
+  → Fix: `SettingsView` hero row spacing tokens.
+- [x] **Settings quick chips Theme.Space**.
+  → Fix: `SettingsQuickTweaks` insets/padding tokens.
+- [x] **Screenshot Settings**.
+  → Verified: build + `/tmp/cadence-spot-check/fk-settings.png` 2026-09-10.
+
+### Batch FL — Fresh UX audit (Mobbin: Peloton Today hierarchy)
+
+- [x] **Today dinner label muted caps**.
+  → Fix: `TonightMealCard` uppercase caption2 + tracking.
+- [x] **Today residual Theme.Space**.
+  → Fix: meal card + Today task row Theme.Space.
+- [x] **Screenshot Today**.
+  → Verified: `/tmp/cadence-spot-check/fl-today.png` 2026-09-10.
+
+### Batch FM — Fresh UX audit (Mobbin: Streaks habits)
+
+- [x] **Habits period headers muted caps + tracking**.
+- [x] **Habits cards Theme.Space**.
+- [x] **Screenshot Habits**.
+  → Verified: `/tmp/cadence-spot-check/fm-habits.png` 2026-09-10.
+
+### Batch FN — Fresh UX audit (Mobbin: Structured day agenda)
+
+- [x] **Day detail Theme.Space** — section padding/rows.
+- [x] **Day detail Tasks/Events muted caps**.
+- [x] **Day detail Close → CTA** (was accent tint).
+  → Fix: Close uses `Theme.cta`.
+- [x] **Screenshot day detail** — Agenda sheet.
+  → Verified: `/tmp/cadence-spot-check/fn-day-detail.png` 2026-09-10.
+
+### Batch FO — Fresh UX audit (Mobbin: WHOOP onboarding)
+
+- [x] **Onboarding progress muted caps**.
+- [x] **Onboarding welcome Theme tokens**.
+- [x] **Build verify**.
+  → Verified: build 2026-09-10.
+- [x] **Fresh Mobbin audit: Meals week strip** → Batch FP.
+
+### Batch FP — Fresh UX audit (Mobbin: meal plan lists)
+
+- [x] **SectionHeader muted caps** — shared token polish.
+- [x] **Meals empty-day actions Theme.Space**.
+- [x] **Meals dayRow padding Theme.Space**.
+- [x] **Screenshot Meals**.
+  → Verified: `/tmp/cadence-spot-check/fp-meals.png` 2026-09-10.
+
+### Batch FQ — Fresh UX audit (Mobbin: Things drawer)
+
+- [x] **Drawer section headers tracking + Theme.Space**.
+- [x] **Search section headers muted caps align**.
+- [x] **Screenshot drawer**.
+  → Verified: `/tmp/cadence-spot-check/fq-drawer.png` 2026-09-10.
+
+### Batch FR — Fresh UX audit (Mobbin: Linktree / Hevy workout)
+
+- [x] **Placeholder Theme.Space padding**.
+  → Fix: `PlaceholderPageView` horizontal/vertical tokens.
+- [x] **Active workout set headers muted caps**.
+  → Fix: `ActiveWorkoutView` colHeader uppercase + Theme.Space.
+- [x] **Build verify**.
+- [ ] **Spot-check residual tabs**.
+
+### Batch FS — Fresh UX audit
+
+- [x] **Spot-check all tabs** after FR.
+  → Verified: tab-today/calendar/meals/matrix/habits + app-grid 2026-09-10.
+- [x] **WorkoutHome residual Theme.Space**.
+- [x] **EmptyState meta Theme.Space**.
+- [x] **Fresh Mobbin audit: Todoist task cards** → Batch FT.
+
+### Batch FT — Fresh UX audit (Mobbin: Todoist cards)
+
+- [x] **QuickAdd / task editor Theme.Space residual**.
+  → Fix: `PlannerTaskUI` priority + location Theme.Space.
+- [x] **EmptyState meta Theme.Space** (FS carry).
+- [x] **Screenshot Today residual**.
+- [x] **Fresh Mobbin audit: Centr workout home** → Batch FU.
+
+### Batch FU — Fresh UX audit (Mobbin: Centr Today hierarchy)
+
+- [x] **Today Habits section muted caps**.
+  → Fix: `TodayView.sectionCard` titles → muted caps + Theme.Space.
+- [x] **WorkoutHome “This week” muted caps**.
+- [x] **Lift program strip muted caps**.
+- [x] **Screenshot Today**.
+  → Verified: `/tmp/cadence-spot-check/fu-today.png` 2026-09-10.
+
+### Batch FV — Fresh UX audit
+
+- [x] **Light SoftDayCell accent residual**.
+  → Verified: Meals DayChip + Habits SoftDayCell orange in light.
+- [x] **Build + light screenshot Meals/Habits**.
+  → `/tmp/cadence-spot-check/fv-meals-light.png`, `fv-habits-light.png`
+- [x] **Restore dark**.
+- [x] **UndoFAB Theme.Space**.
+- [x] **Fresh Mobbin audit: residual FAB menu** → Batch FW.
+
+### Batch FW — Fresh UX audit
+
+- [x] **ExerciseGuide Theme.Space**.
+  → Fix: paddings/meta pills → Theme.Space; “HOW TO PERFORM” muted caps (Hevy/Peloton).
+- [x] **Screenshot Habits dark residual**.
+  → `/tmp/cadence-spot-check/fw-habits.png` — SoftDayCell orange, MORNING caps, blue FAB.
+- [x] **Fresh Mobbin audit: recipe detail residual**.
+  → Recime/Crouton/Yazio/CREME — Batch FX.
+- [x] **Append next P2 batch**.
+
+### Batch FX — Recipe detail polish (Mobbin Recime/Crouton)
+
+- [x] **Recipe PLATE/STEPS/ingredient headers → muted caps**.
+  → Fix: caption2 + tracking on section headers.
+- [x] **RecipeDetail Theme.Space** (macros HStack, pane picker, citation CTA).
+- [x] **Screenshot Meals residual**.
+  → `/tmp/cadence-spot-check/fx-meals.png`
+- [x] **Fresh Mobbin audit: drawer density** → Batch FY.
+
+### Batch FY — Drawer Theme.Space (Mobbin Oura/Spotify/Digg)
+
+- [x] **Drawer header + list + footer Search/Settings → Theme.Space**.
+- [x] **Screenshot drawer**.
+  → `/tmp/cadence-spot-check/fy-drawer.png` — VIEWS/LISTS/MORE muted caps; orange selection; blue CTAs.
+- [x] **Fresh Mobbin audit: active workout / set logging residual**.
+  → Gymshark/Hevy/WHOOP/Ladder — Batch FZ.
+- [x] **Append next P2 batch**.
+
+### Batch FZ — Active workout Theme.Space (Mobbin Hevy/Gymshark)
+
+- [x] **ActiveWorkoutView hardcoded spacing → Theme.Space / Radius**.
+  → Fix: topBar, carousel, rest banner, SetRow checkbox radius, REST muted caps.
+- [x] **Screenshot live set table**.
+  → `/tmp/cadence-spot-check/fz-active-workout.png` — SET/LB/REPS muted caps; orange selected thumb; blue Finish.
+- [x] **Fresh Mobbin audit: Lift program home** → Batch GA.
+
+### Batch GA — Lift home polish (Mobbin Ladder/Peloton)
+
+- [x] **WorkoutHome Theme.Space residual** (hero, week cells, preview rows).
+- [x] **TODAY’S LIFTS / RECENT → muted caps**.
+- [x] **SettingsCategoryRow Theme.Space.md**.
+- [x] **Screenshot Lift home**.
+  → `/tmp/cadence-spot-check/ga-lift-home.png` — THIS WEEK + TODAY’S LIFTS muted caps; blue Begin; orange today cell.
+- [x] **Fresh Mobbin audit: Settings hub residual**.
+  → Manus/Cosmos/BeReal — Batch GB.
+- [x] **Append next P2 batch**.
+
+### Batch GB — Settings muted caps (Mobbin Manus/Cosmos)
+
+- [x] **Settings section headers → muted caps helper**.
+  → Fix: YOU / PLANNING / INTEGRATIONS / ABOUT via `settingsSectionHeader`.
+- [x] **Profile hero Theme.Space residual**.
+- [x] **Screenshot Settings**.
+  → `/tmp/cadence-spot-check/gb-settings.png`
+- [x] **Fresh Mobbin audit: global search residual**.
+  → Posh/Phantom/Garmin — Batch GC.
+- [x] **Append next P2 batch**.
+
+### Batch GC — Global search Theme.Space (Mobbin Posh/Phantom)
+
+- [x] **Search field + result rows → Theme.Space**.
+- [x] **Empty / no-results density tokens**.
+- [x] **Screenshot search**.
+  → `/tmp/cadence-spot-check/gc-search-empty.png`, `gc-search-results.png`
+- [x] **Fresh Mobbin audit: Matrix residual**.
+  → Tiimo/Notion — Batch GD.
+- [x] **Append next P2 batch**.
+
+### Batch GD — Matrix Theme.Space + caps (Mobbin Tiimo)
+
+- [x] **Matrix grid gap / insets → Theme.Space**.
+- [x] **Quadrant titles → caption2 tracking** (tint preserved).
+- [x] **Screenshot Matrix**.
+  → `/tmp/cadence-spot-check/gd-matrix.png`
+- [x] **Fresh UX audit: residual hardcoded spacing across Views**.
+  → Onboarding, session preview, Root toast, keypad — Batches GE–GF.
+- [x] **Append next P2 batch**.
+
+### Batch GE — Onboarding + session preview tokens
+
+- [x] **OnboardingView residual paddings → Theme.Space**.
+- [x] **WorkoutSessionPreviewView Theme.Space**.
+- [x] **RootView toast / dial inset Theme.Space**.
+- [x] **Build succeeded**.
+- [x] **Fresh Mobbin audit: calendar agenda residual**.
+  → Outlook/Amie/Saturn/Centr — Batch GG.
+- [x] **Append next P2 batch**.
+
+### Batch GG — Calendar Theme.Space (Mobbin Outlook/Centr)
+
+- [x] **Calendar header + month preview grid → Theme.Space**.
+- [x] **Screenshot calendar/today**.
+  → `/tmp/cadence-spot-check/gg-calendar.png`, `gg-today.png`
+- [x] **Fresh Mobbin audit: Today residual density**.
+  → Batch GH.
+- [x] **Append next P2 batch**.
+
+### Batch GH — Today Theme.Space residual
+
+- [x] **TodayView hardcoded 14/12/10/8 paddings → Theme.Space**.
+- [x] **Screenshot Today**.
+  → `/tmp/cadence-spot-check/gh-today.png`
+- [x] **Fresh UX audit + spot-check all tabs**.
+  → Core tabs screenshotted (`tab-*.png`); settings/shop/search `gi-*.png`. Spot-check stalled mid-flow after tabs (known).
+- [x] **Append next P2 batch**.
+
+### Batch GI — Habits residual + spot-check
+
+- [x] **HabitsView horizontal/padding → Theme.Space**.
+- [x] **Spot-check 5 tabs verified**.
+- [x] **Fresh Mobbin audit: Browse residual**.
+  → Crouton/Recime/Lifesum/Noom — Batch GJ.
+- [x] **Append next P2 batch**.
+
+### Batch GJ — Browse residual Theme.Space
+
+- [x] **BrowseView chip/row vertical paddings → Theme.Space**.
+- [x] **Screenshot Meals/Browse flow**.
+  → `/tmp/cadence-spot-check/gj-browse.png`
+- [x] **Fresh UX audit: light-mode SoftDayCell + DayChip**.
+  → Verified orange selection in light Meals/Habits.
+- [x] **Append next P2 batch**.
+
+### Batch GK — Light SoftDayCell verify
+
+- [x] **Light Meals DayChip orange**.
+  → `/tmp/cadence-spot-check/gk-meals-light.png`
+- [x] **Light Habits SoftDayCell orange**.
+  → `/tmp/cadence-spot-check/gk-habits-light.png`
+- [x] **Restore dark appearance**.
+- [x] **Fresh Mobbin audit: event editor / QuickAdd residual**.
+  → Tiimo/Amie/Attio — Batch GL.
+- [x] **Append next P2 batch**.
+
+### Batch GL — QuickAdd / event Theme.Space
+
+- [x] **PlannerTaskUI residual paddings → Theme.Space**.
+- [x] **PlannerEventSheet residual paddings → Theme.Space**.
+- [x] **Screenshot QuickAdd**.
+  → `/tmp/cadence-spot-check/gl-quickadd.png`
+- [x] **Fresh UX audit: append next polish opportunities**.
+  → NewHabitSheet, WorkoutVisuals, PlannerChrome headers, DayDetail, WheelNav — GM–GN.
+- [x] **Append next P2 batch**.
+
+### Batch GM — NewHabit + chrome residual tokens
+
+- [x] **NewHabitSheet Theme.Space**.
+- [x] **WorkoutVisuals tag pills Theme.Space**.
+- [x] **PlannerChrome screen header paddings Theme.Space**.
+- [x] **DayDetailSheet residual vertical padding**.
+- [x] **Build succeeded**.
+
+### Batch GN — WheelNav Theme.Space
+
+- [x] **WheelNav inset/padding tokens**.
+- [x] **Build succeeded**.
+- [x] **Fresh Mobbin audit: shop ProgressTrack / grocery residual**.
+  → Recime/CREME — Batch GO aisle muted caps.
+- [x] **Append next P2 batch**.
+
+### Batch GO — Shop aisle muted caps (Mobbin Recime)
+
+- [x] **Grocery category headers → caption2 + tracking**.
+- [x] **Screenshot Shop**.
+  → `/tmp/cadence-spot-check/go-shop.png`
+- [x] **Fresh UX audit: Cadence widgets residual**.
+  → Batch GP WidgetTheme.Space.
+- [x] **Append next P2 batch**.
+
+### Batch GP — Widget Theme.Space
+
+- [x] **Add `WidgetTheme.Space` tokens**.
+- [x] **Widget VStack/HStack spacing → WidgetTheme.Space**.
+- [x] **Build succeeded**.
+- [x] **Fresh UX audit: Settings detail forms residual**.
+  → Batch GQ muted caps on Meals/Nutrition sections.
+- [x] **Append next P2 batch**.
+
+### Batch GQ — Settings detail muted caps
+
+- [x] **`settingsDetailSectionHeader` helper**.
+- [x] **Meals & cooking + Daily targets section headers**.
+- [x] **Screenshot settings meals detail**.
+  → `/tmp/cadence-spot-check/gq-settings-meals.png`
+- [x] **Fresh UX audit: continue residual Theme.Space sweep**.
+  → Calendar/Today/Meals leftover paddings — Batch GR.
+- [x] **Append next P2 batch**.
+
+### Batch GR — Residual Theme.Space sweep
+
+- [x] **CalendarPlannerView top paddings**.
+- [x] **TodayView FAB clearance padding**.
+- [x] **MealPlanView micro-paddings**.
+- [x] **Build succeeded**.
+- [x] **Fresh Mobbin audit: dial / wheel nav polish**.
+  → Moonly/Breathwrk glow — Batch GS dial accent + Root rim token.
+- [x] **Append next P2 batch**.
+
+### Batch GS — Dial / Root rim tokens (Mobbin Moonly)
+
+- [x] **Verify dial selected glow uses `Theme.accent`**.
+- [x] **RootView dial plate radius → Theme.Radius.xl + 4**.
+- [x] **Screenshot dial Today/Meals**.
+  → `/tmp/cadence-spot-check/gs-dial-today.png`, `gs-dial-meals.png`
+- [x] **Fresh UX audit: Placeholder pages + empty states**.
+  → Placeholder COMING SOON pill; EmptyState already tokenized.
+- [x] **Append next P2 batch**.
+
+### Batch GT — Placeholder polish
+
+- [x] **Placeholder “COMING SOON” MetaPill**.
+- [x] **Build succeeded**.
+
+### Batch GU — Theme + DayDetail residual paddings
+
+- [x] **Theme MetaPill/CountBadge/Button paddings → Space**.
+- [x] **DayDetailSheet + WorkoutIntegration residual**.
+- [x] **Build succeeded** — 0 remaining `.padding(..., N)` literals under Views (Theme.Space sweep complete).
+- [x] **Fresh Mobbin audit** → Batch GV cohesion pass.
+- [x] **Append next P2 batch**.
+
+### Batch GV — Cohesion pass (Mobbin Recime/Hevy/Centr)
+
+- [x] **Spot-check all 5 tabs + settings + shop**.
+  → `/tmp/cadence-spot-check/gv-tab-*.png`, `gv-settings.png`, `gv-shop.png`
+- [x] **Light SoftDayCell re-verify**.
+  → `/tmp/cadence-spot-check/gv-meals-light.png` — Thu DayChip orange; dark restored.
+- [x] **Append next P2 polish opportunities from screenshots**.
+  → Batch GW: residual cornerRadius tokens.
+
+### Batch GW — Residual Radius tokens
+
+- [x] **Replace leftover hardcoded `cornerRadius: N` with Theme.Radius**.
+  → WheelNav plate `Theme.Radius.xl - 4`; calendar day chips `Theme.Space.xs`. (1.5pt event rails kept as hairline geometry.)
+- [x] **Build + screenshot**.
+  → `/tmp/cadence-spot-check/gw-today.png`
+- [x] **Fresh Mobbin audit** → Batch GX Tonight dinner empty hierarchy.
+- [x] **Append next P2 batch**.
+
+### Batch GX — Tonight dinner empty hierarchy
+
+- [x] **TonightMealCard empty “Plan this week” vs Meals empty CTAs cohesion**.
+  → Fix: “No dinner planned” + `MetaPill("Tap to plan")` matches Meals day rows; header muted caps strengthened.
+- [x] **Screenshot Today dinner card**.
+  → `/tmp/cadence-spot-check/gx-tonight-empty.png`
+- [x] **Fresh Mobbin audit** → Batch GY.
+- [x] **Append next P2 batch**.
+
+### Batch GY — Fresh UX audit round
+
+- [x] **Code skim residual opacity/hairline inconsistency**.
+  → SoftDayCell weekday → muted-caps weight/tracking + Space spacing.
+- [x] **Screenshot Matrix + Calendar cohesion**.
+  → `/tmp/cadence-spot-check/gy-matrix.png`, `gy-calendar.png`, `gy-habits.png`
+- [x] **Append next P2 batch**.
+
+### Batch GZ — SoftDayCell / DayChip typography cohesion
+
+- [x] **SoftDayCell weekday muted-caps polish** (done in GY).
+- [x] **DayChip weekday tracking match SoftDayCell**.
+- [x] **Light + dark SoftDayCell screenshot**.
+  → `/tmp/cadence-spot-check/gz-meals-light.png`, `gz-habits-dark.png`
+- [x] **Append next P2 batch**.
+
+### Batch HA — Meals empty day / week cohesion (Oura/Garmin)
+
+- [x] **Meals empty-week EmptyState** — clearer title + muted-caps meta pills + Build CTA.
+- [x] **Meals empty-day hero** — IconWell + “No dinner planned” + MetaPill + Swap/Browse (matches TonightMealCard).
+  → `/tmp/cadence-spot-check/ha-meals.png`
+- [x] **Append next P2 batch**.
+
+### Batch HB — Grocery qty scan + Matrix empty (Centr/Todoist)
+
+- [x] **GroceryRow quantity** — bold ink for scan (Centr); muted when checked; reserve blue for actions.
+- [x] **Matrix empty quadrant** — muted-caps DROP HERE cue.
+  → `/tmp/cadence-spot-check/hb-shop.png`, `hb-matrix.png`
+- [x] **Append next P2 batch**.
+
+### Batch HC — Habits mini-week rings (timespent/QUITTR)
+
+- [x] **Habit miniWeek** — solid accent done; dashed ring scheduled-open; faint off-day.
+  → `/tmp/cadence-spot-check/hc-habits.png`
+- [x] **Append next P2 batch**.
+
+### Batch HD — Today dashed add cue (Tiimo/Saturn)
+
+- [x] **Today Tasks empty** (when other sections exist) — dashed “Add something” row.
+- [x] **Today ScrollView padding → Theme.Space.lg**.
+  → `/tmp/cadence-spot-check/hd-today.png`
+- [x] **Append next P2 batch**.
+
+### Batch HE — Browse filter Clear + empty (Recime/Noom)
+
+- [x] **Browse “Clear all”** beside active course/search filters.
+- [x] **Browse empty** — muted-caps NO MATCHES + display title.
+  → `/tmp/cadence-spot-check/he-browse.png`, `he-browse-dessert.png` (Clear all visible on Dessert).
+- [x] **Append next P2 batch**.
+
+### Batch HF — Calendar weekday muted caps (Amie)
+
+- [x] **Calendar month weekday row** — caption2 bold + tracking muted caps.
+- [x] **Week column headers** — matching muted caps.
+  → `/tmp/cadence-spot-check/hf-calendar.png`
+- [x] **Append next P2 batch**.
+
+### Batch HG — Settings hub icon tints (Structured/Hevy)
+
+- [x] **SettingsCategoryRow tints** — accent for identity/nav; cta for action hubs.
+  → `/tmp/cadence-spot-check/hg-settings.png`
+- [x] **Append next P2 batch**.
+
+### Batch HI — Drawer selected row polish (Superlist/Fabric)
+
+- [x] **Drawer nav selected** — accent stroke + trailing chevron.
+  → `/tmp/cadence-spot-check/hi-drawer.png`
+- [x] **Append next P2 batch**.
+
+### Batch HJ — Calendar workout chips muted caps
+
+- [x] **Month workout chips** — UPPERCASE + bold/tracking; Theme.Radius.sm.
+  → `/tmp/cadence-spot-check/hj-calendar.png`
+- [x] **Append next P2 batch**.
+
+### Batch HK — Global search empty (Revolut)
+
+- [x] **No-results** — muted caps + Clear search CTA.
+  → `/tmp/cadence-spot-check/hk-search-empty.png`
+- [x] **Append next P2 batch**.
+
+### Batch HL — Lift home CTA cohesion (Hevy)
+
+- [x] **Week strip weekdays** — muted-caps bold tracking.
+- [x] **TODAY’S LIFTS card** — full-width Start routine CTA (Hevy).
+  → `/tmp/cadence-spot-check/hl-lift.png`
+- [x] **Append next P2 batch**.
+
+### Batch HM — Calendar preview workout caps
+
+- [x] **Month day preview** — workout titles UPPERCASE + bold tracking (match chips).
+  → `/tmp/cadence-spot-check/hm-calendar.png`
+- [x] **Append next P2 batch**.
+
+### Batch HN — Habits week strip workout badges caps
+
+- [x] **SoftDayCell badges** — UPPER/LOWER uppercase + tracking.
+  → `/tmp/cadence-spot-check/hn-habits.png`
+- [x] **Append next P2 batch**.
+
+### Batch HO — SoftDayCell badge tracking + cohesion spot-check
+
+- [x] **Theme SoftDayCell badge tracking**.
+- [x] **Spot-check 5 tabs**.
+  → `/tmp/cadence-spot-check/ho-tab-*.png`
+- [x] **Append next P2**.
+
+### Batch HP — Day detail sheet cohesion (Amie)
+
+- [x] **DayDetailSheet empty** — IconWell + “Nothing scheduled” + MetaPill + Add CTAs.
+  → `/tmp/cadence-spot-check/hp-day-detail.png`
+- [x] **Append next P2 batch**.
+
+### Batch HQ — Active workout REST polish (Hevy)
+
+- [x] **Rest banner** — stronger REST tracking; Skip as CTA capsule; hairline CTA stroke.
+  → Build OK; `/tmp/cadence-spot-check/hq-today.png` (post-install).
+- [x] **Append next P2 batch**.
+
+### Batch HR — QuickAdd muted caps (Todoist)
+
+- [x] **QuickAddSheet** — SAVE TO LIST / DUE DATE muted caps; Space padding.
+  → `/tmp/cadence-spot-check/hr-quickadd.png`
+- [x] **Append next P2**.
+
+### Batch HS — NewHabit sheet polish (timespent)
+
+- [x] **NewHabitSheet** — ICON/FREQUENCY/PICK DAYS/SECTION muted caps; Theme.Space; weekday caps.
+  → `/tmp/cadence-spot-check/hs-newhabit.png`
+- [x] **Append next P2**.
+
+### Batch HT — Tags manage polish (Oura)
+
+- [x] **TagManagerSheet empty** — IconWell + NO TAGS + display title.
+- [x] **TagEditorSheet** — NAME/COLOR muted caps.
+  → `/tmp/cadence-spot-check/ht-tags.png`
+- [x] **Append next P2**.
+
+### Batch HU — Pantry STAPLES polish (Bevel)
+
+- [x] **PantryEditor** — STAPLES muted caps; Add CTA blue; no-match IconWell.
+  → `/tmp/cadence-spot-check/hu-pantry.png`
+- [x] **Append next P2**.
+
+### Batch HV — Exercise guide metadata (Equinox+/Gymshark)
+
+- [x] **ExerciseGuideView** — EQUIPMENT/TARGET/PRESCRIPTION muted-caps rows; HOW TO PERFORM tracking.
+  → Build OK; `/tmp/cadence-spot-check/hv-meals.png`, `hv-meals-light.png`
+- [x] **Append next P2**.
+
+### Batch HW — Settings status toast (Character AI/TIDE)
+
+- [x] **Reminders + Calendar sync status** — IconWell checkmark + surface row.
+  → Build OK; `/tmp/cadence-spot-check/hw-settings.png`
+- [x] **Append next P2**.
+
+### Batch HX — Widget Today muted caps (Yazio/Garmin)
+
+- [x] **CadenceWidgets tasksBody** — TODAY eyebrow + Tasks headline.
+  → Build OK; `/tmp/cadence-spot-check/hx-matrix.png`
+- [x] **Append next P2**.
+
+### Batch HY — Plan generating overlay caps
+
+- [x] **PlanGeneratingOverlay** — BUILDING WEEK muted caps eyebrow.
+  → Build OK.
+- [x] **Append next P2**.
+
+### Batch HZ — BusyOverlay WORKING caps
+
+- [x] **Theme.BusyOverlay** — WORKING muted caps; ProgressView uses CTA; card shadow.
+  → Build OK; `/tmp/cadence-spot-check/hz-meals.png`
+- [x] **Append next P2**.
+
+### Batch IA — Onboarding chrome (WHOOP/Garmin)
+
+- [x] **OnboardingView** — STEP n OF 3 + title caps; CONTINUE/GET STARTED; muted Skip caps; CTA Back; bottom bar shadow; section headers YOU/ACTIVITY…
+  → Build OK; `/tmp/cadence-spot-check/ia-today.png`, `ia-settings.png`, `ia-meals.png`
+- [x] **PrimaryButton** busy → WORKING…; DayDetail OVERDUE caps.
+- [x] **Append next P2**.
+
+### Batch IB — Lift set chrome (Hevy/Ladder)
+
+- [x] **ActiveWorkoutView** — set col headers tracking 0.8.
+- [x] **WorkoutSessionPreview** — START WORKOUT CTA caps.
+- [x] **Screenshot Lift** — `/tmp/cadence-spot-check/ib-lift.png`, `ic-lift.png`
+- [x] **Append next P2**.
+
+### Batch IC — Settings + Lift CTAs (Outsiders/Cal AI)
+
+- [x] **settingsDetailSectionHeader** — tracking 0.8.
+- [x] **Reminders/Calendar** — REMINDER TYPES / TIMING / APPLE CALENDAR muted caps.
+- [x] **WorkoutHome** — BEGIN CATCH-UP / START ROUTINE caps.
+  → `/tmp/cadence-spot-check/ic-lift.png`, `ic-reminders.png`
+- [x] **Append next P2**.
+
+### Batch ID — Shop aisle headers (Recime/Centr)
+
+- [x] **GroceryListView** — aisle headers CTA blue + tracking 0.8; ADD SOMETHING / STAPLES tracking.
+  → `/tmp/cadence-spot-check/id-shop.png`
+- [x] **Append next P2**.
+
+### Batch IE — Shop status + CTA caps
+
+- [x] **Shop** — DONE + N LEFT / ALL PICKED UP muted-caps status.
+- [x] **Lift/Today actions** — SKIP; BEGIN/RESUME WORKOUT; TODAY badge; SAVE CTAs.
+  → `/tmp/cadence-spot-check/ie-shop.png`, `ie-today.png`
+- [x] **Append next P2**.
+
+### Batch IF — Habit SKIP + Matrix DROP + day empty CTAs
+
+- [x] **Today habit** — SKIP muted caps.
+- [x] **Matrix** — DROP HERE tracking 0.8.
+- [x] **DayDetail empty** — ADD TASK OR EVENT / ADD TASK / ADD EVENT.
+- [x] **UndoFAB** — UNDO caps.
+  → `/tmp/cadence-spot-check/if-today.png`, `if-matrix.png`
+- [x] **Append next P2**.
+
+### Batch IG — Meals CTA caps (CREME)
+
+- [x] **MealPlanView** — NEW WEEK / PLAN WEEK; SWAP IN DINNER / BROWSE; TAP TO PLAN / TAP SWAP OR BROWSE MetaPills.
+  → `/tmp/cadence-spot-check/ig-meals.png`
+- [x] **Append next P2**.
+
+### Batch IH — Drawer Settings row (DeepSeek/Obsidian)
+
+- [x] **PlannerDrawer** — section header tracking 0.8; Settings row semibold + chevron.
+  → `/tmp/cadence-spot-check/ih-drawer.png`
+- [x] **Append next P2**.
+
+### Batch II — Drawer actions + Habits CTA (Gymshark)
+
+- [x] **PlannerDrawer** — NEW LIST / MANAGE TAGS muted-caps CTAs.
+- [x] **Habits empty** — ADD HABIT CTA.
+  → `/tmp/cadence-spot-check/ii-drawer.png`, `ii-habits.png`
+- [x] **Append next P2**.
+
+### Batch IJ — Calendar preview (Saturn/Teams)
+
+- [x] **CalendarPlannerView** — TODAY accent jump; AGENDA CTA; NO EVENTS muted caps + cue.
+  → `/tmp/cadence-spot-check/ij-calendar.png`
+- [x] **Append next P2**.
+
+### Batch IK — Browse clear filters (CREME/Recime)
+
+- [x] **BrowseView** — CLEAR ALL / CLEAR FILTERS MetaPill; NO MATCHES tracking 0.8.
+  → `/tmp/cadence-spot-check/ik-browse.png`
+- [x] **Append next P2**.
+
+### Batch IL — Profile recalculate CTAs (Life Reset/Garmin)
+
+- [x] **Profile & goals** — RECALCULATE MACROS / WITH AI; WORKING… busy.
+- [x] **Nutrition** — CALCULATED section header token.
+  → `/tmp/cadence-spot-check/il-profile.png`
+- [x] **Append next P2**.
+
+### Batch IM — Search + Tonight cues
+
+- [x] **Global search** — CLEAR SEARCH capsule CTA.
+- [x] **Tonight card** — TAP TO PLAN MetaPill.
+  → `/tmp/cadence-spot-check/im-today.png`
+- [x] **Append next P2**.
+
+### Batch IN — Active Finish CTA (Hevy)
+
+- [x] **ActiveWorkoutView** — FINISH muted-caps toolbar CTA.
+- [x] **Append next P2**.
+
+### Batch IO — Recipe detail caps (CREME/Kitchen Stories)
+
+- [x] **RecipeDetailView** — PLATE/STEPS/Ingredients tracking 0.8; MAIN/SIDE segmented.
+- [x] **Append next P2**.
+
+### Batch IP — Event sheet chrome (Saturn/MyDyson)
+
+- [x] **PlannerEventSheet** — COLOR/TAGS muted caps; CANCEL/ADD/DONE/DELETE toolbar caps.
+- [x] **Append next P2**.
+
+### Batch IQ — Widget empty caps (Brick)
+
+- [x] **CadenceWidgets** — ALL CLEAR / NO UPCOMING / UP NEXT muted caps; TODAY tracking 0.8.
+- [x] **Append next P2**.
+
+### Batch IR — List settings (Todoist)
+
+- [x] **ListSettingsSheet** — LIST/VISIBILITY muted caps; DONE / DELETE LIST.
+- [x] **Append next P2**.
+
+### Batch IS — Calendar Notion/Outlook 3-day focus (Mobbin)
+
+- [x] **Default scope → 3 Day** — Notion Calendar / Outlook-style focus columns; month no longer default.
+- [x] **Remove AGENDA button + bottom preview strip** — day agenda via column header tap (`DayDetailSheet`); less chrome.
+- [x] **Collapsible month picker** — pull-down handle / title chevron; tap day jumps focus window and collapses; density dots only.
+- [x] **Header** — range title e.g. “Sep 10–12”; TODAY; long-press Change view…
+  → Build OK; `/tmp/cadence-spot-check/calendar-3day-final.png`, `calendar-month-picker-final.png`
+- [x] **Append next P2**.
+
+### Batch IT — Post-calendar chrome (Mobbin declutter)
+
+- [x] **Lift** — drop duplicate START ROUTINE; RESUME WORKOUT caps (single hero CTA).
+- [x] **Meals** — remove TAP SWAP OR BROWSE pill; quiet sentence + SWAP/BROWSE.
+- [x] **Today** — Tasks empty → ADD TASK (cta, no dashed strip).
+- [x] **Shop** — empty: drop ADD SOMETHING header; footer under manual add.
+- [x] **Habits** — sparse tip + ADD HABIT link.
+  → Build OK; spot-check screenshots
+- [x] **Append next P2**.
+
+### Batch IU — Spend sub-app + modular registry (Teller)
+
+- [x] **CadenceSubAppRegistry** — modular sub-app manifests (`docs/SUBAPPS.md`).
+- [x] **Spend wheel page** — purchases + cost-per-use (Mobbin: Starling/Monzo/Orbit).
+- [x] **TellerClient + docs/TELLER_SETUP.md** — sandbox sync stub; mTLS via backend.
+- [x] **Settings → Spend & Teller** — enable toggle, app id, sandbox token.
+  → Build OK; `/tmp/cadence-spot-check/spend-home.png`
+- [x] **Append next P2**.
+
+### Batch IV — Health sub-app (Bevel × Cadence + HealthKit)
+
+- [x] **CadenceSubAppRegistry.health** — modular Health alongside Spend.
+- [x] **Bevel-like dashboard** — Strain/Recovery/Sleep rings, stress & energy, vital pillars, scrubbable HR.
+- [x] **HealthKitClient** + demo fallback; placeholder scoring in `HealthStore`.
+- [x] **docs/APPLE_HEALTH_SETUP.md** — entitlements, types, Review notes.
+  → Build OK; `/tmp/cadence-spot-check/health-home.png`
+- [x] **Append next P2**.
+
+### Batch IW — News daily digest (Perplexity × Cadence)
+
+- [x] **News sub-app** — top-10 mixed topics, image cards, OPEN ARTICLE.
+- [x] **RSS client** + optional AI briefs via existing LLM key.
+- [x] **docs/NEWS_SETUP.md** — feeds now, backend later.
+  → Build OK; `/tmp/cadence-spot-check/news-home.png`
+- [x] **Append next P2**.
+
+### Batch IX — Configurable apps & wheel (Mobbin)
+
+- [x] **CadenceAppsPreferences** — unified show/hide + dial order (Today pinned). — 2026-09-10
+- [x] **Swipe-up Edit / hold-to-edit** — − hide, AVAILABLE +, jiggle (Garmin/Bevel/SmartThings). — 2026-09-10
+- [x] **Settings → Apps & wheel** — Edit Tabs list + Restore defaults. — 2026-09-10
+- [x] **Smart hide** — wheel, drawer Shop, Today meal/lift cards, search jumps, FAB pages. — 2026-09-10
+  → Fix: dual UX from Mobbin (Garmin Edit Tabs, Bevel Edit Home, SmartThings +). Meals off also hides Shop.
+- [x] **Hold-to-edit only** — removed Edit button; Done only while editing; no jiggle (fixed − flicker). — 2026-09-10
+- [x] **Append next P2**.
+
+### Batch IY — Calendar month picker stay-open + year jump
+
+- [x] **Month stays open after day tap** — dismiss via header title or swipe up only. — 2026-09-10
+- [x] **Header title toggles month** — click month range to open/close. — 2026-09-10
+- [x] **Fast year** — tap month title in picker → year grid; chevrons step ±1 year. — 2026-09-10
+- [x] **Hold empty space + drag reorder** — edit from gaps around icons; drag to reorder (Today pinned). — 2026-09-10
+- [x] **Append next P2**.
+
+### Batch IZ — Continue UX loop
+
+- [x] **News topic chips spacing + hit targets** — more gap above cards; capsule contentShape; clip article images. — 2026-09-10
+- [x] **Workout thumbnail hit boxes** — clip scaledToFill + contentShape on exercise images/carousel. — 2026-09-10
+- [x] **Workout finish controls** — back leaves; ··· guide/skip rest; FINISH logs. — 2026-09-10
+- [x] **Tap outside dismisses keyboard/keypad** — app-wide + workout keypad scrim. — 2026-09-10
+- [ ] **Append**.
+
+---
+
+## Recently verified
+
+- **Batch IZ PASS 2026-09-10** — News/workout hit boxes; workout toolbar roles; keyboard dismiss.
+- **Batch IY PASS 2026-09-10** — Calendar month stays open; year grid jump; hold-empty + drag reorder on app grid.
+- **Batch IX PASS 2026-09-10** — Configurable apps/wheel (edit grid + Settings Apps).
+- **Batch IW PASS 2026-09-10** — News digest RSS + AI briefs + images.
+- **Batch IV PASS 2026-09-10** — Health Bevel-like UI + Apple Health setup doc.
+- **Batch IU PASS 2026-09-10** — Spend sub-app scaffold + Teller setup doc.
+- **Batch IT PASS 2026-09-10** — Lift/Meals/Today/Shop/Habits declutter after calendar.
+- **Batch IS PASS 2026-09-10** — Calendar 3-day focus + pull-down month (no AGENDA).
+- **Batch IR PASS 2026-09-10** — List settings muted caps.
+- **Batch IQ PASS 2026-09-10** — Widget ALL CLEAR / UP NEXT caps.
+- **Batch IP PASS 2026-09-10** — Event sheet COLOR/TAGS + toolbar caps.
+- **Batch IO PASS 2026-09-10** — Recipe PLATE/STEPS tracking.
+- **Batch IN PASS 2026-09-10** — Active FINISH CTA caps.
+- **Batch IM PASS 2026-09-10** — CLEAR SEARCH + TAP TO PLAN.
+- **Batch IL PASS 2026-09-10** — Recalculate macros CTA caps.
+- **Batch IK PASS 2026-09-10** — Browse CLEAR ALL / NO MATCHES.
+- **Batch IJ PASS 2026-09-10** — Calendar TODAY/AGENDA/NO EVENTS.
+- **Batch II PASS 2026-09-10** — Drawer NEW LIST / MANAGE TAGS + ADD HABIT.
+
+---
+
 ## Loop signal
 
 | Field | Value |
 |-------|-------|
 | **Phase** | `RUNNING` |
-| **Next batch** | **CM** |
-| **Summary** | Idle flat pill shipping. Next: CM expand pull preview / polish. |
+| **Next batch** | **JC** |
+| **Summary** | Body dial merges Health+Lift; Bevel-style scores + richer HealthKit sync. Continuing JC. |
+
+### Batch JC — Continue UX loop
+
+- [ ] **Next Mobbin friction**.
+- [ ] **Implement + screenshot**.
+- [ ] **Append**.
+
+### Batch JE — Body = Health + Workout (user)
+
+- [x] **Combine Health + Workout dial pages** — 2026-09-10.
+  → Fix: Single **Body** page (`HealthHomeView`) with Overview | Lift; Workout dial remaps to Health; prefs migration hides standalone Workout.
+- [x] **Real Apple Health / Watch sync** — sleep stages, overnight RHR, HRV, SpO₂, workouts, exercise time, zone minutes, wrist temp when available. — 2026-09-10
+  → Fix: Expanded `HealthKitClient`; auto-sync on Body appear.
+- [x] **Bevel-style Sleep / Strain / Recovery** — published components (duration/stages/efficiency/continuity/HR dip; HRV·RHR·RR·SpO₂ vs baselines; active+passive logarithmic strain + target). — 2026-09-10
+  → Fix: `BevelScoring.swift` + `HealthBaselines`; docs/APPLE_HEALTH_SETUP.md.
+
+### Batch JD — Workout dial ↔ Lift system (user + Mobbin)
+
+- [x] **Dial Workout was a Coming Soon placeholder** — 2026-09-10.
+  → Fix: (superseded by Body merge) previously `WorkoutHomeView` on dial.
+
+### Batch JA — Settings redesign (user: Mobbin + make them work)
+
+- [x] **Settings hub** — searchable, tappable profile card, status MetaPills, fixed Meals quick chip, user-facing About. — 2026-09-10
+  → Fix: `SettingsView.swift` Apple Fitness stacked-list pattern.
+- [x] **Shared chrome** — page heroes, status banners, Open iOS Settings. — 2026-09-10
+  → Fix: `SettingsDetailViews.swift` shared components.
+- [x] **All detail pages** — Profile/Nutrition/Meals/Recipes/Lift/Apps/Spend/Health/News/Reminders/Calendar/AI heroes + working CTAs with success/error feedback; AI Save no longer silent. — 2026-09-10
+- [x] **Recipes subtitle** — empty cookbooks reads “All cookbooks” (empty = no filter). — 2026-09-10
+
+### Batch JB — Dial haptics (user report)
+
+- [x] **Rotating apps feels too soft** — 2026-09-10.
+  → Fix: Per-tick feedback is `.heavy` @ 1.0 (was light selection); landing on an app is `.rigid` @ 1.0; removed unused selection generator.
+
+### Batch IZ — Wheel pick snappiness (user report)
+
+- [x] **Opening apps from wheel/menu feels delayed** — 2026-09-10.
+  → Fix: Switch content before dial/menu animation; remove 180ms page crossfade; snappier commit/dismiss springs; wake idle morph only on drag (instant on tap); grid long-press via ButtonStyle so taps aren’t gated on 450ms recognizer.
+- [x] **Workout finish triplication** — ← leave, ··· guide/skip rest, FINISH logs. — 2026-09-10
+- [x] **Tap outside dismisses keyboard/keypad** — root + settings + onboarding + workout scrim. — 2026-09-10

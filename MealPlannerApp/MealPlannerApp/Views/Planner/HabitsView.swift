@@ -12,7 +12,7 @@ struct HabitsHomeView: View {
     @State private var selectedDay = Date()
 
     private var workoutsEnabled: Bool {
-        profiles.first?.workoutsEnabled ?? true
+        CadenceAppsPreferences.isVisible(.workout) && (profiles.first?.workoutsEnabled ?? true)
     }
 
     private var grouped: [(HabitPeriod, [HabitEntity])] {
@@ -27,52 +27,79 @@ struct HabitsHomeView: View {
             PlannerTitleHeader(title: "Habits", onMenu: onOpenDrawer)
 
             weekStrip
-                .padding(.vertical, 10)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: Theme.Space.md) {
                     WorkoutCompactBanner(date: selectedDay)
+                        .padding(.horizontal, Theme.Space.lg)
 
                     if habits.isEmpty {
                         Theme.EmptyState(
                             systemImage: "repeat.circle",
                             title: "No habits yet",
                             message: "Track daily routines like water, meds, or stretching.",
-                            cta: "Add habit",
+                            cta: "ADD HABIT",
                             ctaHint: "Opens new habit form"
                         ) {
                             showAdd = true
                         }
-                        .frame(minHeight: 200)
-                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        .padding(.horizontal, Theme.Space.lg)
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel("No habits yet. Track daily routines like water, meds, or stretching.")
+                    } else if habits.count < 3 {
+                        HStack(alignment: .firstTextBaseline, spacing: Theme.Space.sm) {
+                            Text("Consistency compounds.")
+                                .font(.footnote)
+                                .foregroundStyle(Theme.muted)
+                            Spacer(minLength: 0)
+                            Button {
+                                showAdd = true
+                            } label: {
+                                Text("ADD HABIT")
+                                    .font(.caption.weight(.bold))
+                                    .tracking(0.7)
+                                    .foregroundStyle(Theme.cta)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Add habit")
+                            .accessibilityHint("Opens new habit form")
+                        }
+                        .padding(.horizontal, Theme.Space.lg)
                     }
 
                     ForEach(grouped, id: \.0) { period, items in
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(period.title.uppercased())
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(Theme.muted)
-                                .padding(.horizontal, 16)
+                        VStack(alignment: .leading, spacing: Theme.Space.sm) {
+                            HStack(spacing: Theme.Space.sm) {
+                                Text(period.title.uppercased())
+                                    .font(.caption2.weight(.bold))
+                                    .tracking(0.6)
+                                    .foregroundStyle(Theme.muted)
+                                Theme.CountBadge(count: items.count)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, Theme.Space.lg)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityLabel("\(period.title), \(items.count) habits")
                             ForEach(items) { habit in
                                 habitCard(habit)
                             }
                         }
                     }
                 }
-                .padding(.bottom, 88)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(.bottom, 110)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.canvas.ignoresSafeArea())
-        .dialFABChrome {
-            OrangeFAB(
-                accessibilityLabel: "Add habit",
-                accessibilityHint: "Opens new habit form"
-            ) {
-                showAdd = true
-            }
+        .onChange(of: appModel.requestedFABAction) { _, action in
+            guard action == .addHabit else { return }
+            showAdd = true
+            appModel.requestedFABAction = nil
         }
         .sheet(isPresented: $showAdd) {
             NewHabitSheet()
@@ -86,34 +113,32 @@ struct HabitsHomeView: View {
         let cal = Calendar.current
         let start = cal.dateInterval(of: .weekOfYear, for: .now)?.start ?? .now
         let days = (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: start) }
-        return HStack {
+        return HStack(spacing: 2) {
             ForEach(days, id: \.self) { day in
-                Button {
+                Theme.SoftDayCell(
+                    weekday: shortWeek(day),
+                    dayNumber: "\(cal.component(.day, from: day))",
+                    selected: cal.isDate(selectedDay, inSameDayAs: day),
+                    isToday: cal.isDateInToday(day),
+                    badge: workoutsEnabled
+                        ? WorkoutIntegration.scheduledSession(on: day, workoutsEnabled: true)?.shortName.uppercased()
+                        : nil
+                ) {
                     selectedDay = day
-                } label: {
-                    VStack(spacing: 4) {
-                        Text(shortWeek(day))
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(Theme.muted)
-                        Text("\(cal.component(.day, from: day))")
-                            .font(.subheadline.weight(cal.isDate(selectedDay, inSameDayAs: day) ? .bold : .regular))
-                            .foregroundStyle(cal.isDate(selectedDay, inSameDayAs: day) ? Theme.accent : Theme.ink)
-                        if workoutsEnabled, let session = WorkoutIntegration.scheduledSession(on: day, workoutsEnabled: true) {
-                            Text(session.shortName)
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(Theme.accent)
-                                .lineLimit(1)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.plain)
                 .accessibilityLabel(habitWeekStripLabel(for: day))
                 .accessibilityHint("Shows habits for this day")
                 .accessibilityAddTraits(cal.isDate(selectedDay, inSameDayAs: day) ? [.isButton, .isSelected] : .isButton)
             }
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, Theme.Space.sm)
+        .padding(.vertical, Theme.Space.xs)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1)
+        )
+        .padding(.horizontal, Theme.Space.lg)
     }
 
     private func habitWeekStripLabel(for day: Date) -> String {
@@ -133,7 +158,7 @@ struct HabitsHomeView: View {
     private func habitCard(_ habit: HabitEntity) -> some View {
         let scheduled = habit.isScheduled(on: selectedDay)
         let done = habit.isDone(on: selectedDay)
-        return HStack(spacing: 12) {
+        return HStack(spacing: Theme.Space.md) {
             Button {
                 guard scheduled else { return }
                 if let existing = habit.log(on: selectedDay) {
@@ -157,11 +182,14 @@ struct HabitsHomeView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(habit.name)
                     .font(.headline)
-                    .foregroundStyle(scheduled ? Theme.ink : Theme.muted)
+                    .foregroundStyle(done ? Theme.muted : (scheduled ? Theme.ink : Theme.muted))
+                    .strikethrough(done, color: Theme.muted.opacity(0.7))
                 Text(habitSubtitle(habit))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.muted)
+                    .opacity(done ? 0.75 : 1)
             }
+            .opacity(done ? 0.85 : 1)
             .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture { editingHabit = habit }
@@ -170,9 +198,14 @@ struct HabitsHomeView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(habitMiniWeekLabel(habit))
         }
-        .padding(14)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .padding(.horizontal, 16)
+        .padding(Theme.Space.md)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .strokeBorder(done ? Theme.accent.opacity(0.35) : Theme.hairline, lineWidth: 1)
+        )
+        .shadow(color: Theme.cardShadow, radius: 8, y: 3)
+        .padding(.horizontal, Theme.Space.lg)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(habitRowAccessibilityLabel(habit, scheduled: scheduled, done: done))
         .accessibilityHint("Use complete button to toggle. Double tap habit name to edit.")
@@ -208,6 +241,7 @@ struct HabitsHomeView: View {
     }
 
     private func miniWeek(_ habit: HabitEntity) -> some View {
+        // timespent/QUITTR: solid accent = done; dashed ring = scheduled open; faint = off-day.
         let cal = Calendar.current
         let start = cal.dateInterval(of: .weekOfYear, for: .now)?.start ?? .now
         let doneDays = Set(
@@ -215,15 +249,31 @@ struct HabitsHomeView: View {
                 .filter { $0.status == .done }
                 .map { cal.startOfDay(for: $0.day) }
         )
-        return HStack(spacing: 4) {
+        return HStack(spacing: Theme.Space.xs) {
             ForEach(0..<7, id: \.self) { i in
                 let day = cal.date(byAdding: .day, value: i, to: start) ?? .now
                 let dayStart = cal.startOfDay(for: day)
                 let scheduled = habit.isScheduled(on: day)
                 let filled = doneDays.contains(dayStart)
-                Circle()
-                    .fill(filled ? Theme.accent : (scheduled ? Theme.sunken : Theme.flagNone.opacity(0.35)))
-                    .frame(width: 8, height: 8)
+                ZStack {
+                    if filled {
+                        Circle()
+                            .fill(Theme.accent)
+                            .frame(width: 8, height: 8)
+                    } else if scheduled {
+                        Circle()
+                            .strokeBorder(
+                                Theme.muted.opacity(0.55),
+                                style: StrokeStyle(lineWidth: 1, dash: [2, 1.5])
+                            )
+                            .frame(width: 8, height: 8)
+                    } else {
+                        Circle()
+                            .fill(Theme.flagNone.opacity(0.28))
+                            .frame(width: 8, height: 8)
+                    }
+                }
+                .frame(width: 8, height: 8)
             }
         }
     }

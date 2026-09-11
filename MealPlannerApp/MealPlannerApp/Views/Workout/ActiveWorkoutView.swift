@@ -31,11 +31,11 @@ struct ActiveWorkoutView: View {
                     }
                 )
             } else {
-                VStack(spacing: 16) {
+                VStack(spacing: Theme.Space.lg) {
                     Theme.EmptyState(
                         systemImage: "dumbbell",
                         title: "No active workout",
-                        message: "Start a session from Today or the Lift hub.",
+                        message: "Start a session from Workout on the dial, Today, or Calendar.",
                         cta: "Close",
                         ctaHint: "Closes workout screen"
                     ) {
@@ -94,7 +94,7 @@ struct ActiveWorkoutView: View {
     }
 
     private var savingPlaceholder: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: Theme.Space.md) {
             ProgressView()
             Text(showDoneSheet ? "Saved" : "Saving…")
                 .font(.subheadline)
@@ -213,7 +213,17 @@ private struct LiveWorkoutScreen: View {
                     exerciseDetail(exercise)
                 }
             }
+
             if editorField != nil {
+                Color.black.opacity(0.28)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        editorField = nil
+                    }
+                    .accessibilityLabel("Dismiss keypad")
+                    .accessibilityAddTraits(.isButton)
+                    .transition(.opacity)
+
                 WorkoutKeypadEditor(
                     draft: $editorDraft,
                     field: editorField!,
@@ -234,15 +244,19 @@ private struct LiveWorkoutScreen: View {
         .navigationBarHidden(true)
         .animation(.easeOut(duration: 0.2), value: live.restRemaining > 0)
         .animation(.easeOut(duration: 0.2), value: editorField != nil)
-        .confirmationDialog("Workout Options", isPresented: $showOptions, titleVisibility: .visible) {
-            Button("Finish workout") { onFinish() }
-                .accessibilityHint("Opens finish workout confirmation")
-            Button("Cancel workout", role: .destructive) { onBack() }
-                .accessibilityHint("Opens leave or discard workout confirmation")
+        .confirmationDialog("Workout options", isPresented: $showOptions, titleVisibility: .visible) {
+            Button("Form guide") { showGuide = true }
+                .accessibilityHint("Opens how-to for the current exercise")
+            if live.restRemaining > 0 {
+                Button("Skip rest") { appModel.skipRest() }
+                    .accessibilityHint("Ends the rest timer now")
+            }
+            Button("Leave workout", role: .destructive) { onBack() }
+                .accessibilityHint("Exit or discard this session without finishing")
             Button("Close", role: .cancel) {}
                 .accessibilityHint("Returns to live workout")
         } message: {
-            Text("Finish saves completed sets. Cancel lets you exit or discard the session.")
+            Text("Guide and rest tools. Use FINISH to log the session.")
                 .accessibilityAddTraits(.isStaticText)
         }
         .sheet(isPresented: $showGuide) {
@@ -255,39 +269,58 @@ private struct LiveWorkoutScreen: View {
     private var topBar: some View {
         TimelineView(.periodic(from: live.startedAt, by: 1)) { context in
             let elapsed = max(0, Int(context.date.timeIntervalSince(live.startedAt)))
-            HStack(spacing: 16) {
+            HStack(spacing: Theme.Space.md) {
                 Button(action: onBack) {
-                    Image(systemName: "line.3.horizontal")
+                    Image(systemName: "chevron.backward")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(Theme.ink)
+                        .frame(width: 32, height: 32)
                 }
-                .accessibilityLabel("Workout menu")
-                .accessibilityHint("Finish or cancel workout")
+                .accessibilityLabel("Leave workout")
+                .accessibilityHint("Exit and keep progress, or discard the session")
+
                 Label(formatElapsed(elapsed), systemImage: "stopwatch")
                     .font(.subheadline.monospacedDigit().weight(.semibold))
                     .foregroundStyle(Theme.ink)
-                Spacer()
+
+                Spacer(minLength: Theme.Space.sm)
+
                 if live.restRemaining > 0 {
                     Label(formatElapsed(live.restRemaining), systemImage: "timer")
                         .font(.caption.monospacedDigit().weight(.semibold))
                         .foregroundStyle(Theme.accent)
                 }
+
                 Button { showOptions = true } label: {
-                    Image(systemName: "ellipsis")
+                    Image(systemName: "ellipsis.circle")
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(Theme.ink)
+                        .frame(width: 32, height: 32)
                 }
-                .accessibilityLabel("Workout options")
-                .accessibilityHint("Finish or cancel workout")
+                .accessibilityLabel("More options")
+                .accessibilityHint("Form guide, skip rest, or leave workout")
+
+                Button(action: onFinish) {
+                    Text("FINISH")
+                        .font(.caption.weight(.bold))
+                        .tracking(0.6)
+                        .foregroundStyle(Color.white)
+                        .padding(.horizontal, Theme.Space.md)
+                        .padding(.vertical, Theme.Space.sm)
+                        .background(Theme.cta, in: Capsule(style: .continuous))
+                }
+                .accessibilityLabel("Finish workout")
+                .accessibilityHint("Logs completed sets and updates progression")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, Theme.Space.lg)
+            .padding(.vertical, Theme.Space.md)
         }
     }
 
     private var exerciseCarousel: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
+                HStack(spacing: Theme.Space.sm + 2) {
                     ForEach(Array(live.exercises.enumerated()), id: \.element.id) { index, ex in
                         Button {
                             if index == focusedIndex {
@@ -306,6 +339,7 @@ private struct LiveWorkoutScreen: View {
                             .accessibilityHidden(true)
                         }
                         .buttonStyle(.plain)
+                        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         .accessibilityLabel(
                             index == focusedIndex
                                 ? "\(ex.template.name), selected exercise"
@@ -320,8 +354,8 @@ private struct LiveWorkoutScreen: View {
                         .id(ex.id)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.horizontal, Theme.Space.lg)
+                .padding(.vertical, Theme.Space.sm)
             }
             .onChange(of: focusedIndex) { _, new in
                 if new < live.exercises.count {
@@ -335,8 +369,8 @@ private struct LiveWorkoutScreen: View {
         let completedSets = exercise.sets.filter(\.isCompleted).count
         let isTimed = exercise.template.progressionType == .time
         return ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Theme.Space.md + 2) {
+                VStack(alignment: .leading, spacing: Theme.Space.xs) {
                     Text(exercise.template.name)
                         .font(.title2.weight(.bold))
                         .foregroundStyle(Theme.ink)
@@ -344,10 +378,10 @@ private struct LiveWorkoutScreen: View {
                         .font(.subheadline)
                         .foregroundStyle(Theme.muted)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Theme.Space.lg)
 
                 MuscleTagRow(tags: WorkoutVisuals.muscleTags(for: exercise.template))
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, Theme.Space.lg)
 
                 HStack(spacing: 0) {
                     colHeader("Set", width: 36)
@@ -356,7 +390,7 @@ private struct LiveWorkoutScreen: View {
                     colHeader(isTimed ? "" : "Reps", width: 76)
                     colHeader("", width: 44)
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Theme.Space.lg)
 
                 ForEach(exercise.sets) { set in
                     SetRow(
@@ -389,7 +423,7 @@ private struct LiveWorkoutScreen: View {
                     )
                     .id("\(exercise.id)-\(set.id)")
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, Theme.Space.md)
             }
             .padding(.bottom, bottomInset)
         }
@@ -450,20 +484,25 @@ private struct LiveWorkoutScreen: View {
     }
 
     private var restBanner: some View {
-        VStack(spacing: 10) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
+        // Hevy live rest: muted REST caps, CTA timer, Skip as primary action.
+        VStack(spacing: Theme.Space.sm + 2) {
+            HStack(alignment: .center, spacing: Theme.Space.md) {
+                VStack(alignment: .leading, spacing: Theme.Space.xs) {
                     Text("REST")
-                        .font(.caption.weight(.bold))
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.8)
                         .foregroundStyle(Theme.muted)
                     Text(formatElapsed(live.restRemaining))
                         .font(.title.monospacedDigit().weight(.bold))
-                        .foregroundStyle(Theme.ink)
+                        .foregroundStyle(Theme.cta)
                 }
-                Spacer()
+                Spacer(minLength: 0)
                 Button("Skip") { appModel.skipRest() }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.accent)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Color.white)
+                    .padding(.horizontal, Theme.Space.md)
+                    .padding(.vertical, Theme.Space.sm)
+                    .background(Theme.cta, in: Capsule())
                     .accessibilityLabel("Skip rest")
                     .accessibilityHint("Ends rest timer and continues workout")
             }
@@ -471,16 +510,20 @@ private struct LiveWorkoutScreen: View {
                 value: Double(live.restTotal - live.restRemaining),
                 total: Double(max(live.restTotal, 1))
             )
-            .tint(Theme.accent)
+            .tint(Theme.cta)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Rest timer, \(formatElapsed(live.restRemaining)) remaining")
         .accessibilityHint("Rest between sets. Skip when you are ready to continue.")
         .accessibilityAddTraits(.updatesFrequently)
-        .padding(16)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .padding(.horizontal, 12)
-        .padding(.bottom, 10)
+        .padding(Theme.Space.lg)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .strokeBorder(Theme.cta.opacity(0.22), lineWidth: 1)
+        )
+        .padding(.horizontal, Theme.Space.md)
+        .padding(.bottom, Theme.Space.sm + 2)
     }
 
     private func autoLabel(for exercise: LiveExerciseController, setID: Int) -> String {
@@ -489,8 +532,9 @@ private struct LiveWorkoutScreen: View {
     }
 
     private func colHeader(_ title: String, width: CGFloat? = nil, flex: Bool = false) -> some View {
-        Text(title)
-            .font(.caption2.weight(.semibold))
+        Text(title.uppercased())
+            .font(.caption2.weight(.bold))
+            .tracking(0.8)
             .foregroundStyle(Theme.muted)
             .frame(width: width, alignment: .leading)
             .frame(maxWidth: flex ? .infinity : nil, alignment: .leading)
@@ -550,13 +594,13 @@ private struct SetRow: View {
             default: return false
             }
         }()
-        return HStack(spacing: 8) {
+        return HStack(spacing: Theme.Space.sm) {
             SetTypeBadge(label: WorkoutPrescription.setLabel(for: set), dimmed: set.isCompleted)
                 .frame(width: 36, alignment: .leading)
 
             Text(autoLabel)
                 .font(.caption.monospacedDigit())
-                .foregroundStyle(Color(white: 0.45))
+                .foregroundStyle(Theme.muted)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .lineLimit(1)
 
@@ -602,16 +646,16 @@ private struct SetRow: View {
                 onToggleComplete(next)
             } label: {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                         .stroke(set.isCompleted ? Theme.accent : Theme.muted.opacity(0.4), lineWidth: 1.5)
                         .frame(width: 28, height: 28)
                     if set.isCompleted {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                             .fill(Theme.accent)
                             .frame(width: 28, height: 28)
                         Image(systemName: "checkmark")
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.white)
                     }
                 }
                 .frame(width: 36, height: 36)
@@ -622,10 +666,18 @@ private struct SetRow: View {
             .accessibilityLabel(set.isCompleted ? "Mark set incomplete" : "Complete set")
             .accessibilityHint("Double tap to log set complete or reopen it")
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 4)
+        .padding(.vertical, Theme.Space.sm + 2)
+        .padding(.horizontal, Theme.Space.xs)
         .contentShape(Rectangle())
-        .opacity(set.isCompleted ? 0.55 : 1)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                .fill(set.isCompleted ? Theme.accent.opacity(0.06) : Theme.sunken.opacity(0.35))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1)
+        )
+        .opacity(set.isCompleted ? 0.7 : 1)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(setRowAccessibilityLabel(set, value: value))
     }
@@ -669,7 +721,7 @@ private struct WorkoutSummarySheet: View {
                     Section("Next time") {
                         ForEach(notes.keys.sorted(), id: \.self) { key in
                             if let msg = notes[key] {
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: Theme.Space.xs) {
                                     Text(prettyName(key))
                                         .font(.subheadline.weight(.semibold))
                                     Text(msg)

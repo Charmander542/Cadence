@@ -14,6 +14,7 @@ struct RootView: View {
                 OnboardingView(profile: ensureProfile())
             }
         }
+        .cadenceDismissKeyboardOnTap()
         .onAppear { _ = ensureProfile() }
         .onAppear {
             CadenceAutomation.skipOnboardingIfRequested(modelContext: modelContext, profiles: profiles)
@@ -59,9 +60,10 @@ struct MainTabView: View {
     @State private var isAppGridExpanded = false
     /// Live pull-up distance from the dial — drawn in this ZStack so it never resizes the page inset.
     @State private var wheelExpandPull: CGFloat = 0
+    @StateObject private var appsModel = CadenceAppsModel()
 
-    private let wheelItems: [WheelNavItem] = WheelDestination.dialCases.map(\.navItem)
-    private let appMenuSpring = Animation.spring(response: 0.48, dampingFraction: 0.86)
+    private var wheelItems: [WheelNavItem] { appsModel.dialItems }
+    private let appMenuSpring = Animation.spring(response: 0.32, dampingFraction: 0.90)
 
     var body: some View {
         ZStack {
@@ -87,18 +89,41 @@ struct MainTabView: View {
                 .ignoresSafeArea(edges: .bottom)
             }
 
+            // FAB above the dial as a trailing-only control — must not cover the wheel hit target.
+            if !isAppGridExpanded, let fab = contentDestination.fabAction {
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                        .allowsHitTesting(false)
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                            .allowsHitTesting(false)
+                        OrangeFAB(
+                            accessibilityLabel: fab.accessibilityLabel,
+                            accessibilityHint: fab.accessibilityHint
+                        ) {
+                            appModel.requestedFABAction = fab
+                        }
+                        .padding(.trailing, PlannerChromeMetrics.dialFABTrailingPadding)
+                    }
+                    .padding(.bottom, PlannerChromeMetrics.dialFABBottomPadding)
+                    // Match page content bottom (safeAreaInset dial band).
+                    .padding(.bottom, PlannerChromeMetrics.dialLayoutHeight)
+                }
+                .zIndex(3)
+            }
+
             // Interactive pull-up peek — sibling overlay, not part of the bottom inset.
             if wheelExpandPull > 12, !isAppGridExpanded {
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    RoundedRectangle(cornerRadius: Theme.Radius.xl + 4, style: .continuous)
                         .fill(Theme.surface.opacity(min(0.95, wheelExpandPull / 120)))
                         .frame(height: min(wheelExpandPull * 0.85, 160))
                         .overlay(alignment: .top) {
                             Capsule()
                                 .fill(Theme.muted.opacity(0.45))
                                 .frame(width: 32, height: 4)
-                                .padding(.top, 10)
+                                .padding(.top, Theme.Space.sm + 2)
                         }
                 }
                 .ignoresSafeArea(edges: .bottom)
@@ -127,6 +152,10 @@ struct MainTabView: View {
                             onSelect: handleWheelSelect,
                             onDismiss: {
                                 isAppGridExpanded = false
+                            },
+                            onWorkoutVisibilityChange: { on in
+                                profile.workoutsEnabled = on
+                                Task { await PlannerSyncCoordinator.shared.refreshAll(in: modelContext) }
                             }
                         )
                     }
@@ -153,6 +182,12 @@ struct MainTabView: View {
             if let tab, let dest = WheelDestination.fromLegacyTab(tab) {
                 selectWheel(dest)
                 appModel.requestedMainTab = nil
+            }
+        }
+        .onChange(of: appModel.requestedWheelId) { _, id in
+            if let id, let dest = WheelDestination(rawValue: id) {
+                selectWheel(dest)
+                appModel.requestedWheelId = nil
             }
         }
         .onChange(of: appModel.requestedOpenShop) { _, shouldOpen in
@@ -197,8 +232,10 @@ struct MainTabView: View {
                         case .matrix:
                             selectWheel(.matrix)
                         case .meals:
+                            guard CadenceAppsPreferences.isVisible(.meals) else { break }
                             selectWheel(.meals)
                         case .shop:
+                            guard CadenceAppsPreferences.isVisible(.shop) else { break }
                             openShop()
                         default:
                             plannerDestination = dest
@@ -250,7 +287,7 @@ struct MainTabView: View {
         .animation(.easeInOut(duration: 0.28), value: appModel.isGeneratingPlan)
         .safeAreaInset(edge: .top) {
             if appModel.isGeneratingPlan && appModel.planGeneratingMinimized {
-                HStack(spacing: 10) {
+                HStack(spacing: Theme.Space.sm + 2) {
                     ProgressView()
                         .controlSize(.small)
                     Text(appModel.generatingStatus)
@@ -264,8 +301,8 @@ struct MainTabView: View {
                     .accessibilityLabel("Show plan generation progress")
                     .accessibilityHint("Opens full plan generation overlay")
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.horizontal, Theme.Space.lg)
+                .padding(.vertical, Theme.Space.sm + 2)
                 .background(.ultraThinMaterial)
             }
         }
@@ -278,7 +315,11 @@ struct MainTabView: View {
                 contentDestination = dest
                 selectedWheelId = dest.rawValue
             }
+            ensureSelectionVisible()
             applyLaunchArguments()
+        }
+        .onChange(of: appsModel.revision) { _, _ in
+            ensureSelectionVisible()
         }
     }
 
@@ -351,14 +392,14 @@ struct MainTabView: View {
                     onGoToday: { selectWheel(.today) }
                 )
             }
-            lazyPage(WheelDestination.workout.rawValue, active: page == .workout) {
-                PlaceholderPageView(
-                    title: "Workout",
-                    systemImage: "dumbbell",
-                    subtitle: "Lift sessions and progress will surface here. Placeholder for the wheel demo.",
-                    onOpenDrawer: { showDrawer = true },
-                    onGoToday: { selectWheel(.today) }
-                )
+            lazyPage(WheelDestination.spend.rawValue, active: page == .spend) {
+                SpendHomeView(onOpenDrawer: { showDrawer = true })
+            }
+            lazyPage(WheelDestination.health.rawValue, active: page == .health || page == .workout) {
+                HealthHomeView(onOpenDrawer: { showDrawer = true })
+            }
+            lazyPage(WheelDestination.news.rawValue, active: page == .news) {
+                NewsHomeView(onOpenDrawer: { showDrawer = true })
             }
         }
     }
@@ -374,7 +415,8 @@ struct MainTabView: View {
                 .opacity(active ? 1 : 0)
                 .allowsHitTesting(active)
                 .accessibilityHidden(!active)
-                .animation(.easeInOut(duration: 0.18), value: active)
+                // Instant swap — crossfade made wheel picks feel late.
+                .animation(nil, value: active)
         }
     }
 
@@ -391,17 +433,32 @@ struct MainTabView: View {
     }
 
     private func selectWheel(_ dest: WheelDestination) {
-        loadedPages.insert(dest.rawValue)
-        selectedWheelId = dest.rawValue
-        if dest.showsContentPage {
-            contentDestination = dest
+        let remapped: WheelDestination = {
+            // Workout dial folded into Body (Health).
+            if dest == .workout { return .health }
+            return dest
+        }()
+        let target: WheelDestination = {
+            if remapped.showsContentPage, !CadenceAppsPreferences.isVisible(remapped) {
+                return .today
+            }
+            return remapped
+        }()
+        loadedPages.insert(target.rawValue)
+        selectedWheelId = target.rawValue
+        if target.showsContentPage {
+            contentDestination = target
         }
-        if let legacy = dest.legacyTabIndex {
+        if let legacy = target.legacyTabIndex {
             selectedTab = legacy
         }
     }
 
     private func openShop() {
+        guard CadenceAppsPreferences.isVisible(.meals) else {
+            selectWheel(.today)
+            return
+        }
         loadedPages.insert(WheelDestination.meals.rawValue)
         contentDestination = .meals
         selectedTab = WheelDestination.meals.legacyTabIndex ?? 2
@@ -409,6 +466,18 @@ struct MainTabView: View {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(150))
             openShopOnMeals = true
+        }
+    }
+
+    private func ensureSelectionVisible() {
+        guard let dest = WheelDestination(rawValue: selectedWheelId) else {
+            selectWheel(.today)
+            return
+        }
+        if dest.showsContentPage, !CadenceAppsPreferences.isVisible(dest) {
+            selectWheel(.today)
+        } else if !WheelDestination.dialCases.contains(dest), dest != .shop, dest != .settings {
+            selectWheel(.today)
         }
     }
 
@@ -457,6 +526,14 @@ struct MainTabView: View {
             }
         }
 
+        if let wheelIndex = args.firstIndex(of: "-openWheel"),
+           wheelIndex + 1 < args.count {
+            let token = args[wheelIndex + 1].lowercased()
+            if let dest = WheelDestination(rawValue: token) {
+                selectWheel(dest)
+            }
+        }
+
         if args.contains("-cadenceSpotCheck") {
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(800))
@@ -490,20 +567,38 @@ enum WheelDestination: String, CaseIterable, Identifiable {
     case inbox
     case browse
     case workout
+    case spend
+    case health
+    case news
     case settings
 
     var id: String { rawValue }
 
     /// Destinations shown on the rotary dial and swipe-up app grid.
     /// Shop and Settings open as sheets from the drawer / Meals, not the dial.
+    /// Visibility comes from `CadenceAppsPreferences` (edit grid + Settings → Apps).
     static var dialCases: [WheelDestination] {
-        allCases.filter { $0 != .shop && $0 != .settings }
+        CadenceAppsPreferences.orderedVisibleDialDestinations
     }
 
     var showsContentPage: Bool {
         switch self {
         case .shop, .settings: return false
         default: return true
+        }
+    }
+
+    /// Pages that show the shared dial + button (hosted above the wheel in RootView).
+    var fabAction: FABAction? {
+        switch self {
+        case .today: return .todayQuickAdd
+        case .matrix: return .matrixQuickAdd
+        case .calendar: return .addEvent
+        case .habits: return .addHabit
+        case .spend: return .addSpendItem
+        case .health: return .healthCheckIn
+        case .news: return .refreshNews
+        default: return nil
         }
     }
 
@@ -548,7 +643,13 @@ enum WheelDestination: String, CaseIterable, Identifiable {
         case .browse:
             return .init(id: rawValue, label: "Browse", systemImage: "book")
         case .workout:
-            return .init(id: rawValue, label: "Workout", systemImage: "dumbbell")
+            return .init(id: rawValue, label: "Body", systemImage: "dumbbell")
+        case .spend:
+            return .init(id: rawValue, label: "Spend", systemImage: "creditcard")
+        case .health:
+            return .init(id: rawValue, label: "Body", systemImage: "heart.text.square")
+        case .news:
+            return .init(id: rawValue, label: "News", systemImage: "newspaper")
         case .settings:
             return .init(id: rawValue, label: "Settings", systemImage: "gearshape")
         }

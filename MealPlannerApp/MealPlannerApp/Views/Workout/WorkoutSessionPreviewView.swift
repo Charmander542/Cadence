@@ -21,13 +21,13 @@ struct WorkoutSessionPreviewView: View {
         ZStack(alignment: .bottom) {
             Theme.canvas.ignoresSafeArea()
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: Theme.Space.xl) {
                     headerBlock
                     exerciseList
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 100)
+                .padding(.horizontal, Theme.Space.lg)
+                .padding(.top, Theme.Space.sm)
+                .padding(.bottom, Theme.Space.xl * 5)
             }
             startButton
         }
@@ -44,7 +44,7 @@ struct WorkoutSessionPreviewView: View {
     }
 
     private var headerBlock: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Theme.Space.xs) {
             Text("\(session.exercises.count) Exercises")
                 .font(.title2.weight(.bold))
                 .foregroundStyle(Theme.ink)
@@ -68,7 +68,7 @@ struct WorkoutSessionPreviewView: View {
                 }
             }
         }
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
     }
 
     private func exerciseRow(_ ex: WorkoutExerciseTemplate) -> some View {
@@ -77,16 +77,16 @@ struct WorkoutSessionPreviewView: View {
         return Button {
             guideExercise = ex
         } label: {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: Theme.Space.md) {
                 ExerciseThumbnail(exercise: ex, selected: false, width: 76, heightRatio: 1.45)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: Theme.Space.sm) {
                     Text(ex.name)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.ink)
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Theme.Space.xs) {
                         ForEach(prescribed) { set in
-                            HStack(spacing: 8) {
+                            HStack(spacing: Theme.Space.sm) {
                                 Text(WorkoutVisuals.setLabel(for: set))
                                     .font(.caption2.weight(.bold))
                                     .foregroundStyle(Theme.muted)
@@ -102,8 +102,8 @@ struct WorkoutSessionPreviewView: View {
                                     Text(prevLabel(prev, index: set.id, ex: ex))
                                         .font(.caption2.monospacedDigit())
                                         .foregroundStyle(Theme.accent.opacity(0.85))
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
+                                        .padding(.horizontal, Theme.Space.sm - 2)
+                                        .padding(.vertical, Theme.Space.xs / 2)
                                         .background(Theme.accent.opacity(0.15), in: Capsule())
                                 }
                             }
@@ -112,7 +112,8 @@ struct WorkoutSessionPreviewView: View {
                     MuscleTagRow(tags: WorkoutVisuals.muscleTags(for: ex))
                 }
             }
-            .padding(14)
+            .padding(Theme.Space.md + 2)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
@@ -148,17 +149,19 @@ struct WorkoutSessionPreviewView: View {
             appModel.beginLiveWorkout(session: session, plan: entity.decoded())
             dismiss()
         } label: {
-            Text("Start Workout")
+            Text("START WORKOUT")
                 .font(.headline.weight(.bold))
-                .foregroundStyle(Color.black)
+                .tracking(0.6)
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .padding(.vertical, Theme.Space.lg)
+                .background(Theme.cta, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                .shadow(color: Theme.cta.opacity(0.35), radius: 10, y: 4)
         }
         .accessibilityLabel("Start \(session.name) workout")
         .accessibilityHint("Begins live set tracking")
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+        .padding(.horizontal, Theme.Space.lg)
+        .padding(.bottom, Theme.Space.md)
         .background(
             LinearGradient(colors: [Theme.canvas.opacity(0), Theme.canvas], startPoint: .top, endPoint: .bottom)
                 .frame(height: 90)

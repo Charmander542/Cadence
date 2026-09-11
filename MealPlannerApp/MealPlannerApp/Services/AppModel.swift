@@ -19,12 +19,16 @@ final class AppModel: ObservableObject {
     @Published var showGlobalSearchSheet = false
     /// When set, `MainTabView` switches tabs then clears this value.
     @Published var requestedMainTab: Int?
+    /// When set, `MainTabView` selects a wheel destination by raw id (e.g. `spend`) then clears.
+    @Published var requestedWheelId: String?
     /// When set, `MainTabView` opens the shop list on Meals then clears.
     @Published var requestedOpenShop = false
     /// When set, `MainTabView` opens the planner drawer then clears.
     @Published var requestedOpenDrawer = false
     /// When set, `MainTabView` closes the planner drawer then clears.
     @Published var requestedCloseDrawer = false
+    /// When set, the active page opens its FAB action (quick add / event / habit) then clears.
+    @Published var requestedFABAction: FABAction?
     @Published var generatingStatus = "Planning your week"
     @Published var isBuildingShopList = false
     @Published var isRefreshingGrocery = false

@@ -30,7 +30,8 @@ struct CalendarPlannerView: View {
         sort: \PlannerTaskEntity.dueAt
     ) private var tasks: [PlannerTaskEntity]
     @Query private var profiles: [UserProfileEntity]
-    @State private var scope: CalendarScope = .month
+    /// Notion / Outlook-style default: three focused days, month picker on pull-down.
+    @State private var scope: CalendarScope = .threeDay
     @State private var scopeBeforeDayDrill: CalendarScope?
     @State private var cursor = Date()
     @State private var showScope = false
@@ -40,15 +41,23 @@ struct CalendarPlannerView: View {
     @State private var eventsByDay: [Date: [PlannerTaskEntity]] = [:]
     @State private var eventIndexStamp: Int = 0
     @State private var previewDay: Date = Calendar.current.startOfDay(for: .now)
+    @State private var monthPickerExpanded = false
+    @State private var pickerMonth = Date()
+    /// When the pull-down month picker is open, tap the month title to jump years.
+    @State private var pickerShowsYears = false
 
     private let weekdaySymbols = ["S", "M", "Tu", "W", "Th", "F", "S"]
     private let hourRowHeight: CGFloat = 52
     private let timeGutter: CGFloat = 44
     /// Bottom inset so the add-event FAB does not cover the last month row.
-    private let calendarFABClearance: CGFloat = 96
+    private let calendarFABClearance: CGFloat = 120
 
     private var workoutsEnabled: Bool {
-        profiles.first?.workoutsEnabled ?? true
+        CadenceAppsPreferences.isVisible(.workout) && (profiles.first?.workoutsEnabled ?? true)
+    }
+
+    private var usesFocusChrome: Bool {
+        scope == .threeDay || scope == .week || scope == .day
     }
 
     var body: some View {
@@ -56,29 +65,30 @@ struct CalendarPlannerView: View {
             header
             Group {
                 switch scope {
-                case .year: yearScope
-                case .month: monthScope
-                case .week: weekScope(days: 7)
-                case .threeDay: weekScope(days: 3)
-                case .day: weekScope(days: 1)
+                case .year:
+                    yearScope
+                case .month:
+                    monthScope
+                case .week, .threeDay, .day:
+                    focusScope
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.canvas.ignoresSafeArea())
-        .dialFABChrome {
-            OrangeFAB(
-                accessibilityLabel: "Add event",
-                accessibilityHint: "Opens new calendar event"
-            ) {
-                openNewEvent(at: defaultEventStart)
-            }
+        .onChange(of: appModel.requestedFABAction) { _, action in
+            guard action == .addEvent else { return }
+            openNewEvent(at: defaultEventStart)
+            appModel.requestedFABAction = nil
         }
         .confirmationDialog("View", isPresented: $showScope, titleVisibility: .visible) {
-            ForEach(CalendarScope.allCases) { item in
+            ForEach(CalendarScope.focusOrdered) { item in
                 Button(item.title) {
                     scopeBeforeDayDrill = nil
                     scope = item
+                    if item == .threeDay || item == .week || item == .day {
+                        monthPickerExpanded = false
+                    }
                 }
                     .accessibilityLabel(scope == item ? "\(item.title) view, selected" : "\(item.title) view")
                     .accessibilityHint("Switches calendar to \(item.title.lowercased()) view")
@@ -99,16 +109,24 @@ struct CalendarPlannerView: View {
             eventIndexStamp = 0
             rebuildEventIndex()
         }
+        .onChange(of: cursor) { _, new in
+            previewDay = Calendar.current.startOfDay(for: new)
+            if !Calendar.current.isDate(new, equalTo: pickerMonth, toGranularity: .month) {
+                pickerMonth = new
+            }
+        }
         .onAppear {
             rebuildEventIndex()
+            pickerMonth = cursor
+            previewDay = Calendar.current.startOfDay(for: cursor)
         }
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Theme.Space.md) {
             if scope == .day, let previous = scopeBeforeDayDrill {
                 Button { exitDayDrill(to: previous) } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: Theme.Space.xs) {
                         Image(systemName: "chevron.left")
                             .font(.body.weight(.semibold))
                         Text(previous.title)
@@ -147,39 +165,97 @@ struct CalendarPlannerView: View {
                 .accessibilityLabel("Next \(scope.title.lowercased())")
                 .accessibilityHint("Shows later \(scope.title.lowercased())")
             }
-            Spacer()
-            Button { showScope = true } label: {
-                HStack(spacing: 6) {
+            Spacer(minLength: Theme.Space.sm)
+            Button {
+                if usesFocusChrome {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        monthPickerExpanded.toggle()
+                        if monthPickerExpanded {
+                            pickerMonth = cursor
+                            pickerShowsYears = false
+                        } else {
+                            pickerShowsYears = false
+                        }
+                    }
+                } else {
+                    showScope = true
+                }
+            } label: {
+                HStack(spacing: Theme.Space.sm - 2) {
                     Text(headerTitle).font(Theme.title(.title2))
-                    Image(systemName: "chevron.down")
+                    Image(systemName: usesFocusChrome
+                          ? (monthPickerExpanded ? "chevron.up" : "chevron.down")
+                          : "chevron.down")
                         .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.muted)
                 }
                 .foregroundStyle(Theme.ink)
             }
-            .accessibilityLabel("Calendar view, \(headerTitle)")
-            .accessibilityHint("Double tap to change month, week, or day view")
-            Spacer()
-            Button { cursor = .now; previewDay = Calendar.current.startOfDay(for: .now) } label: {
-                Text("Today")
-                    .font(.subheadline.weight(.semibold))
+            .accessibilityLabel(usesFocusChrome
+                ? "\(headerTitle). Calendar \(monthPickerExpanded ? "expanded" : "collapsed")"
+                : "Calendar view, \(headerTitle)")
+            .accessibilityHint(usesFocusChrome
+                ? "Double tap to \(monthPickerExpanded ? "hide" : "show") month picker"
+                : "Double tap to change month, week, or day view")
+            .contextMenu {
+                Button("Change view…") { showScope = true }
+            }
+            Spacer(minLength: Theme.Space.sm)
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    cursor = .now
+                    previewDay = Calendar.current.startOfDay(for: .now)
+                    pickerMonth = .now
+                    // Keep month picker open if already expanded — only title / swipe-up dismisses it.
+                }
+            } label: {
+                Text("TODAY")
+                    .font(.caption.weight(.bold))
+                    .tracking(0.7)
                     .foregroundStyle(Theme.accent)
             }
             .accessibilityLabel("Go to today")
             .accessibilityHint("Jumps calendar to today's date")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, Theme.Space.lg)
+        .padding(.vertical, Theme.Space.sm + 2)
     }
 
     private var headerTitle: String {
+        let cal = Calendar.current
         let f = DateFormatter()
         switch scope {
-        case .year: f.dateFormat = "yyyy"
-        case .month: f.dateFormat = "MMMM yyyy"
-        default: f.dateFormat = "MMM d, yyyy"
+        case .year:
+            f.dateFormat = "yyyy"
+            return f.string(from: cursor)
+        case .month:
+            f.dateFormat = "MMMM yyyy"
+            return f.string(from: cursor)
+        case .threeDay:
+            let start = weekStart(days: 3)
+            let end = cal.date(byAdding: .day, value: 2, to: start) ?? start
+            return threeDayRangeTitle(start: start, end: end)
+        case .week:
+            f.dateFormat = "MMM d"
+            let start = weekStart(days: 7)
+            let end = cal.date(byAdding: .day, value: 6, to: start) ?? start
+            return "\(f.string(from: start))–\(f.string(from: end))"
+        case .day:
+            f.dateFormat = "EEE, MMM d"
+            return f.string(from: cursor)
         }
-        return f.string(from: cursor)
+    }
+
+    private func threeDayRangeTitle(start: Date, end: Date) -> String {
+        let cal = Calendar.current
+        let day = DateFormatter()
+        day.dateFormat = "d"
+        let month = DateFormatter()
+        month.dateFormat = "MMM"
+        if cal.isDate(start, equalTo: end, toGranularity: .month) {
+            return "\(month.string(from: start)) \(day.string(from: start))–\(day.string(from: end))"
+        }
+        return "\(month.string(from: start)) \(day.string(from: start))–\(month.string(from: end)) \(day.string(from: end))"
     }
 
     private var defaultEventStart: Date {
@@ -249,6 +325,294 @@ struct CalendarPlannerView: View {
         return Calendar.current.date(from: comps) ?? day
     }
 
+    // MARK: - Focus (3-day / week / day) + pull-down month picker
+
+    private var focusScope: some View {
+        let days: Int = {
+            switch scope {
+            case .week: return 7
+            case .day: return 1
+            default: return 3
+            }
+        }()
+        return VStack(spacing: 0) {
+            if monthPickerExpanded {
+                compactMonthPicker
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            monthPickerHandle
+            weekScope(days: days)
+                .padding(.bottom, calendarFABClearance * 0.35)
+        }
+    }
+
+    private var monthPickerHandle: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.22)) {
+                monthPickerExpanded.toggle()
+                if monthPickerExpanded {
+                    pickerMonth = cursor
+                    pickerShowsYears = false
+                } else {
+                    pickerShowsYears = false
+                }
+            }
+        } label: {
+            VStack(spacing: Theme.Space.xs) {
+                Capsule()
+                    .fill(Theme.muted.opacity(0.45))
+                    .frame(width: 36, height: 4)
+                Text(monthPickerExpanded ? "SWIPE UP TO CLOSE" : "PULL DOWN FOR MONTH")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.7)
+                    .foregroundStyle(Theme.muted)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Theme.Space.sm)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(monthPickerExpanded ? "Hide month picker" : "Show month picker")
+        .accessibilityHint(monthPickerExpanded
+            ? "Collapses to the focused day columns"
+            : "Expands a month grid to choose which days to view")
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 12)
+                .onEnded { value in
+                    let dy = value.translation.height
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        if dy > 28 {
+                            monthPickerExpanded = true
+                            pickerMonth = cursor
+                            pickerShowsYears = false
+                        } else if dy < -28 {
+                            monthPickerExpanded = false
+                            pickerShowsYears = false
+                        }
+                    }
+                }
+        )
+    }
+
+    private var compactMonthPicker: some View {
+        let cal = Calendar.current
+        let year = cal.component(.year, from: pickerMonth)
+        return VStack(spacing: Theme.Space.sm) {
+            HStack {
+                Button {
+                    if pickerShowsYears {
+                        pickerMonth = cal.date(byAdding: .year, value: -1, to: pickerMonth) ?? pickerMonth
+                    } else {
+                        pickerMonth = cal.date(byAdding: .month, value: -1, to: pickerMonth) ?? pickerMonth
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 28, height: 28)
+                }
+                .accessibilityLabel(pickerShowsYears ? "Previous year" : "Previous month")
+
+                Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        pickerShowsYears.toggle()
+                    }
+                } label: {
+                    HStack(spacing: Theme.Space.xs) {
+                        if pickerShowsYears {
+                            Text(year, format: .number.grouping(.never))
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Theme.ink)
+                        } else {
+                            Text(verbatim: compactPickerTitle)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Theme.ink)
+                        }
+                        Image(systemName: pickerShowsYears ? "chevron.up" : "chevron.down")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(pickerShowsYears ? "Year \(year)" : compactPickerTitle)
+                .accessibilityHint(pickerShowsYears
+                    ? "Double tap to return to month days"
+                    : "Double tap to jump by year")
+
+                Spacer()
+
+                Button {
+                    if pickerShowsYears {
+                        pickerMonth = cal.date(byAdding: .year, value: 1, to: pickerMonth) ?? pickerMonth
+                    } else {
+                        pickerMonth = cal.date(byAdding: .month, value: 1, to: pickerMonth) ?? pickerMonth
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Theme.ink)
+                        .frame(width: 28, height: 28)
+                }
+                .accessibilityLabel(pickerShowsYears ? "Next year" : "Next month")
+            }
+            .padding(.horizontal, Theme.Space.lg)
+
+            if pickerShowsYears {
+                compactYearPicker(centeredOn: year)
+            } else {
+                compactMonthDayGrid
+            }
+        }
+        .padding(.top, Theme.Space.xs)
+        .background(Theme.surface.opacity(0.55))
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.hairline).frame(height: 1)
+        }
+    }
+
+    private var compactMonthDayGrid: some View {
+        let days = monthDays(for: pickerMonth)
+        return VStack(spacing: Theme.Space.sm) {
+            HStack(spacing: 0) {
+                ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, sym in
+                    Text(sym.uppercased())
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.7)
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.horizontal, Theme.Space.md)
+
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7),
+                spacing: Theme.Space.xs
+            ) {
+                ForEach(days, id: \.self) { day in
+                    compactMonthDayCell(day)
+                }
+            }
+            .padding(.horizontal, Theme.Space.md)
+            .padding(.bottom, Theme.Space.sm)
+        }
+    }
+
+    /// Apple Calendar–style year grid — tap a year to land on the same month in that year.
+    private func compactYearPicker(centeredOn year: Int) -> some View {
+        let cal = Calendar.current
+        let years = Array((year - 8)...(year + 7))
+        return LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: Theme.Space.sm), count: 4),
+            spacing: Theme.Space.sm
+        ) {
+            ForEach(years, id: \.self) { y in
+                let isCurrent = y == cal.component(.year, from: .now)
+                let isSelected = y == year
+                Button {
+                    var comps = cal.dateComponents([.year, .month, .day], from: pickerMonth)
+                    comps.year = y
+                    if let jumped = cal.date(from: comps) {
+                        pickerMonth = jumped
+                    }
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        pickerShowsYears = false
+                    }
+                } label: {
+                    Text(y, format: .number.grouping(.never))
+                        .font(.subheadline.weight(isSelected || isCurrent ? .bold : .medium))
+                        .foregroundStyle(isCurrent ? Color.white : Theme.ink)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Space.sm + 2)
+                        .background {
+                            if isCurrent {
+                                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                    .fill(Theme.accent)
+                            } else if isSelected {
+                                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                    .fill(Theme.accent.opacity(0.18))
+                            }
+                        }
+                        .overlay {
+                            if isSelected && !isCurrent {
+                                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                    .strokeBorder(Theme.accent.opacity(0.55), lineWidth: 1)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(y)\(isCurrent ? ", current year" : "")\(isSelected ? ", selected" : "")")
+                .accessibilityHint("Shows \(compactPickerTitle) in \(y)")
+            }
+        }
+        .padding(.horizontal, Theme.Space.md)
+        .padding(.bottom, Theme.Space.md)
+    }
+
+    private var compactPickerTitle: String {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        return f.string(from: pickerMonth)
+    }
+
+    private func compactMonthDayCell(_ day: Date) -> some View {
+        let cal = Calendar.current
+        let inMonth = cal.isDate(day, equalTo: pickerMonth, toGranularity: .month)
+        let isToday = cal.isDateInToday(day)
+        let isFocusStart = cal.isDate(day, inSameDayAs: cursor)
+        let focusCount = scope == .week ? 7 : (scope == .day ? 1 : 3)
+        let focusStart = weekStart(days: focusCount)
+        let focusEnd = cal.date(byAdding: .day, value: focusCount - 1, to: focusStart) ?? focusStart
+        let inFocus = inMonth && day >= focusStart && day <= focusEnd
+        let hasItems = !dayCalendarItems(for: day).isEmpty
+        return Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                cursor = cal.startOfDay(for: day)
+                previewDay = cursor
+                // Stay expanded — dismiss only via header title or swipe up.
+            }
+        } label: {
+            VStack(spacing: 3) {
+                Text("\(cal.component(.day, from: day))")
+                    .font(.caption.weight(isToday || isFocusStart ? .bold : .medium))
+                    .foregroundStyle(isToday ? Color.white : (inMonth ? Theme.ink : Theme.muted.opacity(0.35)))
+                    .frame(width: 30, height: 30)
+                    .background {
+                        if isToday {
+                            Circle().fill(Theme.accent)
+                        } else if inFocus {
+                            Circle().fill(Theme.accent.opacity(0.18))
+                        }
+                    }
+                    .overlay {
+                        if inFocus && !isToday {
+                            Circle().strokeBorder(Theme.accent.opacity(0.55), lineWidth: 1)
+                        }
+                    }
+                Circle()
+                    .fill(hasItems && inMonth ? Theme.cta.opacity(0.9) : Color.clear)
+                    .frame(width: 4, height: 4)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
+        .disabled(!inMonth)
+        .accessibilityLabel(compactMonthAccessibilityLabel(day: day, inFocus: inFocus, isToday: isToday, hasItems: hasItems))
+        .accessibilityHint("Shows this day in the focused columns")
+    }
+
+    private func compactMonthAccessibilityLabel(day: Date, inFocus: Bool, isToday: Bool, hasItems: Bool) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMMM d"
+        var label = f.string(from: day)
+        if isToday { label = "Today, \(label)" }
+        if inFocus { label += ", in focus" }
+        if hasItems { label += ", has items" }
+        return label
+    }
+
     // MARK: - Month
 
     private var monthScope: some View {
@@ -256,14 +620,14 @@ struct CalendarPlannerView: View {
             let gridWidth = max(0, geo.size.width)
             let colWidth = gridWidth / 7
             let headerHeight: CGFloat = 28
-            let previewHeight: CGFloat = 132
-            let cellHeight = max(52, (geo.size.height - headerHeight - calendarFABClearance - previewHeight) / 6)
+            let cellHeight = max(44, (geo.size.height - headerHeight - calendarFABClearance) / 6)
             let days = monthDays(for: cursor)
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 0) {
                     ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, sym in
-                        Text(sym)
-                            .font(.caption.weight(.semibold))
+                        Text(sym.uppercased())
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.8)
                             .foregroundStyle(Theme.muted)
                             .frame(width: colWidth, height: headerHeight, alignment: .center)
                     }
@@ -275,74 +639,11 @@ struct CalendarPlannerView: View {
                     }
                 }
                 .frame(width: gridWidth, alignment: .leading)
-                monthDayPreview
-                    .frame(height: previewHeight)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, calendarFABClearance)
+                Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(.bottom, calendarFABClearance)
         }
-    }
-
-    private var monthDayPreview: some View {
-        let items = dayCalendarItems(for: previewDay)
-        let dayTitle: String = {
-            let f = DateFormatter()
-            f.dateFormat = Calendar.current.isDateInToday(previewDay) ? "'Today,' EEEE MMM d" : "EEEE, MMM d"
-            return f.string(from: previewDay)
-        }()
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(dayTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                Spacer()
-                Button("Agenda") { openDayDetail(for: previewDay) }
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Theme.cta)
-                    .accessibilityHint("Opens full day agenda")
-            }
-            if items.isEmpty {
-                Text("Nothing scheduled — tap a day or + to add.")
-                    .font(.caption)
-                    .foregroundStyle(Theme.muted)
-            } else {
-                ForEach(items.prefix(3)) { item in
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(item.color)
-                            .frame(width: 6, height: 6)
-                        Text(item.title)
-                            .font(.caption)
-                            .foregroundStyle(Theme.ink)
-                            .lineLimit(1)
-                    }
-                }
-                if items.count > 3 {
-                    Text("+\(items.count - 3) more")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.muted)
-                }
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(monthPreviewAccessibilityLabel(day: previewDay, items: items))
-    }
-
-    private func monthPreviewAccessibilityLabel(day: Date, items: [CalendarDayItem]) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "EEEE, MMMM d"
-        var label = "Preview for \(f.string(from: day))"
-        if items.isEmpty {
-            label += ", nothing scheduled"
-        } else {
-            label += ", \(items.count) item\(items.count == 1 ? "" : "s")"
-        }
-        return label
     }
 
     private func monthCell(_ day: Date, width: CGFloat, height: CGFloat) -> some View {
@@ -350,7 +651,7 @@ struct CalendarPlannerView: View {
         let isToday = Calendar.current.isDateInToday(day)
         let isPreview = Calendar.current.isDate(previewDay, inSameDayAs: day)
         let items = dayCalendarItems(for: day)
-        return VStack(alignment: .leading, spacing: 6) {
+        return VStack(spacing: Theme.Space.sm - 2) {
             ZStack {
                 if isToday {
                     Circle()
@@ -363,46 +664,36 @@ struct CalendarPlannerView: View {
                 }
                 Text("\(Calendar.current.component(.day, from: day))")
                     .font(.subheadline.weight(isToday ? .bold : .medium))
-                    .foregroundStyle(isToday ? Color.black : dayNumberColor(inMonth: inMonth))
+                    .foregroundStyle(isToday ? Color.white : dayNumberColor(inMonth: inMonth))
             }
             .frame(maxWidth: .infinity)
             .frame(height: 28)
-            if !items.isEmpty {
-                VStack(alignment: .leading, spacing: 3) {
-                    ForEach(items.prefix(3)) { item in
-                        if let task = item.task {
-                            Button {
-                                openEditEvent(task)
-                            } label: {
-                                calendarEventChip(item.title, color: item.color, accessibilityLabel: "Event: \(item.title)")
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityHint("Opens event editor")
-                        } else {
-                            calendarEventChip(item.title, color: item.color, accessibilityLabel: "Workout: \(item.title)")
-                        }
-                    }
-                    if items.count > 3 {
-                        Text("+\(items.count - 3) more")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Theme.muted)
-                            .accessibilityLabel("\(items.count - 3) more events")
-                    }
+            HStack(spacing: 3) {
+                ForEach(0..<min(items.count, 3), id: \.self) { idx in
+                    Circle()
+                        .fill(items[idx].color.opacity(0.9))
+                        .frame(width: 5, height: 5)
                 }
             }
+            .frame(height: 8)
             Spacer(minLength: 0)
         }
         .contentShape(Rectangle())
         .gesture(
             TapGesture(count: 2)
-                .onEnded { openDayView(for: day) }
+                .onEnded { openDayDetail(for: day) }
                 .exclusively(before: TapGesture(count: 1).onEnded {
-                    previewDay = Calendar.current.startOfDay(for: day)
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        cursor = Calendar.current.startOfDay(for: day)
+                        previewDay = cursor
+                        scope = .threeDay
+                        monthPickerExpanded = false
+                    }
                 })
         )
-        .padding(.horizontal, 4)
-        .padding(.vertical, 6)
-        .frame(width: width, height: height, alignment: .topLeading)
+        .padding(.horizontal, Theme.Space.xs)
+        .padding(.vertical, Theme.Space.sm - 2)
+        .frame(width: width, height: height, alignment: .top)
         .overlay(alignment: .trailing) {
             Rectangle()
                 .fill(Theme.gridDivider)
@@ -416,7 +707,7 @@ struct CalendarPlannerView: View {
         .opacity(inMonth ? 1 : 0.35)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(monthCellAccessibilityLabel(day: day, items: items, isToday: isToday, inMonth: inMonth))
-        .accessibilityHint("Single tap to preview below. Double tap to open day view.")
+        .accessibilityHint("Single tap opens 3-day focus. Double tap opens day agenda.")
         .accessibilityAddTraits(isToday ? [.isButton, .isSelected] : .isButton)
     }
 
@@ -462,7 +753,7 @@ struct CalendarPlannerView: View {
             let hours = Array(6...22)
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
-                    Color.clear.frame(width: timeGutter, height: 44)
+                    Color.clear.frame(width: timeGutter, height: 52)
                     ForEach(columns, id: \.self) { day in
                         dayColumnHeader(day, width: colWidth)
                             .contentShape(Rectangle())
@@ -470,11 +761,11 @@ struct CalendarPlannerView: View {
                                 TapGesture(count: 2)
                                     .onEnded { openDayView(for: day) }
                                     .exclusively(before: TapGesture(count: 1).onEnded {
-                                        cursor = Calendar.current.startOfDay(for: day)
+                                        openDayDetail(for: day)
                                     })
                             )
                             .accessibilityLabel(dayColumnAccessibilityLabel(day))
-                            .accessibilityHint("Double tap to open day view")
+                            .accessibilityHint("Double tap for day timeline. Single tap opens day agenda.")
                     }
                 }
                 Divider().overlay(Theme.gridDivider)
@@ -487,7 +778,7 @@ struct CalendarPlannerView: View {
                                     .font(.caption2)
                                     .foregroundStyle(Theme.muted)
                                     .frame(width: timeGutter, height: hourRowHeight, alignment: .topLeading)
-                                    .padding(.top, 4)
+                                    .padding(.top, Theme.Space.xs)
                                 ForEach(columns, id: \.self) { day in
                                     weekHourCell(day: day, hour: hour, width: colWidth)
                                 }
@@ -509,7 +800,7 @@ struct CalendarPlannerView: View {
                         .font(.caption2)
                         .foregroundStyle(Theme.muted)
                         .frame(width: timeGutter, alignment: .topLeading)
-                        .padding(.top, 4)
+                        .padding(.top, Theme.Space.xs)
                     ForEach(columns, id: \.self) { day in
                         allDayCell(day: day, width: colWidth)
                     }
@@ -543,15 +834,22 @@ struct CalendarPlannerView: View {
 
     private func dayColumnHeader(_ day: Date, width: CGFloat) -> some View {
         let isToday = Calendar.current.isDateInToday(day)
-        return VStack(spacing: 2) {
-            Text(weekday(day))
-                .font(.caption2.weight(.semibold))
+        return VStack(spacing: 4) {
+            Text(weekday(day).uppercased())
+                .font(.caption2.weight(.bold))
+                .tracking(0.8)
                 .foregroundStyle(Theme.muted)
             Text("\(Calendar.current.component(.day, from: day))")
-                .font(.headline)
-                .foregroundStyle(isToday ? Theme.accent : Theme.ink)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(isToday ? Color.white : Theme.ink)
+                .frame(width: 32, height: 32)
+                .background {
+                    if isToday {
+                        Circle().fill(Theme.accent)
+                    }
+                }
         }
-        .frame(width: width, height: 44)
+        .frame(width: width, height: 52)
     }
 
     private func weekHourCell(day: Date, hour: Int, width: CGFloat) -> some View {
@@ -617,13 +915,13 @@ struct CalendarPlannerView: View {
         return Text("\(label) · New Event")
             .font(.system(size: 10, weight: .semibold))
             .lineLimit(2)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 3)
+            .padding(.horizontal, Theme.Space.xs)
+            .padding(.vertical, Theme.Space.xs - 1)
             .frame(maxWidth: .infinity, alignment: .leading)
             .foregroundStyle(.white.opacity(0.9))
-            .background(Theme.accent.opacity(0.45), in: RoundedRectangle(cornerRadius: 4))
+            .background(Theme.accent.opacity(0.45), in: RoundedRectangle(cornerRadius: Theme.Space.xs))
             .overlay(
-                RoundedRectangle(cornerRadius: 4)
+                RoundedRectangle(cornerRadius: Theme.Space.xs)
                     .strokeBorder(Theme.accent.opacity(0.8), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
             )
             .accessibilityLabel("New event draft, \(label)")
@@ -643,12 +941,13 @@ struct CalendarPlannerView: View {
 
     private func calendarEventChip(_ title: String, color: Color, accessibilityLabel label: String) -> some View {
         Text(title)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: 9, weight: .bold))
+            .tracking(0.3)
             .lineLimit(2)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 3)
+            .padding(.horizontal, Theme.Space.xs)
+            .padding(.vertical, Theme.Space.xs - 1)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(color.opacity(0.85), in: RoundedRectangle(cornerRadius: 4))
+            .background(color.opacity(0.85), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .foregroundStyle(.white)
             .accessibilityLabel(label)
     }
@@ -664,15 +963,15 @@ struct CalendarPlannerView: View {
 
     private var yearScope: some View {
         let months = (0..<12).compactMap { Calendar.current.date(byAdding: .month, value: $0, to: yearStart(cursor)) }
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
+        let columns = Array(repeating: GridItem(.flexible(), spacing: Theme.Space.sm + 2), count: 3)
         return ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
+            LazyVGrid(columns: columns, spacing: Theme.Space.lg) {
                 ForEach(months, id: \.self) { month in
                     Button {
                         cursor = month
                         scope = .month
                     } label: {
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
                             Text(PlannerDate.monthTitle(month))
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(Calendar.current.isDate(month, equalTo: .now, toGranularity: .month) ? Theme.accent : Theme.ink)

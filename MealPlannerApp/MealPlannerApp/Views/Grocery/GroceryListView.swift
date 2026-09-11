@@ -61,7 +61,7 @@ struct GroceryListView: View {
         NavigationStack {
             List {
                 if appModel.isBuildingShopList && grouped.isEmpty {
-                    HStack(spacing: 10) {
+                    HStack(spacing: Theme.Space.sm + 2) {
                         ProgressView()
                         Text("Building shop list…")
                             .foregroundStyle(Theme.muted)
@@ -92,12 +92,14 @@ struct GroceryListView: View {
                                 .onSubmit { addManual(category: "produce") }
                             Button("Add") { addManual(category: "produce") }
                                 .fontWeight(.semibold)
+                                .foregroundStyle(Theme.cta)
                                 .disabled(draftItemNames["produce", default: ""].trimmingCharacters(in: .whitespaces).isEmpty)
                                 .accessibilityHint("Adds typed item to Produce")
                         }
-                    } header: {
-                        Text("Add something")
-                            .accessibilityAddTraits(.isHeader)
+                    } footer: {
+                        Text("Or type a one-off item above.")
+                            .font(.caption)
+                            .foregroundStyle(Theme.muted)
                     }
                 } else {
                     ForEach(grouped, id: \.0) { category, rows in
@@ -121,7 +123,7 @@ struct GroceryListView: View {
                                     } label: {
                                         Label("Pantry", systemImage: "cabinet")
                                     }
-                                    .tint(Theme.accent)
+                                    .tint(Theme.cta)
                                     .accessibilityLabel("Move \(item.ingredientName) to pantry")
                                     .accessibilityHint("Keeps item off future shop lists")
                                 }
@@ -134,13 +136,24 @@ struct GroceryListView: View {
                                     .onSubmit { addManual(category: category) }
                                 Button("Add") { addManual(category: category) }
                                     .fontWeight(.semibold)
+                                    .foregroundStyle(Theme.cta)
                                     .disabled(draftItemNames[category, default: ""].trimmingCharacters(in: .whitespaces).isEmpty)
                                     .accessibilityHint("Adds typed item to \(category) section")
                             }
                         } header: {
-                            Text(category.capitalized)
-                                .accessibilityAddTraits(.isHeader)
-                                .accessibilityLabel(groceryCategoryHeaderLabel(category: category, count: rows.count))
+                            let open = rows.filter { !$0.isChecked || settling.contains($0.persistentModelID) }.count
+                            return HStack {
+                                Text(category.uppercased())
+                                    .font(.caption2.weight(.bold))
+                                    .tracking(0.8)
+                                    .foregroundStyle(Theme.cta)
+                                    .textCase(nil)
+                                Spacer()
+                                Theme.CountBadge(count: open)
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityAddTraits(.isHeader)
+                            .accessibilityLabel(groceryCategoryHeaderLabel(category: category, count: rows.count))
                         }
                     }
                 }
@@ -152,8 +165,10 @@ struct GroceryListView: View {
                         Pantry.seedIfNeeded(in: modelContext)
                         showPantry = true
                     } label: {
-                        Label("Pantry", systemImage: "cabinet")
+                        Image(systemName: "cabinet")
+                            .foregroundStyle(Theme.cta)
                     }
+                    .accessibilityLabel("Pantry")
                     .accessibilityHint("Edit staples kept off the shop list")
                     Button {
                         Task { await refreshIngredients() }
@@ -162,6 +177,7 @@ struct GroceryListView: View {
                             ProgressView()
                         } else {
                             Image(systemName: "arrow.clockwise")
+                                .foregroundStyle(Theme.cta)
                         }
                     }
                     .accessibilityLabel("Rebuild shop list")
@@ -175,30 +191,46 @@ struct GroceryListView: View {
                             .accessibilityHint("Add a custom item under \(cat)")
                         }
                     } label: {
-                        Label("Add item", systemImage: "plus")
+                        Image(systemName: "plus")
+                            .foregroundStyle(Theme.cta)
                     }
                     .accessibilityLabel("Add item")
                     .accessibilityHint("Choose a category, then enter an item name")
                 }
             }
             .safeAreaInset(edge: .top, spacing: 0) {
-                HStack {
-                    Button("Done") { dismiss() }
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Theme.cta)
-                        .accessibilityLabel("Done")
-                        .accessibilityHint("Closes shop and returns to Meals")
-                        .accessibilityIdentifier("shop-done")
-                    Spacer()
-                    if !grouped.isEmpty {
-                        Text(uncheckedCount == 0 ? "All picked up" : "\(uncheckedCount) left to shop")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(uncheckedCount == 0 ? Theme.accent : Theme.ink)
-                            .accessibilityAddTraits(.isHeader)
+                VStack(spacing: Theme.Space.sm) {
+                    HStack {
+                        Button("DONE") { dismiss() }
+                            .font(.caption.weight(.bold))
+                            .tracking(0.6)
+                            .foregroundStyle(Theme.cta)
+                            .accessibilityLabel("Done")
+                            .accessibilityHint("Closes shop and returns to Meals")
+                            .accessibilityIdentifier("shop-done")
+                        Spacer()
+                        if !grouped.isEmpty {
+                            Text(uncheckedCount == 0 ? "ALL PICKED UP" : "\(uncheckedCount) LEFT")
+                                .font(.caption.weight(.bold))
+                                .tracking(0.7)
+                                .foregroundStyle(uncheckedCount == 0 ? Theme.accent : Theme.muted)
+                                .accessibilityAddTraits(.isHeader)
+                        }
+                    }
+                    if !items.isEmpty {
+                        let total = max(items.filter { !Self.isStaleBreakfastEggs($0) }.count, 1)
+                        let done = total - uncheckedCount
+                        Theme.ProgressTrack(
+                            progress: Double(max(done, 0)) / Double(total),
+                            tint: uncheckedCount == 0 ? Theme.accent : Theme.cta,
+                            height: 6
+                        )
+                        .accessibilityLabel("Shopping progress")
+                        .accessibilityValue("\(max(done, 0)) of \(total) items checked")
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.horizontal, Theme.Space.lg)
+                .padding(.vertical, Theme.Space.sm + 2)
                 .background(Theme.canvas.opacity(0.95))
             }
             .overlay {
@@ -241,6 +273,8 @@ struct GroceryListView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.canvas)
+            .scrollDismissesKeyboard(.interactively)
+            .cadenceDismissKeyboardOnTap()
         }
     }
 
@@ -373,13 +407,18 @@ struct GroceryRow: View {
 
     var body: some View {
         Button(action: onToggle) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Space.sm + 2) {
                 Theme.CheckGlyph(checked: item.isChecked)
-                Text(GroceryConsolidator.displayText(item.asConsolidated()))
+                Text(nameLabel)
                     .strikethrough(item.isChecked)
-                    // Manual entries should stand out (blue) when unchecked.
                     .foregroundStyle(item.isChecked ? Theme.muted : (item.isManual ? Theme.cta : Theme.ink))
-                Spacer()
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: Theme.Space.sm)
+                // Centr/Amazon: bold trailing qty for aisle scan; blue reserved for CTAs.
+                Text(quantityLabel)
+                    .font(.subheadline.weight(.bold).monospacedDigit())
+                    .foregroundStyle(item.isChecked ? Theme.muted : Theme.ink)
+                    .strikethrough(item.isChecked)
                 if item.isManual {
                     Text("manual")
                         .font(.caption2)
@@ -391,6 +430,34 @@ struct GroceryRow: View {
         .buttonStyle(.plain)
         .accessibilityLabel(groceryRowAccessibilityLabel)
         .accessibilityHint("Double tap to toggle while shopping")
+    }
+
+    private var nameLabel: String {
+        let c = item.asConsolidated()
+        if c.isApproximate || c.unit == "to_taste" {
+            return c.ingredientName.capitalized
+        }
+        if let peeled = IngredientCanonicalizer.peelEmbeddedMeasure(from: c.ingredientName) {
+            let cleaned = IngredientCanonicalizer.canonicalize(peeled.rest)
+            return (cleaned.isEmpty ? c.ingredientName : cleaned).capitalized
+        }
+        return c.ingredientName.capitalized
+    }
+
+    private var quantityLabel: String {
+        let c = item.asConsolidated()
+        if c.isApproximate || c.unit == "to_taste" {
+            return "to taste"
+        }
+        let qty = GroceryConsolidator.formatQty(c.quantity)
+        switch c.unit {
+        case "count":
+            return qty
+        case "to_taste":
+            return "to taste"
+        default:
+            return "\(qty) \(c.unit)"
+        }
     }
 
     private var groceryRowAccessibilityLabel: String {
@@ -422,7 +489,7 @@ struct PantryEditor: View {
                         .foregroundStyle(Theme.muted)
                         .accessibilityAddTraits(.isStaticText)
                 }
-                Section("Staples") {
+                Section {
                     ForEach(visibleItems) { item in
                         Text(item.name.capitalized)
                             .accessibilityLabel("\(item.name.capitalized), pantry staple")
@@ -448,20 +515,40 @@ struct PantryEditor: View {
                             }
                     }
                     if visibleItems.isEmpty, !query.trimmingCharacters(in: .whitespaces).isEmpty {
-                        Text("No staples match “\(query.trimmingCharacters(in: .whitespacesAndNewlines))”.")
-                            .foregroundStyle(Theme.muted)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel("No staples match \(query.trimmingCharacters(in: .whitespacesAndNewlines))")
-                            .accessibilityAddTraits(.isStaticText)
+                        VStack(spacing: Theme.Space.sm) {
+                            Theme.IconWell(systemImage: "magnifyingglass", tint: Theme.muted, size: 40)
+                            Text("NO MATCHES")
+                                .font(.caption2.weight(.bold))
+                                .tracking(0.6)
+                                .foregroundStyle(Theme.muted)
+                            Text("No staples match “\(query.trimmingCharacters(in: .whitespacesAndNewlines))”.")
+                                .font(.subheadline)
+                                .foregroundStyle(Theme.muted)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Space.md)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("No staples match \(query.trimmingCharacters(in: .whitespacesAndNewlines))")
+                        .accessibilityAddTraits(.isStaticText)
                     }
                     HStack {
                         TextField("Add staple", text: $newName)
                             .accessibilityHint("Staple to keep off future shop lists")
                             .onSubmit { add() }
                         Button("Add") { add() }
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Theme.cta)
                             .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
                             .accessibilityHint("Adds staple to pantry so it stays off the shop list")
                     }
+                } header: {
+                    Text("STAPLES")
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.8)
+                        .foregroundStyle(Theme.muted)
+                        .textCase(nil)
+                        .accessibilityAddTraits(.isHeader)
                 }
             }
             .navigationTitle("Pantry")
@@ -469,6 +556,7 @@ struct PantryEditor: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                        .foregroundStyle(Theme.cta)
                         .accessibilityHint("Closes pantry editor")
                 }
             }

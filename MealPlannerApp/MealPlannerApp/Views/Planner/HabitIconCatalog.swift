@@ -78,12 +78,15 @@ struct HabitIconBadge: View {
             }
             .foregroundStyle(.white)
             .frame(width: size, height: size)
-            .background(HabitIconCatalog.color(hex: colorHex), in: Circle())
+            .background(
+                (completed ? Theme.accent : HabitIconCatalog.color(hex: colorHex)),
+                in: Circle()
+            )
             if selected {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: size * 0.32))
                     .foregroundStyle(Theme.accent)
-                    .background(Circle().fill(Color.black))
+                    .background(Circle().fill(Theme.canvas))
                     .offset(x: 4, y: 4)
             }
         }

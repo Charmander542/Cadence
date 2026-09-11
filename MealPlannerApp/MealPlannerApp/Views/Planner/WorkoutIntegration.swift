@@ -10,6 +10,7 @@ enum WorkoutIntegration {
     }
 
     static func workoutsEnabled(in context: ModelContext) -> Bool {
+        guard CadenceAppsPreferences.isVisible(.workout) else { return false }
         let profiles = (try? context.fetch(FetchDescriptor<UserProfileEntity>())) ?? []
         return profiles.first?.workoutsEnabled ?? true
     }
@@ -44,7 +45,7 @@ struct WorkoutDayCard: View {
     @State private var showLiftHub = false
 
     private var workoutsEnabled: Bool {
-        profiles.first?.workoutsEnabled ?? true
+        CadenceAppsPreferences.isVisible(.workout) && (profiles.first?.workoutsEnabled ?? true)
     }
 
     private var scheduled: WorkoutSessionTemplate? {
@@ -77,9 +78,9 @@ struct WorkoutDayCard: View {
                     HStack(spacing: 12) {
                         Image(systemName: dayLog != nil ? "checkmark.circle.fill" : "dumbbell.fill")
                             .font(compact ? .title3 : .title2)
-                            .foregroundStyle(dayLog != nil ? Color.mint : Theme.cta)
+                            .foregroundStyle(dayLog != nil ? Theme.accent : Theme.cta)
                             .frame(width: 36, height: 36)
-                            .background(Theme.cta.opacity(0.15), in: Circle())
+                            .background((dayLog != nil ? Theme.accent : Theme.cta).opacity(0.15), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text(session.name)
                                 .font(compact ? .headline : .title3.weight(.bold))
@@ -90,8 +91,9 @@ struct WorkoutDayCard: View {
                         }
                         Spacer(minLength: 0)
                         if Calendar.current.isDateInToday(date) {
-                            Text("Today")
-                                .font(.subheadline.weight(.semibold))
+                            Text("TODAY")
+                                .font(.caption.weight(.bold))
+                                .tracking(0.7)
                                 .foregroundStyle(Theme.accent)
                         }
                     }
@@ -122,7 +124,12 @@ struct WorkoutDayCard: View {
             }
         }
         .padding(compact ? 12 : 14)
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .strokeBorder(promoted ? Theme.cta.opacity(0.22) : Theme.hairline, lineWidth: 1)
+        )
+        .shadow(color: promoted ? Theme.cta.opacity(0.16) : Theme.cardShadow, radius: promoted ? 14 : 10, y: promoted ? 5 : 4)
         .onAppear { planEntity = WorkoutStore.plan(in: modelContext) }
         .workoutPreviewSheet(session: $previewSession, planEntity: planEntity)
         .sheet(isPresented: $showLiftHub) {
@@ -178,7 +185,7 @@ struct WorkoutCompactBanner: View {
     @State private var showLiftHub = false
 
     private var workoutsEnabled: Bool {
-        profiles.first?.workoutsEnabled ?? true
+        CadenceAppsPreferences.isVisible(.workout) && (profiles.first?.workoutsEnabled ?? true)
     }
 
     private var scheduled: WorkoutSessionTemplate? {
@@ -187,33 +194,31 @@ struct WorkoutCompactBanner: View {
 
     var body: some View {
         if workoutsEnabled, let session = scheduled, Calendar.current.isDateInToday(date) {
-            HStack(spacing: 10) {
-                Image(systemName: "dumbbell.fill")
-                    .foregroundStyle(Theme.cta)
-                    .frame(width: 28, height: 28)
-                    .background(Theme.cta.opacity(0.15), in: Circle())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(session.name)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.ink)
-                    Text(session.focus)
-                        .font(.caption)
-                        .foregroundStyle(Theme.muted)
-                        .lineLimit(1)
+            Theme.Card(padding: 12) {
+                HStack(spacing: 10) {
+                    Theme.IconWell(systemImage: "dumbbell.fill", tint: Theme.cta, size: 32)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(session.name)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.ink)
+                        Text(session.focus)
+                            .font(.caption)
+                            .foregroundStyle(Theme.muted)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    Button {
+                        showLiftHub = true
+                    } label: {
+                        Text("Lift")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Theme.cta)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open Lift program")
+                    .accessibilityHint("Opens full workout program and history")
                 }
-                Spacer(minLength: 0)
-                Button {
-                    showLiftHub = true
-                } label: {
-                    Text("Lift")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Theme.accent)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open Lift program")
-                .accessibilityHint("Opens full workout program and history")
             }
-            .padding(.horizontal, 16)
             .accessibilityElement(children: .contain)
             .accessibilityLabel("\(session.name), \(session.focus). Use Lift for full program.")
             .sheet(isPresented: $showLiftHub) {
@@ -262,7 +267,7 @@ struct WorkoutWeekStrip: View {
     var onSelectDay: ((Date, WorkoutSessionTemplate?) -> Void)?
 
     private var workoutsEnabled: Bool {
-        profiles.first?.workoutsEnabled ?? true
+        CadenceAppsPreferences.isVisible(.workout) && (profiles.first?.workoutsEnabled ?? true)
     }
 
     var body: some View {
@@ -274,12 +279,14 @@ struct WorkoutWeekStrip: View {
     }
 
     private var weekStripContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.Space.sm + 2) {
             Text("Lift program")
-                .font(.headline)
-                .foregroundStyle(Theme.ink)
+                .font(.caption2.weight(.bold))
+                .tracking(0.6)
+                .textCase(.uppercase)
+                .foregroundStyle(Theme.muted)
                 .accessibilityAddTraits(.isHeader)
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.Space.sm - 2) {
                 ForEach(2...8, id: \.self) { raw in
                     let weekday = raw == 8 ? 1 : raw
                     let session = WorkoutProgram.scheduledSession(for: weekday)
@@ -289,7 +296,7 @@ struct WorkoutWeekStrip: View {
                     Button {
                         onSelectDay?(dayDate, session)
                     } label: {
-                        VStack(spacing: 6) {
+                        VStack(spacing: Theme.Space.sm - 2) {
                             Text(shortDay(weekday))
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(isToday ? Theme.accent : Theme.muted)
@@ -302,10 +309,21 @@ struct WorkoutWeekStrip: View {
                                 .frame(width: 6, height: 6)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, Theme.Space.sm + 2)
                         .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                                 .fill(isToday ? Theme.accent.opacity(0.14) : Theme.sunken)
+                        )
+                        .overlay {
+                            if isToday {
+                                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                    .strokeBorder(Theme.accent.opacity(0.35), lineWidth: 1)
+                            }
+                        }
+                        .shadow(
+                            color: isToday ? Theme.accent.opacity(0.22) : .clear,
+                            radius: 5,
+                            y: 1
                         )
                     }
                     .buttonStyle(.plain)
@@ -360,6 +378,9 @@ struct TonightMealCard: View {
     private static let mealsTabIndex = 2
 
     var body: some View {
+        if !CadenceAppsPreferences.isVisible(.meals) {
+            EmptyView()
+        } else {
         Group {
             if let plan = plans.first?.decoded(),
                let dinner = plan.meal(day: selectedDay, slot: .dinner),
@@ -374,15 +395,13 @@ struct TonightMealCard: View {
                         side: dinner.sideRecipeID.flatMap { appModel.recipeDB.recipe(id: $0) }
                     )
                 } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "fork.knife")
-                            .font(.title3)
-                            .foregroundStyle(Theme.cta)
-                            .frame(width: 36, height: 36)
-                            .background(Theme.cta.opacity(0.15), in: Circle())
-                        VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: Theme.Space.md) {
+                        Theme.IconWell(systemImage: "fork.knife", tint: Theme.cta, size: 40)
+                        VStack(alignment: .leading, spacing: Theme.Space.xs) {
                             Text("Tonight's dinner")
-                                .font(.caption.weight(.semibold))
+                                .font(.caption2.weight(.bold))
+                                .tracking(0.6)
+                                .textCase(.uppercase)
                                 .foregroundStyle(Theme.muted)
                             Text(Theme.recipeDisplayName(recipe.name))
                                 .font(.headline)
@@ -393,8 +412,13 @@ struct TonightMealCard: View {
                         Image(systemName: "chevron.right")
                             .foregroundStyle(Theme.muted)
                     }
-                    .padding(compact ? 10 : 14)
-                    .background(mealCardBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding(compact ? Theme.Space.sm + 2 : Theme.Space.md + 2)
+                    .background(mealCardBackground, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                            .strokeBorder(promoted ? Theme.cta.opacity(0.22) : Theme.hairline, lineWidth: 1)
+                    )
+                    .shadow(color: promoted ? Theme.cta.opacity(0.16) : Theme.cardShadow, radius: promoted ? 14 : 10, y: promoted ? 5 : 4)
                 }
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .combine)
@@ -404,33 +428,38 @@ struct TonightMealCard: View {
                 Button {
                     appModel.requestedMainTab = Self.mealsTabIndex
                 } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "fork.knife")
-                            .font(.title3)
-                            .foregroundStyle(Theme.cta)
-                            .frame(width: 36, height: 36)
-                            .background(Theme.cta.opacity(0.15), in: Circle())
-                        VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: Theme.Space.md) {
+                        Theme.IconWell(systemImage: "fork.knife", tint: Theme.cta, size: 40)
+                        VStack(alignment: .leading, spacing: Theme.Space.xs) {
                             Text("Tonight's dinner")
-                                .font(.caption.weight(.semibold))
+                                .font(.caption2.weight(.bold))
+                                .tracking(0.6)
+                                .textCase(.uppercase)
                                 .foregroundStyle(Theme.muted)
-                            Text("Plan this week")
+                            Text("No dinner planned")
                                 .font(.headline)
                                 .foregroundStyle(Theme.ink)
+                            Theme.MetaPill(text: "TAP TO PLAN", tone: .cta)
                         }
                         Spacer()
                         Image(systemName: "chevron.right")
                             .foregroundStyle(Theme.muted)
                     }
-                    .padding(compact ? 10 : 14)
-                    .background(mealCardBackground, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding(compact ? Theme.Space.sm + 2 : Theme.Space.md + 2)
+                    .background(mealCardBackground, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                            .strokeBorder(promoted ? Theme.cta.opacity(0.22) : Theme.hairline, lineWidth: 1)
+                    )
+                    .shadow(color: promoted ? Theme.cta.opacity(0.16) : Theme.cardShadow, radius: promoted ? 14 : 10, y: promoted ? 5 : 4)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Plan dinner, go to Meals")
-                .accessibilityHint("Opens Meals tab to plan your week")
+                .accessibilityLabel("No dinner planned. Tap to plan on Meals")
+                .accessibilityHint("Opens Meals tab to plan tonight’s dinner")
             }
         }
         .onAppear { selectedDay = MealPlanView.mondayBasedDayIndex() }
+        }
     }
 
     private var mealCardBackground: AnyShapeStyle {

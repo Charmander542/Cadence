@@ -34,7 +34,7 @@ struct NewHabitSheet: View {
                     periodSection
                 }
                 .padding(16)
-                .padding(.bottom, 80)
+                .padding(.bottom, Theme.Space.xl * 4)
             }
             .background(Theme.canvas)
             .navigationTitle(isEditing ? "Edit Habit" : "New Habit")
@@ -53,20 +53,14 @@ struct NewHabitSheet: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                Button(action: save) {
-                    Text("Save")
-                        .font(.headline.weight(.bold))
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(canSave ? Theme.accent : Theme.accent.opacity(0.35), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                }
-                .disabled(!canSave)
-                .accessibilityLabel("Save habit")
-                .accessibilityHint(canSave ? "Saves habit changes" : "Enter a name and schedule to save")
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(Theme.canvas)
+                Theme.PrimaryButton(title: "SAVE") { save() }
+                    .disabled(!canSave)
+                    .opacity(canSave ? 1 : 0.45)
+                    .accessibilityLabel("Save habit")
+                    .accessibilityHint(canSave ? "Saves habit changes" : "Enter a name and schedule to save")
+                    .padding(.horizontal, Theme.Space.lg)
+                    .padding(.vertical, Theme.Space.sm + 2)
+                    .background(Theme.canvas)
             }
         }
         .presentationDetents([.large])
@@ -78,22 +72,23 @@ struct NewHabitSheet: View {
         TextField("Daily Check-in", text: $name)
             .font(.title3)
             .padding(16)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .strokeBorder(Theme.hairline, lineWidth: 1)
+            )
             .accessibilityLabel("Habit name")
             .accessibilityValue(name.isEmpty ? "Empty" : name)
             .accessibilityHint("Name shown on habits list and Today")
     }
 
     private var iconSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Icon")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.muted)
-                .accessibilityAddTraits(.isHeader)
-            HStack(spacing: 16) {
+        VStack(alignment: .leading, spacing: Theme.Space.md) {
+            habitSectionHeader("Icon")
+            HStack(spacing: Theme.Space.lg) {
                 HabitIconBadge(symbol: selectedIcon.symbol, colorHex: selectedIcon.colorHex, size: 56, selected: false)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Theme.Space.xs) {
                     Text("Icon")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Theme.accent)
@@ -106,7 +101,7 @@ struct NewHabitSheet: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Selected habit icon, \(habitIconName(selectedIcon))")
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 7), spacing: 12) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Theme.Space.md), count: 7), spacing: Theme.Space.md) {
                 ForEach(HabitIconCatalog.options) { option in
                     Button {
                         selectedIcon = option
@@ -128,12 +123,9 @@ struct NewHabitSheet: View {
     }
 
     private var frequencySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Frequency")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.muted)
-                .accessibilityAddTraits(.isHeader)
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.Space.sm + 2) {
+            habitSectionHeader("Frequency")
+            HStack(spacing: Theme.Space.sm) {
                 ForEach(HabitFrequency.allCases) { item in
                     pill(item.title, selected: frequency == item, hint: "Sets how often this habit repeats") {
                         frequency = item
@@ -149,22 +141,20 @@ struct NewHabitSheet: View {
     }
 
     private var weekdaySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Pick Days")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.muted)
-                .accessibilityAddTraits(.isHeader)
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.Space.sm + 2) {
+            habitSectionHeader("Pick Days")
+            HStack(spacing: Theme.Space.sm - 2) {
                 ForEach(HabitWeekdayMask.labels(), id: \.weekday) { item in
                     let on = HabitWeekdayMask.contains(item.weekday, in: weekdayMask)
                     Button {
                         weekdayMask = HabitWeekdayMask.toggle(item.weekday, in: weekdayMask)
                     } label: {
-                        Text(item.short)
-                            .font(.caption.weight(.semibold))
+                        Text(item.short.uppercased())
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.3)
                             .foregroundStyle(on ? .black : Theme.ink)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
+                            .padding(.vertical, Theme.Space.sm + 2)
                             .background(on ? Theme.accent : Theme.sunken, in: Capsule())
                     }
                     .buttonStyle(.plain)
@@ -176,12 +166,9 @@ struct NewHabitSheet: View {
     }
 
     private var periodSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Section")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.muted)
-                .accessibilityAddTraits(.isHeader)
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.Space.sm + 2) {
+            habitSectionHeader("Section")
+            HStack(spacing: Theme.Space.sm) {
                 ForEach(HabitPeriod.allCases, id: \.self) { item in
                     pill(item.title, selected: period == item, hint: "Shows habit in the \(item.title.lowercased()) section on Today") { period = item }
                 }
@@ -191,14 +178,25 @@ struct NewHabitSheet: View {
         }
     }
 
+    private func habitSectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.caption2.weight(.bold))
+            .tracking(0.6)
+            .foregroundStyle(Theme.muted)
+            .accessibilityAddTraits(.isHeader)
+    }
+
     private func pill(_ title: String, selected: Bool, hint: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(selected ? .black : Theme.ink)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .foregroundStyle(selected ? Color.white : Theme.ink)
+                .padding(.horizontal, Theme.Space.md + 2)
+                .padding(.vertical, Theme.Space.sm + 2)
                 .background(selected ? Theme.accent : Theme.sunken, in: Capsule())
+                .overlay(
+                    Capsule().strokeBorder(selected ? Theme.accent.opacity(0.25) : Theme.hairline, lineWidth: 1)
+                )
         }
         .buttonStyle(.plain)
         .accessibilityLabel(selected ? "\(title), selected" : title)

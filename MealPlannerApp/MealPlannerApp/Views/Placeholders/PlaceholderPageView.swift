@@ -17,28 +17,28 @@ struct PlaceholderPageView: View {
             }
 
             VStack(spacing: Theme.Space.lg) {
-                Spacer(minLength: 24)
-                Image(systemName: systemImage)
-                    .font(.system(size: 48, weight: .semibold))
-                    .foregroundStyle(Theme.cta)
-                    .accessibilityHidden(true)
+                Spacer(minLength: Theme.Space.xxl)
+                Theme.IconWell(systemImage: systemImage, tint: Theme.muted, size: 72)
+                Theme.MetaPill(text: "COMING SOON", tone: .accent)
                 Text(title)
-                    .font(.title2.weight(.bold))
+                    .font(Theme.title(.title2))
                     .foregroundStyle(Theme.ink)
                 Text(subtitle)
                     .font(.subheadline)
                     .foregroundStyle(Theme.muted)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+                    .padding(.horizontal, Theme.Space.xxl)
                 if let onGoToday {
-                    Button("Back to Today", action: onGoToday)
-                        .buttonStyle(.borderedProminent)
-                        .tint(Theme.cta)
-                        .accessibilityLabel("Back to Today")
-                        .accessibilityHint("Returns to the Today screen")
+                    Theme.PrimaryButton(title: "Back to Today", systemImage: "sun.max") {
+                        onGoToday()
+                    }
+                    .padding(.horizontal, Theme.Space.xxl + Theme.Space.md)
+                    .accessibilityLabel("Back to Today")
+                    .accessibilityHint("Returns to the Today screen")
                 }
                 Spacer()
             }
+            .padding(Theme.Space.lg)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Theme.canvas.ignoresSafeArea())

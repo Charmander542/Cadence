@@ -12,8 +12,8 @@ struct ExerciseGuideView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: Theme.Space.xl) {
+                    VStack(alignment: .leading, spacing: Theme.Space.md) {
                         heroImage
                         metaSectionContent
                     }
@@ -22,8 +22,8 @@ struct ExerciseGuideView: View {
                     instructionsSection
                     attribution
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 32)
+                .padding(.horizontal, Theme.Space.lg)
+                .padding(.bottom, Theme.Space.xl + Theme.Space.md)
             }
             .background(Theme.canvas.ignoresSafeArea())
             .navigationTitle(exercise.name)
@@ -31,7 +31,7 @@ struct ExerciseGuideView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
-                        .foregroundStyle(Theme.accent)
+                        .foregroundStyle(Theme.cta)
                         .accessibilityHint("Closes exercise form guide")
                 }
             }
@@ -52,7 +52,7 @@ struct ExerciseGuideView: View {
                 )
             } else {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                         .fill(Theme.surface)
                         .frame(height: 160)
                     Image(systemName: WorkoutVisuals.fallbackIcon(for: exercise))
@@ -65,22 +65,38 @@ struct ExerciseGuideView: View {
     }
 
     private var metaSectionContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        // Equinox+: muted-caps metadata labels + ink values.
+        VStack(alignment: .leading, spacing: Theme.Space.md) {
             MuscleTagRow(tags: WorkoutVisuals.muscleTags(for: exercise))
             if let catalog {
-                HStack(spacing: 8) {
-                    if !catalog.equipment.isEmpty {
-                        metaPill(catalog.equipment.capitalized)
-                    }
-                    ForEach(catalog.primaryMuscles.prefix(3), id: \.self) { m in
-                        metaPill(m.capitalized)
-                    }
+                if !catalog.equipment.isEmpty {
+                    metaRow(label: "EQUIPMENT", value: catalog.equipment.capitalized)
+                }
+                if !catalog.primaryMuscles.isEmpty {
+                    metaRow(
+                        label: "TARGET",
+                        value: catalog.primaryMuscles.prefix(3).map(\.capitalized).joined(separator: ", ")
+                    )
                 }
             }
-            Text(WorkoutVisuals.repRange(exercise))
-                .font(.subheadline)
-                .foregroundStyle(Theme.muted)
+            metaRow(label: "PRESCRIPTION", value: WorkoutVisuals.repRange(exercise))
         }
+    }
+
+    private func metaRow(label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .font(.caption2.weight(.bold))
+                .tracking(0.6)
+                .foregroundStyle(Theme.muted)
+                .frame(width: 108, alignment: .leading)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.ink)
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(label.lowercased()), \(value)")
     }
 
     private var exerciseGuideHeroLabel: String {
@@ -99,19 +115,20 @@ struct ExerciseGuideView: View {
     }
 
     private var instructionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("How to perform")
-                .font(.headline)
-                .foregroundStyle(Theme.ink)
+        VStack(alignment: .leading, spacing: Theme.Space.md) {
+            Text("HOW TO PERFORM")
+                .font(.caption2.weight(.bold))
+                .tracking(0.8)
+                .foregroundStyle(Theme.muted)
                 .accessibilityAddTraits(.isHeader)
             if let steps = catalog?.instructions, !steps.isEmpty {
                 ForEach(Array(steps.enumerated()), id: \.offset) { idx, step in
-                    HStack(alignment: .top, spacing: 12) {
+                    HStack(alignment: .top, spacing: Theme.Space.md) {
                         Text("\(idx + 1)")
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.white)
                             .frame(width: 24, height: 24)
-                            .background(Theme.accent, in: Circle())
+                            .background(Theme.cta, in: Circle())
                         Text(step)
                             .font(.subheadline)
                             .foregroundStyle(Theme.ink.opacity(0.9))
@@ -133,16 +150,7 @@ struct ExerciseGuideView: View {
         Text("Exercise data from free-exercise-db (public domain).")
             .font(.caption2)
             .foregroundStyle(Theme.muted.opacity(0.7))
-            .padding(.top, 8)
+            .padding(.top, Theme.Space.sm)
             .accessibilityAddTraits(.isStaticText)
-    }
-
-    private func metaPill(_ text: String) -> some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(Theme.muted)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Theme.sunken, in: Capsule())
     }
 }

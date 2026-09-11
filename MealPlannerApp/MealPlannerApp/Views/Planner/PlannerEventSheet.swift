@@ -68,15 +68,17 @@ struct PlannerEventSheet: View {
                         .accessibilityHint("Optional notes for this event")
                 }
 
-                Section("Color") {
+                Section {
                     ColorSwatchGrid(
                         selectedHex: $colorHex,
                         swatchHint: "Sets accent color for calendar event",
                         swatchNamePrefix: "Event color"
                     )
+                } header: {
+                    eventSectionHeader("COLOR")
                 }
 
-                Section("Tags") {
+                Section {
                     if allTags.isEmpty {
                         Text("Use #tag in the title or manage tags from the menu.")
                             .font(.caption)
@@ -84,6 +86,8 @@ struct PlannerEventSheet: View {
                             .accessibilityAddTraits(.isStaticText)
                     }
                     FlowLayoutTags(allTags: allTags, selected: $selectedTags)
+                } header: {
+                    eventSectionHeader("TAGS")
                 }
 
                 Section {
@@ -124,12 +128,12 @@ struct PlannerEventSheet: View {
                     .accessibilityLabel("Repeat, \(recurrence.title)")
                     .accessibilityHint("Sets how often this event repeats")
                     if recurrence == .customWeekly {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: Theme.Space.sm) {
                             Text(RecurrenceWeekdayMask.summary(recurrenceWeekdayMask))
                                 .font(.caption)
                                 .foregroundStyle(Theme.muted)
                                 .accessibilityAddTraits(.isStaticText)
-                            HStack(spacing: 6) {
+                            HStack(spacing: Theme.Space.sm - 2) {
                                 ForEach(RecurrenceWeekdayMask.labels(), id: \.weekday) { item in
                                     let on = RecurrenceWeekdayMask.contains(item.weekday, in: recurrenceWeekdayMask)
                                     Button {
@@ -139,7 +143,7 @@ struct PlannerEventSheet: View {
                                             .font(.caption.weight(.semibold))
                                             .foregroundStyle(on ? .black : Theme.ink)
                                             .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 8)
+                                            .padding(.vertical, Theme.Space.sm)
                                             .background(on ? Theme.accent : Theme.sunken, in: Capsule())
                                     }
                                     .buttonStyle(.plain)
@@ -184,7 +188,7 @@ struct PlannerEventSheet: View {
                 Section {
                     Picker("Priority", selection: $priority) {
                         ForEach(TaskPriority.allCases) { item in
-                            HStack(spacing: 10) {
+                            HStack(spacing: Theme.Space.sm + 2) {
                                 PriorityFlagIcon(priority: item)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(item.title)
@@ -219,17 +223,24 @@ struct PlannerEventSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("CANCEL") { dismiss() }
+                        .font(.caption.weight(.bold))
+                        .tracking(0.5)
                         .accessibilityHint("Discards event without saving")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(isEditing ? "Done" : "Add") { save() }
+                    Button(isEditing ? "DONE" : "ADD") { save() }
+                        .font(.caption.weight(.bold))
+                        .tracking(0.5)
+                        .foregroundStyle(Theme.cta)
                         .disabled(!canSave)
                         .accessibilityHint(canSave ? "Saves calendar event" : "Enter an event title to save")
                 }
                 if isEditing, let task = context.task {
                     ToolbarItem(placement: .destructiveAction) {
-                        Button("Delete", role: .destructive) { delete(task) }
+                        Button("DELETE", role: .destructive) { delete(task) }
+                            .font(.caption.weight(.bold))
+                            .tracking(0.5)
                             .accessibilityHint("Permanently removes this event")
                     }
                 }
@@ -363,6 +374,15 @@ struct PlannerEventSheet: View {
         let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
         return (comps.hour ?? 0) != 0 || (comps.minute ?? 0) != 0
     }
+
+    private func eventSectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2.weight(.bold))
+            .tracking(0.8)
+            .foregroundStyle(Theme.muted)
+            .textCase(nil)
+            .accessibilityAddTraits(.isHeader)
+    }
 }
 
 private struct FlowLayoutTags: View {
@@ -370,7 +390,7 @@ private struct FlowLayoutTags: View {
     @Binding var selected: Set<String>
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 90), spacing: 8)], spacing: 8) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 90), spacing: Theme.Space.sm)], spacing: Theme.Space.sm) {
             ForEach(allTags) { tag in
                 let on = selected.contains(tag.name)
                 Button {
@@ -379,8 +399,8 @@ private struct FlowLayoutTags: View {
                     Text("#\(tag.name)")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, Theme.Space.sm + 2)
+                        .padding(.vertical, Theme.Space.sm - 2)
                         .frame(maxWidth: .infinity)
                         .background(PlannerColor.from(hex: tag.colorHex).opacity(on ? 1 : 0.35), in: Capsule())
                 }

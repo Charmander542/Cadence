@@ -142,7 +142,7 @@ struct TodayView: View {
                 showSearchInBar: false
             )
             ScrollView {
-                VStack(spacing: 14) {
+                VStack(spacing: Theme.Space.sm) {
                     if destination == .today {
                         todayHeroCards
                     }
@@ -202,23 +202,44 @@ struct TodayView: View {
                                 taskRow(task)
                             }
                         }
+                    } else if destination == .today,
+                              openToday.isEmpty,
+                              !(overdue.isEmpty && todayEvents.isEmpty && openHabits.isEmpty && completedCount == 0) {
+                        sectionCard(id: "tasks", title: "Tasks", count: 0) {
+                            Button { showQuickAdd = true } label: {
+                                HStack(spacing: Theme.Space.sm + 2) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.body.weight(.semibold))
+                                        .foregroundStyle(Theme.cta)
+                                    Text("ADD TASK")
+                                        .font(.caption.weight(.bold))
+                                        .tracking(0.7)
+                                        .foregroundStyle(Theme.cta)
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(.vertical, Theme.Space.sm)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Add task")
+                            .accessibilityHint("Opens quick add for a new task")
+                        }
                     }
                     if !openToday.isEmpty && destination != .today {
                         VStack(spacing: 0) {
                             ForEach(openToday) { task in
                                 taskRow(task)
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 10)
+                                    .padding(.horizontal, Theme.Space.md + 2)
+                                    .padding(.vertical, Theme.Space.sm + 2)
                             }
                         }
-                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
                     }
                     if completedCount > 0 {
                         completedSection
                     }
                 }
-                .padding(16)
-                .padding(.bottom, 88)
+                .padding(Theme.Space.lg)
+                .padding(.bottom, Theme.Space.xl * 5 + Theme.Space.md)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -230,16 +251,18 @@ struct TodayView: View {
                         UndoFAB(accessibilityHint: todayUndoAccessibilityHint) {
                             performUndo()
                         }
-                        .padding(.leading, 22)
                         .transition(.move(edge: .leading).combined(with: .opacity))
                     }
                 }
                 .animation(.easeInOut(duration: 0.22), value: pendingUndo != nil)
             },
-            fab: {
-                OrangeFAB { showQuickAdd = true }
-            }
+            fab: { EmptyView() }
         )
+        .onChange(of: appModel.requestedFABAction) { _, action in
+            guard action == .todayQuickAdd else { return }
+            showQuickAdd = true
+            appModel.requestedFABAction = nil
+        }
         .sheet(isPresented: $showQuickAdd) {
             QuickAddSheet()
         }
@@ -284,8 +307,8 @@ struct TodayView: View {
                         .foregroundStyle(Theme.muted)
                         .font(.caption.weight(.semibold))
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
+                .padding(.horizontal, Theme.Space.md + 2)
+                .padding(.vertical, Theme.Space.md)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Completed, \(completedCount) items")
@@ -308,7 +331,7 @@ struct TodayView: View {
                 }
             }
         }
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
     }
 
     private var postponeMenu: AnyView {
@@ -321,7 +344,7 @@ struct TodayView: View {
                 Button("Next week") { postponeOverdue(days: 7) }
                     .accessibilityHint("Moves all overdue tasks one week forward")
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: Theme.Space.xs) {
                     Text("Postpone")
                     Image(systemName: "chevron.down")
                         .font(.caption2)
@@ -346,31 +369,36 @@ struct TodayView: View {
             Button {
                 if isCollapsed { collapsed.remove(id) } else { collapsed.insert(id) }
             } label: {
-                HStack {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(Theme.ink)
+                HStack(spacing: Theme.Space.sm) {
+                    Text(title.uppercased())
+                        .font(.caption2.weight(.bold))
+                        .tracking(0.6)
+                        .foregroundStyle(id == "overdue" ? Theme.danger : Theme.muted)
+                    Theme.CountBadge(count: count, emphasized: id == "tasks")
                     Spacer()
                     if let trailing { trailing }
-                    Text("\(count)")
-                        .foregroundStyle(Theme.muted)
                     Image(systemName: "chevron.down")
                         .rotationEffect(.degrees(isCollapsed ? -90 : 0))
                         .foregroundStyle(Theme.muted)
                         .font(.caption.weight(.semibold))
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
+                .padding(.horizontal, Theme.Space.md + 2)
+                .padding(.vertical, Theme.Space.md)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("\(title), \(count) items")
             .accessibilityValue(isCollapsed ? "Collapsed" : "Expanded")
             .accessibilityHint("Double tap to show or hide")
             if !isCollapsed {
+                Divider().overlay(Theme.gridDivider).padding(.horizontal, Theme.Space.md + 2)
                 content()
             }
         }
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1)
+        )
     }
 
     private var tagColorMap: [String: Color] {
@@ -378,11 +406,11 @@ struct TodayView: View {
     }
 
     private func taskRow(_ task: PlannerTaskEntity) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Theme.Space.md) {
             TaskCheckbox(completed: task.isCompleted, overdue: task.isOverdue) {
                 toggleTask(task)
             }
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Theme.Space.xs) {
                 Text(task.title)
                     .foregroundStyle(task.isCompleted ? Theme.muted : Theme.ink)
                     .strikethrough(task.isCompleted)
@@ -394,28 +422,29 @@ struct TodayView: View {
             .contentShape(Rectangle())
             .onTapGesture { editingTask = task }
             if let due = task.dueAt {
-                Text(PlannerDate.shortDue(due))
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(task.isOverdue && !task.isCompleted ? Theme.danger : Theme.accent)
+                Theme.MetaPill(
+                    text: PlannerDate.shortDue(due),
+                    tone: task.isOverdue && !task.isCompleted ? .danger : .accent
+                )
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, Theme.Space.md + 2)
+        .padding(.vertical, Theme.Space.sm + 2)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(taskRowAccessibilityLabel(task))
         .accessibilityHint("Double tap to edit")
     }
 
     private func eventRow(_ event: PlannerTaskEntity, completed: Bool = false) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.Space.sm) {
             CountdownTrackButton(eventID: event.id)
             Button {
                 editingEvent = EventSheetContext(task: event, startDate: event.dueAt ?? .now)
             } label: {
-                HStack(spacing: 10) {
-                    Circle()
+                HStack(spacing: Theme.Space.sm + 2) {
+                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
                         .fill(PlannerColor.from(hex: event.colorHex.isEmpty ? PlannerColor.palette[0] : event.colorHex))
-                        .frame(width: 8, height: 8)
+                        .frame(width: 3, height: 18)
                     Text(event.title)
                         .font(.subheadline)
                         .foregroundStyle(completed ? Theme.muted : Theme.ink)
@@ -436,8 +465,8 @@ struct TodayView: View {
             .accessibilityLabel(todayEventAccessibilityLabel(event, completed: completed))
             .accessibilityHint("Double tap to edit event")
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, Theme.Space.md + 2)
+        .padding(.vertical, Theme.Space.sm + 2)
     }
 
     private func todayEventAccessibilityLabel(_ event: PlannerTaskEntity, completed: Bool) -> String {
@@ -461,7 +490,7 @@ struct TodayView: View {
 
     private func habitRow(_ habit: HabitEntity, showSkip: Bool = false) -> some View {
         let done = habit.isDone(on: .now)
-        return HStack(spacing: 12) {
+        return HStack(spacing: Theme.Space.md) {
             Button {
                 toggleHabit(habit)
             } label: {
@@ -485,19 +514,20 @@ struct TodayView: View {
                 Button {
                     skipHabit(habit)
                 } label: {
-                    Text("Skip")
-                        .font(.caption.weight(.semibold))
+                    Text("SKIP")
+                        .font(.caption.weight(.bold))
+                        .tracking(0.5)
                         .foregroundStyle(Theme.muted)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
+                        .padding(.horizontal, Theme.Space.sm)
+                        .padding(.vertical, Theme.Space.sm - 2)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Skip habit")
                 .accessibilityHint("Marks habit skipped for today without completing it")
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, Theme.Space.md + 2)
+        .padding(.vertical, Theme.Space.sm + 2)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(todayHabitRowAccessibilityLabel(habit, done: done))
         .accessibilityHint("Use complete or skip buttons. Double tap habit name to edit.")
@@ -655,9 +685,10 @@ struct QuickAddSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
-                Text("Save to list")
-                    .font(.caption.weight(.semibold))
+            VStack(spacing: Theme.Space.md + 2) {
+                Text("SAVE TO LIST")
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.6)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityAddTraits(.isHeader)
@@ -668,7 +699,7 @@ struct QuickAddSheet: View {
                                 .accessibilityHint("Saves task to \(list.name) list")
                         }
                     } label: {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Theme.Space.xs) {
                             Text(selectedListName)
                                 .font(.headline)
                             Image(systemName: "chevron.up.chevron.down")
@@ -684,7 +715,7 @@ struct QuickAddSheet: View {
                     }
                 }
                 HStack(alignment: .center) {
-                    Circle().stroke(Theme.muted.opacity(0.45), lineWidth: 1.5).frame(width: 22, height: 22)
+                    Theme.CheckGlyph(checked: false)
                     TextField("What do you want to do?", text: $title)
                         .font(.title3)
                         .submitLabel(.done)
@@ -692,6 +723,13 @@ struct QuickAddSheet: View {
                         .onChange(of: title) { _, _ in applyParsedHints() }
                         .accessibilityHint("Task title; try tomorrow or #tag for smart hints")
                 }
+                .padding(.horizontal, Theme.Space.md)
+                .padding(.vertical, Theme.Space.sm + 2)
+                .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .strokeBorder(Theme.hairline, lineWidth: 1)
+                )
                 SmartTitleHints(parsed: parsed, tagColors: tagColorMap)
                 Text("Tips: tomorrow · #tag")
                     .font(.caption2)
@@ -699,8 +737,9 @@ struct QuickAddSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityLabel("Tips: type tomorrow or hash tag in the title")
                     .accessibilityAddTraits(.isStaticText)
-                Text("Due date")
-                    .font(.caption.weight(.semibold))
+                Text("DUE DATE")
+                    .font(.caption2.weight(.bold))
+                    .tracking(0.6)
                     .foregroundStyle(Theme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityAddTraits(.isHeader)
@@ -718,6 +757,7 @@ struct QuickAddSheet: View {
                     .accessibilityHint("Opens calendar to change due date")
                     Toggle("Remind me", isOn: $hasReminder)
                         .font(.subheadline)
+                        .tint(Theme.cta)
                         .accessibilityLabel("Remind me, \(hasReminder ? "on" : "off")")
                         .accessibilityHint("Schedules notification on due date")
                 } else {
@@ -727,7 +767,7 @@ struct QuickAddSheet: View {
                         .accessibilityLabel("Due date, none")
                         .accessibilityAddTraits(.isStaticText)
                 }
-                HStack(spacing: 22) {
+                HStack(spacing: Theme.Space.md + 2) {
                     Menu {
                         Button("Today") { hasDue = true; due = .now }
                             .accessibilityHint("Sets due date to today")
@@ -739,24 +779,29 @@ struct QuickAddSheet: View {
                         Button("No date") { hasDue = false }
                             .accessibilityHint("Clears due date")
                     } label: {
-                        Label("Date", systemImage: "calendar")
+                        Theme.IconWell(systemImage: "calendar", tint: Theme.cta, size: 40)
                     }
                     .accessibilityLabel("Due date, \(hasDue ? dueLabel : "none")")
                     .accessibilityHint("Set or clear due date")
                     Spacer()
-                    Button("Save") { save() }
-                        .font(.headline)
-                        .foregroundStyle(Theme.accent)
-                        .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .accessibilityHint(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Enter a task title to save" : "Creates task in selected list")
+                    Theme.PrimaryButton(
+                        title: "SAVE",
+                        systemImage: "checkmark"
+                    ) {
+                        save()
+                    }
+                    .opacity(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .frame(maxWidth: 160)
+                    .accessibilityHint(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Enter a task title to save" : "Creates task in selected list")
                 }
-                .foregroundStyle(Theme.ink)
                 .font(.title3)
             }
-            .padding(18)
+            .padding(Theme.Space.lg + 2)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(Theme.surface)
+        .cadenceDismissKeyboardOnTap()
+        .background(Theme.canvas)
         .presentationDetents([Self.compactDetent, Self.expandedDetent], selection: $sheetDetent)
         .presentationDragIndicator(.visible)
         .presentationContentInteraction(.scrolls)
@@ -914,12 +959,12 @@ struct TaskEditorSheet: View {
                     }
                 }
                 if task.recurrence == .customWeekly {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: Theme.Space.sm) {
                         Text(RecurrenceWeekdayMask.summary(task.recurrenceWeekdayMask))
                             .font(.caption)
                             .foregroundStyle(Theme.muted)
                             .accessibilityAddTraits(.isStaticText)
-                        HStack(spacing: 6) {
+                        HStack(spacing: Theme.Space.sm - 2) {
                             ForEach(RecurrenceWeekdayMask.labels(), id: \.weekday) { item in
                                 let on = RecurrenceWeekdayMask.contains(item.weekday, in: task.recurrenceWeekdayMask)
                                 Button {
@@ -929,7 +974,7 @@ struct TaskEditorSheet: View {
                                         .font(.caption.weight(.semibold))
                                         .foregroundStyle(on ? .black : Theme.ink)
                                         .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 8)
+                                        .padding(.vertical, Theme.Space.sm)
                                         .background(on ? Theme.accent : Theme.sunken, in: Capsule())
                                 }
                                 .buttonStyle(.plain)
@@ -944,7 +989,7 @@ struct TaskEditorSheet: View {
                     set: { task.priority = $0 }
                 )) {
                     ForEach(TaskPriority.allCases) { p in
-                        HStack(spacing: 10) {
+                        HStack(spacing: Theme.Space.sm + 2) {
                             PriorityFlagIcon(priority: p)
                             Text(p.title)
                         }
@@ -976,6 +1021,7 @@ struct TaskEditorSheet: View {
             .scrollDismissesKeyboard(.never)
             .scrollContentBackground(.hidden)
             .background(Theme.canvas)
+            .tint(Theme.cta)
             .navigationTitle("Task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -990,6 +1036,7 @@ struct TaskEditorSheet: View {
                         Task { await PlannerSyncCoordinator.shared.taskDidChange(task, in: modelContext) }
                         dismiss()
                     }
+                    .foregroundStyle(Theme.cta)
                     .accessibilityHint("Saves task changes and closes editor")
                 }
                 ToolbarItem(placement: .destructiveAction) {

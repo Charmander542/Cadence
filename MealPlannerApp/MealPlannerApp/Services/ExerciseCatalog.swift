@@ -59,6 +59,7 @@ struct ExerciseCatalogThumbnail: View {
     private var fixedHeight: CGFloat { width * heightRatio }
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: fullWidth ? 14 : 10, style: .continuous)
         Group {
             if fullWidth {
                 Color.clear
@@ -68,20 +69,21 @@ struct ExerciseCatalogThumbnail: View {
             } else {
                 imageContent
                     .frame(width: width, height: fixedHeight)
+                    .clipped()
             }
         }
         .background(Theme.sunken)
-        .clipShape(RoundedRectangle(cornerRadius: fullWidth ? 14 : 10, style: .continuous))
+        .clipShape(shape)
+        .contentShape(shape)
         .overlay(
-            RoundedRectangle(cornerRadius: fullWidth ? 14 : 10, style: .continuous)
-                .stroke(selected ? Theme.accent : Color.clear, lineWidth: 2)
+            shape.stroke(selected ? Theme.accent : Color.clear, lineWidth: 2)
         )
         .overlay(alignment: .bottom) {
             if selected, !fullWidth {
                 Capsule()
                     .fill(Theme.accent)
                     .frame(width: width * 0.6, height: 3)
-                    .offset(y: 6)
+                    .padding(.bottom, 5)
             }
         }
         .accessibilityLabel(exercise.name)
@@ -94,6 +96,9 @@ struct ExerciseCatalogThumbnail: View {
             Image(uiImage: ui)
                 .resizable()
                 .scaledToFill()
+                // Prevent scaledToFill from expanding the hit target past the frame.
+                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                .clipped()
         } else {
             Image(systemName: WorkoutVisuals.fallbackIcon(for: exercise))
                 .font(fullWidth ? .largeTitle : .title3)

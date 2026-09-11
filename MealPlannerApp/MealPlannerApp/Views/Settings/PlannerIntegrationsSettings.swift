@@ -12,6 +12,15 @@ struct RemindersSettingsView: View {
     var body: some View {
         Form {
             Section {
+                SettingsPageHero(
+                    systemImage: "bell.badge",
+                    title: "Reminders",
+                    subtitle: "Task, habit, workout, and meal notifications on your schedule.",
+                    tint: Theme.cta
+                )
+            }
+
+            Section {
                 Toggle("Enable notifications", isOn: Binding(
                     get: { PlannerPreferences.notificationsEnabled },
                     set: { newValue in
@@ -27,11 +36,19 @@ struct RemindersSettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
                         .accessibilityAddTraits(.isStaticText)
+                    SettingsOpenSystemSettingsButton()
+                } else if notificationStatus == .notDetermined, PlannerPreferences.notificationsEnabled {
+                    Text("Cadence will ask for notification permission when you refresh reminders.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .accessibilityAddTraits(.isStaticText)
                 }
+            } header: {
+                settingsDetailSectionHeader("Master")
             }
 
             if PlannerPreferences.notificationsEnabled {
-                Section("Reminder types") {
+                Section {
                     Toggle("Task reminders", isOn: boolBinding { PlannerPreferences.taskRemindersEnabled } set: { PlannerPreferences.taskRemindersEnabled = $0 })
                         .accessibilityLabel("Task reminders, \(PlannerPreferences.taskRemindersEnabled ? "on" : "off")")
                         .accessibilityHint("Notifies before tasks are due")
@@ -44,9 +61,11 @@ struct RemindersSettingsView: View {
                     Toggle("Meal reminders", isOn: boolBinding { PlannerPreferences.mealRemindersEnabled } set: { PlannerPreferences.mealRemindersEnabled = $0 })
                         .accessibilityLabel("Meal reminders, \(PlannerPreferences.mealRemindersEnabled ? "on" : "off")")
                         .accessibilityHint("Notifies for lunch and dinner on plan days")
+                } header: {
+                    settingsDetailSectionHeader("Reminder types")
                 }
 
-                Section("Timing") {
+                Section {
                     Stepper(
                         "Task reminder: \(PlannerPreferences.defaultTaskReminderMinutesBefore) min before",
                         value: Binding(
@@ -89,12 +108,18 @@ struct RemindersSettingsView: View {
                     )
                     .accessibilityLabel("Dinner reminder, \(PlannerPreferences.dinnerReminderHour) o'clock")
                     .accessibilityHint("Hour of day for dinner reminders on plan days")
+                } header: {
+                    settingsDetailSectionHeader("Timing")
                 }
             }
 
             Section {
-                Button("Refresh all reminders") {
+                Button {
                     Task { await refreshNotifications() }
+                } label: {
+                    Label(isBusy ? "Working…" : "Refresh all reminders", systemImage: "arrow.clockwise")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.cta)
                 }
                 .disabled(isBusy)
                 .accessibilityHint("Reschedules task, habit, workout, and meal notifications")
@@ -102,13 +127,9 @@ struct RemindersSettingsView: View {
 
             if let statusMessage {
                 Section {
-                    Text(statusMessage)
-                        .font(.footnote)
-                        .foregroundStyle(Theme.muted)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel(statusMessage)
-                        .accessibilityAddTraits(.updatesFrequently)
+                    SettingsStatusBanner(message: statusMessage)
                 }
+                .listRowBackground(Theme.surface)
             }
         }
         .navigationTitle("Reminders")
@@ -144,21 +165,28 @@ struct CalendarSyncSettingsView: View {
     @State private var appleCalendars: [CalendarChoice] = []
     @State private var googleCalendars: [GoogleCalendarSummary] = []
     @State private var statusMessage: String?
+    @State private var statusTone: Theme.MetaPill.MetaTone = .accent
+    @State private var statusIcon = "checkmark.circle.fill"
     @State private var isBusy = false
 
     var body: some View {
         Form {
+            Section {
+                SettingsPageHero(
+                    systemImage: "calendar.badge.clock",
+                    title: "Calendar sync",
+                    subtitle: "Export tasks, workouts, and meals to Apple or Google calendars.",
+                    tint: Theme.accent
+                )
+            }
+
             appleCalendarSection
             googleCalendarSection
             if let statusMessage {
                 Section {
-                    Text(statusMessage)
-                        .font(.footnote)
-                        .foregroundStyle(Theme.muted)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel(statusMessage)
-                        .accessibilityAddTraits(.updatesFrequently)
+                    SettingsStatusBanner(message: statusMessage, systemImage: statusIcon, tone: statusTone)
                 }
+                .listRowBackground(Theme.surface)
             }
         }
         .navigationTitle("Calendar sync")
@@ -183,6 +211,7 @@ struct CalendarSyncSettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)
                     .accessibilityAddTraits(.isStaticText)
+                SettingsOpenSystemSettingsButton()
             }
 
             if appleCalendars.isEmpty {
@@ -200,13 +229,17 @@ struct CalendarSyncSettingsView: View {
                 }
             }
 
-            Button("Request calendar access") {
+            Button {
                 Task { await requestCalendarAccess() }
+            } label: {
+                Label(isBusy ? "Working…" : "Request calendar access", systemImage: "calendar.badge.plus")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.cta)
             }
             .disabled(isBusy)
             .accessibilityHint("Allows syncing tasks, workouts, and meals to Apple Calendar")
         } header: {
-            Text("Apple Calendar")
+            settingsDetailSectionHeader("Apple Calendar")
         } footer: {
             Text("Turn on any sub-calendars where Cadence should export. Google calendars added to iOS appear here too.")
                 .accessibilityAddTraits(.isStaticText)
@@ -218,15 +251,21 @@ struct CalendarSyncSettingsView: View {
             if GoogleCalendarService.shared.isConfigured {
                 if GoogleCalendarService.shared.isSignedIn {
                     Label("Connected", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Theme.accent)
                     Button("Disconnect Google") {
                         GoogleCalendarService.shared.signOut()
                         googleCalendars = []
+                        showStatus("Google account disconnected.", tone: .neutral, icon: "link.badge.minus")
                     }
+                    .foregroundStyle(Theme.danger)
                     .accessibilityHint("Stops syncing with Google Calendar")
                 } else {
-                    Button("Connect Google account") {
+                    Button {
                         Task { await connectGoogle() }
+                    } label: {
+                        Label(isBusy ? "Working…" : "Connect Google account", systemImage: "person.crop.circle.badge.plus")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.cta)
                     }
                     .disabled(isBusy)
                     .accessibilityHint("Signs in to sync with Google Calendar")
@@ -243,8 +282,12 @@ struct CalendarSyncSettingsView: View {
                     .accessibilityHint("Exports planned dinners to Google Calendar")
 
                 if googleCalendars.isEmpty, GoogleCalendarService.shared.isSignedIn {
-                    Button("Load calendars") {
+                    Button {
                         Task { await loadGoogleCalendars() }
+                    } label: {
+                        Label("Load calendars", systemImage: "arrow.down.circle")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.cta)
                     }
                     .accessibilityHint("Fetches available Google calendars to sync")
                 } else if GoogleCalendarService.shared.isSignedIn {
@@ -264,7 +307,7 @@ struct CalendarSyncSettingsView: View {
                     .accessibilityAddTraits(.isStaticText)
             }
         } header: {
-            Text("Google Calendar")
+            settingsDetailSectionHeader("Google Calendar")
         } footer: {
             if !GoogleCalendarService.shared.isConfigured {
                 EmptyView()
@@ -273,6 +316,12 @@ struct CalendarSyncSettingsView: View {
                     .accessibilityAddTraits(.isStaticText)
             }
         }
+    }
+
+    private func showStatus(_ message: String, tone: Theme.MetaPill.MetaTone = .accent, icon: String = "checkmark.circle.fill") {
+        statusTone = tone
+        statusIcon = icon
+        statusMessage = message
     }
 
     private func appleCalendarBinding(_ calendarID: String) -> Binding<Bool> {
@@ -319,7 +368,7 @@ struct CalendarSyncSettingsView: View {
         isBusy = true
         defer { isBusy = false }
         await PlannerSyncCoordinator.shared.syncCalendars(in: modelContext)
-        statusMessage = "Calendar sync updated."
+        showStatus("Calendar sync updated.")
     }
 
     private func connectGoogle() async {
@@ -328,9 +377,9 @@ struct CalendarSyncSettingsView: View {
         do {
             try await GoogleCalendarService.shared.signIn()
             await loadGoogleCalendars()
-            statusMessage = "Google account connected."
+            showStatus("Google account connected.")
         } catch {
-            statusMessage = error.localizedDescription
+            showStatus(error.localizedDescription, tone: .danger, icon: "exclamationmark.triangle.fill")
         }
     }
 
@@ -338,8 +387,9 @@ struct CalendarSyncSettingsView: View {
         do {
             googleCalendars = try await GoogleCalendarService.shared.listCalendars()
             GoogleCalendarService.shared.initializeGoogleCalendarSelectionIfNeeded(with: googleCalendars)
+            showStatus("Loaded \(googleCalendars.count) Google calendars.")
         } catch {
-            statusMessage = error.localizedDescription
+            showStatus(error.localizedDescription, tone: .danger, icon: "exclamationmark.triangle.fill")
         }
     }
 

@@ -7,19 +7,19 @@ struct DayDetailSheet: View {
     var day: Date
 
     private var workoutsEnabled: Bool {
-        profiles.first?.workoutsEnabled ?? true
+        CadenceAppsPreferences.isVisible(.workout) && (profiles.first?.workoutsEnabled ?? true)
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 14) {
+                VStack(spacing: Theme.Space.md + 2) {
                     DayAgendaSection(day: day)
                     if workoutsEnabled {
                         WorkoutDayDetailCard(day: day)
                     }
                 }
-                .padding(16)
+                .padding(Theme.Space.lg)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .scrollBounceBehavior(.basedOnSize)
@@ -29,6 +29,7 @@ struct DayDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") { dismiss() }
+                        .foregroundStyle(Theme.cta)
                         .accessibilityHint("Closes day agenda")
                 }
             }
@@ -73,40 +74,48 @@ struct DayAgendaSection: View {
     var body: some View {
         Group {
             if dayTasks.isEmpty && dayEvents.isEmpty {
+                // Craft/Amie empty day: icon + clear title + primary CTAs.
                 Theme.Card {
-                    VStack(spacing: 14) {
-                        Text("No tasks or events this day.")
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.muted)
+                    VStack(spacing: Theme.Space.md) {
+                        Theme.IconWell(systemImage: "calendar", tint: Theme.muted, size: 40)
+                        Text("Nothing scheduled")
+                            .font(Theme.display(.headline))
+                            .foregroundStyle(Theme.ink)
                             .multilineTextAlignment(.center)
-                        Button("Add task") { showQuickAdd = true }
-                            .buttonStyle(.borderedProminent)
+                        Theme.MetaPill(text: "ADD TASK OR EVENT", tone: .cta)
+                        HStack(spacing: Theme.Space.sm + 2) {
+                            Button("ADD TASK") { showQuickAdd = true }
+                                .buttonStyle(.borderedProminent)
+                                .tint(Theme.cta)
+                                .accessibilityHint("Opens quick add with this day as due date")
+                            Button("ADD EVENT") {
+                                newEventContext = EventSheetContext(startDate: day)
+                            }
+                            .buttonStyle(.bordered)
                             .tint(Theme.cta)
-                            .accessibilityHint("Opens quick add with this day as due date")
-                        Button("Add event") {
-                            newEventContext = EventSheetContext(startDate: day)
+                            .accessibilityHint("Creates a calendar event on this day")
                         }
-                        .buttonStyle(.bordered)
-                        .accessibilityHint("Creates a calendar event on this day")
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, Theme.Space.sm)
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("No tasks or events this day. Add task or add event.")
+                    .accessibilityLabel("Nothing scheduled this day. Add task or add event.")
                     .accessibilityHint("Choose an action below")
                 }
             } else {
                 if !dayTasks.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: Theme.Space.sm) {
                         Text("Tasks")
-                            .font(.caption.weight(.bold))
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.6)
+                            .textCase(.uppercase)
                             .foregroundStyle(Theme.muted)
                             .accessibilityAddTraits(.isHeader)
                         ForEach(dayTasks) { task in
                             Button {
                                 editingTask = task
                             } label: {
-                                HStack(spacing: 10) {
+                                HStack(spacing: Theme.Space.sm + 2) {
                                     Circle()
                                         .stroke(Theme.muted, lineWidth: 1.5)
                                         .frame(width: 18, height: 18)
@@ -115,8 +124,9 @@ struct DayAgendaSection: View {
                                         .foregroundStyle(Theme.ink)
                                     Spacer()
                                     if task.isOverdue {
-                                        Text("Overdue")
-                                            .font(.caption2.weight(.semibold))
+                                        Text("OVERDUE")
+                                            .font(.caption2.weight(.bold))
+                                            .tracking(0.6)
                                             .foregroundStyle(Theme.danger)
                                             .accessibilityHidden(true)
                                     }
@@ -124,7 +134,7 @@ struct DayAgendaSection: View {
                                         .font(.caption2)
                                         .foregroundStyle(Theme.muted)
                                 }
-                                .padding(.vertical, 4)
+                                .padding(.vertical, Theme.Space.xs)
                             }
                             .buttonStyle(.plain)
                             .accessibilityElement(children: .combine)
@@ -132,13 +142,20 @@ struct DayAgendaSection: View {
                             .accessibilityHint("Double tap to edit task")
                         }
                     }
-                    .padding(14)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding(Theme.Space.md + 2)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                            .strokeBorder(Theme.hairline, lineWidth: 1)
+                    )
+                    .shadow(color: Theme.cardShadow, radius: 8, y: 3)
                 }
                 if !dayEvents.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: Theme.Space.sm) {
                         Text("Events")
-                            .font(.caption.weight(.bold))
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.6)
+                            .textCase(.uppercase)
                             .foregroundStyle(Theme.muted)
                             .accessibilityAddTraits(.isHeader)
                         ForEach(dayEvents) { event in
@@ -147,10 +164,10 @@ struct DayAgendaSection: View {
                                 Button {
                                     editingEvent = event
                                 } label: {
-                                    HStack(spacing: 10) {
-                                        Circle()
+                                    HStack(spacing: Theme.Space.sm + 2) {
+                                        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
                                             .fill(PlannerColor.from(hex: event.colorHex.isEmpty ? PlannerColor.palette[0] : event.colorHex))
-                                            .frame(width: 8, height: 8)
+                                            .frame(width: 3, height: 18)
                                         Text(event.title)
                                             .font(.subheadline)
                                             .foregroundStyle(Theme.ink)
@@ -164,7 +181,7 @@ struct DayAgendaSection: View {
                                             .font(.caption2)
                                             .foregroundStyle(Theme.muted)
                                     }
-                                    .padding(.vertical, 4)
+                                    .padding(.vertical, Theme.Space.xs)
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityElement(children: .combine)
@@ -173,8 +190,13 @@ struct DayAgendaSection: View {
                             }
                         }
                     }
-                    .padding(14)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding(Theme.Space.md + 2)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                            .strokeBorder(Theme.hairline, lineWidth: 1)
+                    )
+                    .shadow(color: Theme.cardShadow, radius: 8, y: 3)
                 }
             }
         }
@@ -260,8 +282,13 @@ struct WorkoutDayDetailCard: View {
                 restDayCard
             }
         }
-        .padding(14)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(Theme.Space.md + 2)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
+                .strokeBorder(Theme.hairline, lineWidth: 1)
+        )
+        .shadow(color: Theme.cardShadow, radius: 8, y: 3)
         .workoutPreviewSheet(session: $previewSession)
         .confirmationDialog("Replace in-progress workout?", isPresented: $showReplaceLiveConfirm, titleVisibility: .visible) {
             if let session = pendingStart {
@@ -286,7 +313,7 @@ struct WorkoutDayDetailCard: View {
     }
 
     private func scheduledHeader(_ session: WorkoutSessionTemplate) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Theme.Space.md) {
             Image(systemName: "dumbbell.fill")
                 .font(.title2)
                 .foregroundStyle(Theme.accent)
@@ -305,7 +332,7 @@ struct WorkoutDayDetailCard: View {
     }
 
     private var restDayCard: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Theme.Space.md) {
             Image(systemName: "moon.zzz.fill")
                 .font(.title2)
                 .foregroundStyle(Theme.muted)
@@ -321,7 +348,7 @@ struct WorkoutDayDetailCard: View {
     }
 
     private func missedSection(_ session: WorkoutSessionTemplate) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.Space.sm + 2) {
             Text("Missed")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.danger)
@@ -331,10 +358,10 @@ struct WorkoutDayDetailCard: View {
             Button {
                 previewSession = session
             } label: {
-                Label("Do this workout", systemImage: "dumbbell.fill")
+                Label("DO THIS WORKOUT", systemImage: "dumbbell.fill")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, Theme.Space.md)
             }
             .buttonStyle(.borderedProminent)
             .tint(Theme.accent)
@@ -378,32 +405,37 @@ struct WorkoutTodayActions: View {
     }
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: Theme.Space.sm + 2) {
             if appModel.liveWorkout != nil {
                 Button { appModel.resumeLiveWorkout() } label: {
-                    Label("Resume workout", systemImage: "play.fill")
-                        .font(.headline)
+                    Label("RESUME WORKOUT", systemImage: "play.fill")
+                        .font(.headline.weight(.bold))
+                        .tracking(0.4)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, Theme.Space.md)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Theme.cta)
                 .accessibilityLabel("Resume workout")
                 .accessibilityHint("Returns to in-progress live workout")
             } else {
-                HStack(spacing: 10) {
+                HStack(spacing: Theme.Space.sm + 2) {
                     Button { requestStart(todaySession) } label: {
-                        Label("Begin workout", systemImage: "dumbbell.fill")
-                            .font(.headline)
+                        Label("BEGIN WORKOUT", systemImage: "dumbbell.fill")
+                            .font(.headline.weight(.bold))
+                            .tracking(0.4)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, Theme.Space.md)
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.cta)
                     .accessibilityLabel("Begin \(todaySession.name) workout")
                     .accessibilityHint("Starts live workout session")
-                    Button("Skip") { showSkipConfirm = true }
+                    Button("SKIP") { showSkipConfirm = true }
+                        .font(.subheadline.weight(.bold))
+                        .tracking(0.4)
                         .buttonStyle(.bordered)
+                        .tint(Theme.cta)
                         .accessibilityLabel("Skip \(todaySession.name)")
                         .accessibilityHint("Marks session skipped for today")
                 }
@@ -468,11 +500,11 @@ struct WorkoutLogSummary: View {
     var log: WorkoutLogEntity
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.Space.sm + 2) {
             HStack {
                 Label("Completed", systemImage: "checkmark.circle.fill")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.mint)
+                    .foregroundStyle(Theme.accent)
                 Spacer()
                 Text(formatDuration(log.durationSec))
                     .font(.caption.monospacedDigit())
@@ -490,7 +522,7 @@ struct WorkoutLogSummary: View {
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(Theme.muted)
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, Theme.Space.xs)
             }
         }
         .accessibilityElement(children: .combine)
