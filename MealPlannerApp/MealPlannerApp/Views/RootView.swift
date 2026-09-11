@@ -331,8 +331,6 @@ struct MainTabView: View {
             expandPull: $wheelExpandPull,
             onSelect: handleWheelSelect
         )
-        // Same charcoal plate as the swipe-up tile menu — solid, no fade gradient.
-        .background(Theme.surface.allowsHitTesting(false))
         .zIndex(2)
     }
 
