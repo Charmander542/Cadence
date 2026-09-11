@@ -59,7 +59,7 @@ enum WidgetSnapshotWriter {
         let allTasks = (try? context.fetch(FetchDescriptor<PlannerTaskEntity>())) ?? []
         let widgetTasks = allTasks
             .filter(isTodayOpenTask)
-            .prefix(8)
+            .prefix(12)
             .map {
                 WidgetTaskItem(
                     id: $0.id,
@@ -72,18 +72,22 @@ enum WidgetSnapshotWriter {
 
         let habits = ((try? context.fetch(FetchDescriptor<HabitEntity>())) ?? [])
             .filter { $0.isScheduled(on: .now) && !$0.isDone(on: .now) }
-            .prefix(4)
+            .prefix(6)
             .map {
                 WidgetHabitItem(id: $0.id, name: $0.name, isDone: false)
             }
 
         let nextEvent = CountdownTracking.resolveNextEvent(from: allTasks)
+        let matrixQuadrants = buildMatrixQuadrants(from: allTasks)
+        let calendarDays = buildCalendarDays(from: allTasks)
 
         var snap = WidgetSnapshotStore.load()
         snap.updatedAt = .now
         snap.tasks = Array(widgetTasks)
         snap.habits = Array(habits)
         snap.nextEvent = nextEvent
+        snap.matrixQuadrants = matrixQuadrants
+        snap.calendarDays = calendarDays
         WidgetSnapshotStore.save(snap)
         scheduleTimelineReload()
     }
@@ -105,5 +109,61 @@ enum WidgetSnapshotWriter {
         if let due = task.dueAt, Calendar.current.isDateInToday(due) { return true }
         if task.dueAt == nil, task.list?.showInToday == true { return true }
         return false
+    }
+
+    private static func buildMatrixQuadrants(from tasks: [PlannerTaskEntity]) -> [WidgetMatrixQuadrant] {
+        let open = tasks.filter { !$0.isCompleted && !$0.isEvent }
+        let grouped = Dictionary(grouping: open, by: { $0.priority.matrixQuadrant })
+        let shortTitles: [MatrixQuadrant: String] = [
+            .urgentImportant: "Do",
+            .notUrgentImportant: "Schedule",
+            .urgentUnimportant: "Delegate",
+            .notUrgentUnimportant: "Eliminate",
+        ]
+        return MatrixQuadrant.allCases.map { q in
+            let items = grouped[q, default: []]
+            return WidgetMatrixQuadrant(
+                id: q.rawValue,
+                roman: q.roman,
+                title: shortTitles[q] ?? q.title,
+                count: items.count,
+                taskTitles: items.prefix(3).map(\.title)
+            )
+        }
+    }
+
+    private static func buildCalendarDays(from tasks: [PlannerTaskEntity]) -> [WidgetCalendarDay] {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+        let weekday = DateFormatter()
+        weekday.dateFormat = "EEE"
+        return (0..<7).compactMap { offset -> WidgetCalendarDay? in
+            guard let day = cal.date(byAdding: .day, value: offset, to: today) else { return nil }
+            let dayStart = cal.startOfDay(for: day)
+            let events = tasks
+                .filter { task in
+                    guard task.isEvent, let due = task.dueAt else { return false }
+                    return cal.isDate(due, inSameDayAs: dayStart)
+                }
+                .sorted { ($0.dueAt ?? .distantFuture) < ($1.dueAt ?? .distantFuture) }
+            let openTasks = tasks.filter { task in
+                guard !task.isEvent, !task.isCompleted, let due = task.dueAt else { return false }
+                return cal.isDate(due, inSameDayAs: dayStart)
+            }
+            let formatter = DateFormatter()
+            formatter.calendar = cal
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = "yyyy-MM-dd"
+            let id = formatter.string(from: dayStart)
+            return WidgetCalendarDay(
+                id: id,
+                date: dayStart,
+                weekdaySymbol: weekday.string(from: dayStart).uppercased(),
+                dayNumber: cal.component(.day, from: dayStart),
+                isToday: offset == 0,
+                eventTitles: events.prefix(4).map(\.title),
+                openTaskCount: openTasks.count
+            )
+        }
     }
 }

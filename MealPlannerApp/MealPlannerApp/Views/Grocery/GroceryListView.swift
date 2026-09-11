@@ -450,11 +450,35 @@ struct GroceryRow: View {
             return "to taste"
         }
         let qty = GroceryConsolidator.formatQty(c.quantity)
+        let n = Int(c.quantity.rounded(.up))
         switch c.unit {
         case "count":
+            // Produce counts stay numeric ("2" · Onion). Proteins should already
+            // be cans/fillets/lb from consolidation — if not, show a clear piece label.
+            if c.category == "protein" {
+                return "\(qty) pc"
+            }
             return qty
         case "to_taste":
             return "to taste"
+        case "can":
+            return "\(qty) can\(n == 1 ? "" : "s")"
+        case "jar":
+            return "\(qty) jar\(n == 1 ? "" : "s")"
+        case "package":
+            return "\(qty) pkg"
+        case "fillet":
+            return "\(qty) fillet\(n == 1 ? "" : "s")"
+        case "block":
+            return "\(qty) block\(n == 1 ? "" : "s")"
+        case "bottle":
+            return "\(qty) bottle\(n == 1 ? "" : "s")"
+        case "bunch":
+            return "\(qty) bunch\(n == 1 ? "" : "es")"
+        case "head":
+            return "\(qty) head\(n == 1 ? "" : "s")"
+        case "bag":
+            return "\(qty) bag\(n == 1 ? "" : "s")"
         default:
             return "\(qty) \(c.unit)"
         }

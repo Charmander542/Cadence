@@ -370,7 +370,7 @@ struct SettingsView: View {
 
     private var spendSubtitle: String {
         if !SpendPreferences.isEnabled { return "Hidden from wheel" }
-        return SpendPreferences.isConfigured ? "Teller configured" : "Connect Teller"
+        return SpendPreferences.isConfigured ? "Plaid configured" : "Connect Plaid"
     }
 
     private var newsSubtitle: String {

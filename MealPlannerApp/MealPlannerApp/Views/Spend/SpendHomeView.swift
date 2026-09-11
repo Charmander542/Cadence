@@ -86,6 +86,7 @@ struct SpendHomeView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.canvas.ignoresSafeArea())
         .onAppear {
+            SpendPreferences.ingestLocalSecretsIfNeeded()
             SpendStore.seedDemoIfNeeded(in: modelContext)
         }
         .onChange(of: appModel.requestedFABAction) { _, action in
@@ -159,13 +160,26 @@ struct SpendHomeView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.ink)
                     Text(connected
-                         ? (enrollments.first?.institutionName ?? "Teller enrollment")
-                         : "Connect with Teller to import and categorize buys.")
+                         ? (enrollments.first?.institutionName ?? "Plaid connection")
+                         : "Connect with Plaid to import and categorize buys.")
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
+                if connected {
+                    Button {
+                        Task { await syncNow() }
+                    } label: {
+                        Text(isSyncing ? "…" : "SYNC")
+                            .font(.caption.weight(.bold))
+                            .tracking(0.7)
+                            .foregroundStyle(Theme.cta)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isSyncing)
+                    .accessibilityHint("Syncs purchases from linked banks")
+                }
                 Button {
                     showConnectInfo = true
                 } label: {
@@ -175,7 +189,7 @@ struct SpendHomeView: View {
                         .foregroundStyle(Theme.cta)
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("Opens Spend and Teller settings")
+                .accessibilityHint("Opens Spend and Plaid settings")
             }
         }
     }
@@ -225,8 +239,8 @@ struct SpendHomeView: View {
                 Theme.EmptyState(
                     systemImage: "creditcard",
                     title: "No purchases yet",
-                    message: "Connect Teller or add a tracked item to get started.",
-                    cta: "CONNECT TELLER",
+                    message: "Connect Plaid or add a tracked item to get started.",
+                    cta: "CONNECT PLAID",
                     ctaHint: "Opens Spend settings"
                 ) {
                     showConnectInfo = true
@@ -379,6 +393,18 @@ struct SpendHomeView: View {
         let f = DateFormatter()
         f.dateFormat = "MMM d"
         return f.string(from: date)
+    }
+
+    @MainActor
+    private func syncNow() async {
+        isSyncing = true
+        defer { isSyncing = false }
+        do {
+            let count = try await SpendStore.syncAllEnrollments(in: modelContext)
+            syncMessage = count == 0 ? "Up to date" : "Synced \(count) updates"
+        } catch {
+            syncMessage = error.localizedDescription
+        }
     }
 }
 

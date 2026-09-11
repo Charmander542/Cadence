@@ -2,15 +2,28 @@ import SwiftUI
 
 struct BrowseView: View {
     @EnvironmentObject private var appModel: AppModel
+    @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var searchQuery = ""
     @State private var searchDebounceTask: Task<Void, Never>?
-    @State private var course = "all"
+    @State private var course: String
     @State private var displayLimit = 50
+
+    /// When set, tapping a recipe selects it for meal substitution instead of opening detail.
+    var onPick: ((Recipe) -> Void)? = nil
+    var pickTitle: String = "Recipes"
 
     private let courses = ["all", "main", "side", "dessert", "other"]
     private let pageSize = 50
     private let searchDebounceMs = 350
+
+    init(onPick: ((Recipe) -> Void)? = nil, pickTitle: String = "Recipes", initialCourse: String = "all") {
+        self.onPick = onPick
+        self.pickTitle = pickTitle
+        _course = State(initialValue: initialCourse)
+    }
+
+    private var isPicking: Bool { onPick != nil }
 
     private var filtered: [Recipe] {
         let q = searchQuery.trimmingCharacters(in: .whitespaces)
@@ -63,7 +76,6 @@ struct BrowseView: View {
                             .accessibilityLabel("\(c.capitalized) course filter")
                             .accessibilityAddTraits(course == c ? [.isButton, .isSelected] : .isButton)
                         }
-                        // Recime: Clear all beside active filters.
                         if course != "all" || !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             Button {
                                 course = "all"
@@ -87,7 +99,9 @@ struct BrowseView: View {
                 .listRowInsets(EdgeInsets(top: Theme.Space.sm, leading: Theme.Space.lg, bottom: Theme.Space.sm, trailing: Theme.Space.lg))
                 .listRowBackground(Color.clear)
             } footer: {
-                Text("Search above by recipe name or ingredient.")
+                Text(isPicking
+                     ? "Search, then tap a recipe to use it for this day."
+                     : "Search above by recipe name or ingredient.")
                     .accessibilityAddTraits(.isStaticText)
             }
             if filtered.isEmpty {
@@ -122,68 +136,101 @@ struct BrowseView: View {
                     .accessibilityElement(children: .contain)
                 }
             } else {
-            ForEach(results) { recipe in
-                NavigationLink {
-                    RecipeDetailView(
-                        recipe: recipe,
-                        scaledServings: recipe.baseServings,
-                        reason: recipe.course.capitalized,
-                        proteinG: recipe.proteinGPerServing,
-                        calories: recipe.caloriesPerServing
-                    )
-                } label: {
-                    HStack(spacing: Theme.Space.md) {
-                        Theme.IconWell(
-                            systemImage: courseIcon(recipe.course),
-                            tint: Theme.cta,
-                            size: 40
-                        )
-                        VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
-                            Text(Theme.recipeDisplayName(recipe.name)).font(.body.weight(.semibold))
-                            HStack(spacing: Theme.Space.sm) {
-                                Theme.MetaPill(
-                                    text: recipe.course.isEmpty ? "recipe" : recipe.course,
-                                    tone: .accent
-                                )
-                                Text(recipe.sourceCitation)
-                                    .font(.caption)
-                                    .foregroundStyle(Theme.muted)
-                                    .lineLimit(1)
-                                if recipe.webLink != nil {
-                                    Image(systemName: "link")
-                                        .font(.caption)
-                                        .foregroundStyle(Theme.cta)
-                                }
-                            }
+                ForEach(results) { recipe in
+                    if let onPick {
+                        Button {
+                            onPick(recipe)
+                            dismiss()
+                        } label: {
+                            recipeRow(recipe)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(browseRecipeRowLabel(recipe))
+                        .accessibilityHint("Uses this recipe for the selected day")
+                    } else {
+                        NavigationLink {
+                            RecipeDetailView(
+                                recipe: recipe,
+                                scaledServings: recipe.baseServings,
+                                reason: recipe.course.capitalized,
+                                proteinG: recipe.proteinGPerServing,
+                                calories: recipe.caloriesPerServing
+                            )
+                        } label: {
+                            recipeRow(recipe)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel(browseRecipeRowLabel(recipe))
+                        .accessibilityHint("Opens recipe details")
                     }
-                    .padding(.vertical, Theme.Space.xs / 2)
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(browseRecipeRowLabel(recipe))
-                .accessibilityHint("Opens recipe details")
-            }
-            if hasMore {
-                Button("Show more recipes (\(filtered.count - displayLimit) remaining)") {
-                    displayLimit += pageSize
+                if hasMore {
+                    Button("Show more recipes (\(filtered.count - displayLimit) remaining)") {
+                        displayLimit += pageSize
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.cta)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .accessibilityLabel("Show more recipes")
+                    .accessibilityHint("Loads \(min(pageSize, filtered.count - displayLimit)) more of \(filtered.count) matching recipes")
                 }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.cta)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .accessibilityLabel("Show more recipes")
-                .accessibilityHint("Loads \(min(pageSize, filtered.count - displayLimit)) more of \(filtered.count) matching recipes")
-            }
             }
         }
         .scrollContentBackground(.hidden)
         .background(Theme.canvas)
-        .navigationTitle("Recipes")
+        .navigationTitle(pickTitle)
         .searchable(text: $query, prompt: "Chicken, sheet pan, mushrooms…")
         .onChange(of: query) { _, newValue in
             scheduleSearchQuery(newValue)
         }
         .onChange(of: course) { _, _ in displayLimit = pageSize }
         .onDisappear { searchDebounceTask?.cancel() }
+        .toolbar {
+            if isPicking {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .accessibilityHint("Closes without changing dinner")
+                }
+            }
+        }
+    }
+
+    private func recipeRow(_ recipe: Recipe) -> some View {
+        HStack(spacing: Theme.Space.md) {
+            Theme.IconWell(
+                systemImage: courseIcon(recipe.course),
+                tint: Theme.cta,
+                size: 40
+            )
+            VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
+                Text(Theme.recipeDisplayName(recipe.name)).font(.body.weight(.semibold))
+                HStack(spacing: Theme.Space.sm) {
+                    Theme.MetaPill(
+                        text: recipe.course.isEmpty ? "recipe" : recipe.course,
+                        tone: .accent
+                    )
+                    Text(recipe.sourceCitation)
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
+                        .lineLimit(1)
+                    if recipe.webLink != nil {
+                        Image(systemName: "link")
+                            .font(.caption)
+                            .foregroundStyle(Theme.cta)
+                    }
+                }
+            }
+            if isPicking {
+                Spacer(minLength: 8)
+                Image(systemName: "plus.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(Theme.cta)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(.vertical, Theme.Space.xs / 2)
+        .contentShape(Rectangle())
     }
 
     private func courseIcon(_ course: String) -> String {

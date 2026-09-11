@@ -2,14 +2,36 @@ import Foundation
 
 /// Local unit conversion + grocery consolidation (no AI).
 enum UnitConverter {
-    enum Kind { case volume, weight, count, taste }
+    enum Kind { case volume, weight, count, taste, package }
+
+    /// Buyable package / piece units that must not collapse to bare "count".
+    private static let packageUnitAliases: [String: String] = [
+        "can": "can", "cans": "can", "tin": "can", "tins": "can",
+        "jar": "jar", "jars": "jar",
+        "package": "package", "packages": "package", "pack": "package", "packs": "package",
+        "fillet": "fillet", "fillets": "fillet", "filet": "fillet", "filets": "fillet",
+        "block": "block", "blocks": "block",
+        "bottle": "bottle", "bottles": "bottle",
+        "clove": "clove", "cloves": "clove",
+        "slice": "slice", "slices": "slice",
+        "bunch": "bunch", "bunches": "bunch", "bush": "bunch", "bushes": "bunch",
+        "head": "head", "heads": "head",
+        "bag": "bag", "bags": "bag",
+    ]
+
+    static func normalizedPackageUnit(_ unit: String) -> String? {
+        packageUnitAliases[unit.lowercased()]
+    }
 
     static func kind(of unit: String) -> Kind {
-        switch unit.lowercased() {
+        let u = unit.lowercased()
+        switch u {
         case "tsp", "tbsp", "cup", "ml", "l": return .volume
         case "g", "kg", "oz", "lb": return .weight
         case "to_taste": return .taste
-        default: return .count
+        default:
+            if normalizedPackageUnit(u) != nil { return .package }
+            return .count
         }
     }
 
@@ -18,6 +40,8 @@ enum UnitConverter {
         switch kind(of: u) {
         case .taste:
             return (1, "to_taste")
+        case .package:
+            return (quantity, normalizedPackageUnit(u) ?? u)
         case .count:
             return (quantity, "count")
         case .volume:
@@ -51,6 +75,10 @@ enum UnitConverter {
     static func convert(_ quantity: Double, from: String, to: String) -> Double? {
         let fromU = from.lowercased()
         let toU = to.lowercased()
+        // Same package unit (can↔cans etc.) converts 1:1 after normalize.
+        if let a = normalizedPackageUnit(fromU), let b = normalizedPackageUnit(toU), a == b {
+            return quantity
+        }
         guard kind(of: fromU) == kind(of: toU), kind(of: fromU) != .taste else { return nil }
         let baseA = baseAmount(quantity: quantity, unit: fromU)
         let basePerTo = baseAmount(quantity: 1, unit: toU)
@@ -70,7 +98,9 @@ enum UnitConverter {
         case "oz": return quantity * 28.3495
         case "lb": return quantity * 453.592
         case "count": return quantity
-        default: return nil
+        default:
+            if normalizedPackageUnit(unit) != nil { return quantity }
+            return nil
         }
     }
 }
@@ -144,6 +174,8 @@ enum IngredientCanonicalizer {
         "chicken wing": 0.1,
         "chicken piece": 0.4,
         "chicken": 0.5,
+        "shrimp": 0.125,
+        "prawn": 0.125,
     ]
 
     /// Large egg ≈ 50g.
@@ -178,6 +210,28 @@ enum IngredientCanonicalizer {
     static func isFryingOil(_ raw: String) -> Bool {
         let s = raw.lowercased()
         return s.contains("oil") && s.range(of: #"\binch(?:es)?\b"#, options: .regularExpression) != nil
+    }
+
+    /// Resolve a buyable shop unit from the parsed line (preserves can/fillet/package).
+    static func shopUnit(for ing: ParsedIngredient, fryingOil: Bool) -> String {
+        if fryingOil { return "cup" }
+        if let u = ing.unit?.lowercased(), !u.isEmpty, u != "each" {
+            if let pack = UnitConverter.normalizedPackageUnit(u) { return pack }
+            return u
+        }
+        let raw = ing.raw.lowercased()
+        let packageTokens = [
+            "cans", "can", "tins", "tin", "jars", "jar",
+            "packages", "package", "packs", "pack",
+            "fillets", "fillet", "filets", "filet",
+            "blocks", "block", "bottles", "bottle",
+        ]
+        for token in packageTokens {
+            if raw.range(of: #"\b\#(token)\b"#, options: .regularExpression) != nil {
+                return UnitConverter.normalizedPackageUnit(token) ?? token
+            }
+        }
+        return "count"
     }
 
     static func canonicalize(_ raw: String) -> String {
@@ -699,6 +753,10 @@ enum IngredientCanonicalizer {
                 return (lb, "lb")
             }
         }
+        // Keep cans / fillets / packages distinct — never rewrite to bare "count".
+        if let pack = UnitConverter.normalizedPackageUnit(u) {
+            return (quantity, pack)
+        }
         if u == "count" || UnitConverter.kind(of: u) == .count {
             if let per = countToLb[key] {
                 return (quantity * per, "lb")
@@ -796,6 +854,52 @@ enum ShopFriendlyUnits {
         let lbPerUnit: Double
         let mergeAsWeight: Bool
         let plural: String
+    }
+
+    /// When a protein lands as bare "count", map it to how you'd buy it.
+    struct ProteinPurchase {
+        let unit: String
+        /// If converting from count pieces, multiply qty by this (fillet→1, shrimp count→lb factor).
+        let countFactor: Double
+        let roundUp: Bool
+    }
+
+    private static let proteinPurchase: [String: ProteinPurchase] = [
+        "tuna": .init(unit: "can", countFactor: 1, roundUp: true),
+        "anchovy": .init(unit: "can", countFactor: 1, roundUp: true),
+        "sardine": .init(unit: "can", countFactor: 1, roundUp: true),
+        "tofu": .init(unit: "package", countFactor: 1, roundUp: true),
+        "tempeh": .init(unit: "package", countFactor: 1, roundUp: true),
+        "bacon": .init(unit: "package", countFactor: 1, roundUp: true),
+        "salmon": .init(unit: "fillet", countFactor: 1, roundUp: true),
+        "cod": .init(unit: "fillet", countFactor: 1, roundUp: true),
+        "halibut": .init(unit: "fillet", countFactor: 1, roundUp: true),
+        "tilapia": .init(unit: "fillet", countFactor: 1, roundUp: true),
+    ]
+
+    static func proteinPurchase(for name: String) -> ProteinPurchase? {
+        let key = IngredientCanonicalizer.canonicalize(name)
+        if let direct = proteinPurchase[key] { return direct }
+        return proteinPurchase.first(where: { key == $0.key || key.hasPrefix($0.key + " ") })?.value
+    }
+
+    /// Apply canned / fillet / package defaults when unit is missing or bare count.
+    static func clarifyPurchaseUnit(name: String, quantity: Double, unit: String) -> (qty: Double, unit: String) {
+        let u = unit.lowercased()
+        if UnitConverter.normalizedPackageUnit(u) != nil || UnitConverter.kind(of: u) == .weight || UnitConverter.kind(of: u) == .volume {
+            if let pack = UnitConverter.normalizedPackageUnit(u) {
+                return (max(1, quantity.rounded(.up)), pack)
+            }
+            return (quantity, unit)
+        }
+        guard u == "count" || u.isEmpty || u == "each" else {
+            return (quantity, unit)
+        }
+        guard let rule = proteinPurchase(for: name) else {
+            return (quantity, unit)
+        }
+        let qty = max(1, (quantity * rule.countFactor).rounded(rule.roundUp ? .up : .toNearestOrAwayFromZero))
+        return (qty, rule.unit)
     }
 
     private static let rules: [String: Rule] = [
@@ -976,7 +1080,7 @@ enum GroceryConsolidator {
                 let key = IngredientCanonicalizer.groceryName(for: ing)
                 guard !key.isEmpty else { continue }
                 let fryingOil = IngredientCanonicalizer.isFryingOil(ing.raw)
-                var unit = fryingOil ? "cup" : (ing.unit == "each" ? "count" : (ing.unit ?? "count"))
+                var unit = IngredientCanonicalizer.shopUnit(for: ing, fryingOil: fryingOil)
                 var scaledQty = fryingOil ? 2.0 : (ing.quantity ?? 1) * factor
                 // Bad cookbook rows often leave "250g cheddar" in the item with count=1.
                 if !fryingOil,
@@ -1159,6 +1263,11 @@ enum GroceryConsolidator {
             qty = max(1, qty)
         }
 
+        // Canned fish / tofu / fillets — never a bare "1" beside the name.
+        let clarified = ShopFriendlyUnits.clarifyPurchaseUnit(name: name, quantity: qty, unit: unit)
+        qty = clarified.qty
+        unit = clarified.unit
+
         if unit == "count", category == "protein" || name.contains("chicken") || name.contains("artichoke") {
             qty = max(1, qty.rounded(.up))
         }
@@ -1266,6 +1375,22 @@ enum GroceryConsolidator {
             return "\(qty) head\(n == 1 ? "" : "s") \(safeName)"
         case "bag":
             return "\(qty) bag\(n == 1 ? "" : "s") \(safeName)"
+        case "can":
+            return "\(qty) can\(n == 1 ? "" : "s") \(safeName)"
+        case "jar":
+            return "\(qty) jar\(n == 1 ? "" : "s") \(safeName)"
+        case "package":
+            return "\(qty) package\(n == 1 ? "" : "s") \(safeName)"
+        case "fillet":
+            return "\(qty) fillet\(n == 1 ? "" : "s") \(safeName)"
+        case "block":
+            return "\(qty) block\(n == 1 ? "" : "s") \(safeName)"
+        case "bottle":
+            return "\(qty) bottle\(n == 1 ? "" : "s") \(safeName)"
+        case "clove":
+            return "\(qty) clove\(n == 1 ? "" : "s") \(safeName)"
+        case "slice":
+            return "\(qty) slice\(n == 1 ? "" : "s") \(safeName)"
         case "cup":
             return "\(qty) cup\(n == 1 ? "" : "s") \(safeName)"
         case "tbsp":

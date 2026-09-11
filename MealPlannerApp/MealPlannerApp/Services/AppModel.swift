@@ -307,9 +307,8 @@ final class AppModel: ObservableObject {
         profile: UserProfileEntity,
         modelContext: ModelContext
     ) async -> Bool {
-        guard let current = plan.meal(day: day, slot: .dinner),
-              let currentRecipe = recipeDB.recipe(id: current.recipeID)
-        else { return false }
+        let current = plan.meal(day: day, slot: .dinner)
+        let currentRecipe = current.flatMap { recipeDB.recipe(id: $0.recipeID) }
         let keep = plan.meals.filter { $0.slot == .dinner && $0.dayIndex != day }
             .compactMap { recipeDB.recipe(id: $0.recipeID) }
         let history = RecipeHistory.loadRecent(in: modelContext, withinDays: profile.recipeCooldownDays)
@@ -324,8 +323,54 @@ final class AppModel: ObservableObject {
             errorMessage = "No good swap found."
             return false
         }
+        return applyDinner(
+            day: day,
+            main: next,
+            plan: plan,
+            profile: profile,
+            modelContext: modelContext,
+            reason: currentRecipe == nil ? "Picked for this day." : "Rerolled for variety.",
+            scaledServings: current?.scaledServings
+        )
+    }
+
+    /// Manually substitute a day's dinner with a chosen recipe (search / browse).
+    @discardableResult
+    func replaceDinner(
+        day: Int,
+        recipeID: String,
+        plan: WeeklyPlan,
+        profile: UserProfileEntity,
+        modelContext: ModelContext
+    ) -> Bool {
+        guard let next = recipeDB.recipe(id: recipeID) else {
+            errorMessage = "Recipe not found."
+            return false
+        }
+        let current = plan.meal(day: day, slot: .dinner)
+        return applyDinner(
+            day: day,
+            main: next,
+            plan: plan,
+            profile: profile,
+            modelContext: modelContext,
+            reason: "Picked from cookbook.",
+            scaledServings: current?.scaledServings
+        )
+    }
+
+    /// Shared path for algorithmic reroll and manual cookbook substitute.
+    @discardableResult
+    private func applyDinner(
+        day: Int,
+        main: Recipe,
+        plan: WeeklyPlan,
+        profile: UserProfileEntity,
+        modelContext: ModelContext,
+        reason: String,
+        scaledServings: Int?
+    ) -> Bool {
         var meals = plan.meals
-        // Re-pair a side that fits the new main (don't keep a leftover mismatch).
         let usedKinds = Set(
             plan.meals.filter { $0.slot == .dinner && $0.dayIndex != day }
                 .compactMap { $0.sideRecipeID }
@@ -334,37 +379,40 @@ final class AppModel: ObservableObject {
         )
         let sidePool = recipeDB.allRecipes().filter {
             ($0.course == "side" || SideCatalog.match($0) != nil)
-                && $0.id != next.id
+                && $0.id != main.id
                 && !WeekPlanner.looksLikeBreakfast($0)
         }
         let newSide = sidePool.max { a, b in
             SideCatalog.score(
                 side: a,
-                mainProteins: WeekPlanner.flavor(next).proteins,
+                mainProteins: WeekPlanner.flavor(main).proteins,
                 usedKinds: usedKinds,
                 usedSideIDs: []
             ) < SideCatalog.score(
                 side: b,
-                mainProteins: WeekPlanner.flavor(next).proteins,
+                mainProteins: WeekPlanner.flavor(main).proteins,
                 usedKinds: usedKinds,
                 usedSideIDs: []
             )
         }
         let sideID = newSide?.id
-        let plate = MealNutrition.plate(main: next, side: newSide)
-        for i in meals.indices where meals[i].dayIndex == day && meals[i].slot == .dinner {
-            meals[i] = PlannedMeal(
-                dayIndex: day,
-                slot: .dinner,
-                recipeID: next.id,
-                reason: "Swapped in for variety.",
-                scaledServings: meals[i].scaledServings,
-                proteinG: plate.proteinG > 0 ? plate.proteinG : nil,
-                calories: plate.calories > 0 ? plate.calories : nil,
-                sideRecipeID: sideID
-            )
+        let plate = MealNutrition.plate(main: main, side: newSide)
+        let servings = scaledServings ?? profile.servingsPerRecipe
+        let replacement = PlannedMeal(
+            dayIndex: day,
+            slot: .dinner,
+            recipeID: main.id,
+            reason: reason,
+            scaledServings: servings,
+            proteinG: plate.proteinG > 0 ? plate.proteinG : nil,
+            calories: plate.calories > 0 ? plate.calories : nil,
+            sideRecipeID: sideID
+        )
+        if let idx = meals.firstIndex(where: { $0.dayIndex == day && $0.slot == .dinner }) {
+            meals[idx] = replacement
+        } else {
+            meals.append(replacement)
         }
-        // Drop any legacy leftover-lunch row for this day.
         meals.removeAll { $0.dayIndex == day && $0.slot == .lunch }
         let updated = WeeklyPlan(
             generatedAt: plan.generatedAt,

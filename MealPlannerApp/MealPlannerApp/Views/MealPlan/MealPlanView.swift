@@ -1,6 +1,11 @@
 import SwiftUI
 import SwiftData
 
+private struct SubstituteDay: Identifiable {
+    let day: Int
+    var id: Int { day }
+}
+
 struct MealPlanView: View {
     @EnvironmentObject private var appModel: AppModel
     @Environment(\.modelContext) private var modelContext
@@ -16,6 +21,8 @@ struct MealPlanView: View {
     /// Mon=0 … Sun=6 (same as `todayIndex` / plan dayIndex). Never use Calendar weekday (1…7).
     @State private var selectedDay = MealPlanView.mondayBasedDayIndex()
     @State private var swappingDay: Int?
+    /// Day whose dinner is being replaced via cookbook search.
+    @State private var substituteDay: Int?
     @State private var cachedPlan: WeeklyPlan?
     @State private var cachedRecipeLookup: [String: Recipe] = [:]
 
@@ -117,6 +124,31 @@ struct MealPlanView: View {
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(isPresented: $showBrowse) {
                 BrowseView()
+            }
+            .sheet(item: Binding(
+                get: { substituteDay.map { SubstituteDay(day: $0) } },
+                set: { substituteDay = $0?.day }
+            )) { item in
+                NavigationStack {
+                    BrowseView(
+                        onPick: { recipe in
+                            guard let plan = cachedPlan else { return }
+                            _ = appModel.replaceDinner(
+                                day: item.day,
+                                recipeID: recipe.id,
+                                plan: plan,
+                                profile: profile,
+                                modelContext: modelContext
+                            )
+                            substituteDay = nil
+                            refreshPlanCache()
+                        },
+                        pickTitle: "Substitute · \(dayLabel(item.day))",
+                        initialCourse: "main"
+                    )
+                }
+                .presentationDetents([.large])
+                .environmentObject(appModel)
             }
             .sheet(isPresented: $showShop, onDismiss: onShopDismiss) {
                 GroceryListView(profile: profile)
@@ -301,21 +333,36 @@ struct MealPlanView: View {
                     .accessibilityHint("Opens side recipe details")
                 }
 
-                HStack {
-                    Spacer()
+                HStack(spacing: Theme.Space.md) {
                     Button {
                         swappingDay = day
                         Task {
                             _ = await appModel.swapDinner(day: day, plan: plan, profile: profile, modelContext: modelContext)
                             swappingDay = nil
+                            refreshPlanCache()
                         }
                     } label: {
-                        if swappingDay == day { ProgressView() }
-                        else { Label("Swap", systemImage: "arrow.triangle.2.circlepath") }
+                        if swappingDay == day {
+                            ProgressView()
+                        } else {
+                            Label("Reroll", systemImage: "arrow.triangle.2.circlepath")
+                        }
                     }
                     .font(.caption.weight(.semibold))
-                    .accessibilityLabel("Swap dinner")
+                    .disabled(swappingDay != nil)
+                    .accessibilityLabel("Reroll dinner")
                     .accessibilityHint("Picks a different dinner recipe for this day")
+
+                    Button {
+                        substituteDay = day
+                    } label: {
+                        Label("Change", systemImage: "magnifyingglass")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .accessibilityLabel("Change dinner")
+                    .accessibilityHint("Search cookbooks and pick a recipe for this day")
+
+                    Spacer(minLength: 0)
                 }
             } else {
                 // Garmin/Oura empty meal: icon + title + muted cue + primary CTAs.
@@ -326,7 +373,7 @@ struct MealPlanView: View {
                             .font(Theme.display(.headline))
                             .foregroundStyle(Theme.ink)
                             .multilineTextAlignment(.center)
-                        Text("Pick a recipe or swap one in.")
+                        Text("Reroll a suggestion or search the cookbook.")
                             .font(.subheadline)
                             .foregroundStyle(Theme.muted)
                             .multilineTextAlignment(.center)
@@ -336,29 +383,31 @@ struct MealPlanView: View {
                                 Task {
                                     _ = await appModel.swapDinner(day: day, plan: plan, profile: profile, modelContext: modelContext)
                                     swappingDay = nil
+                                    refreshPlanCache()
                                 }
                             } label: {
                                 if swappingDay == day {
                                     ProgressView()
                                 } else {
-                                    Label("SWAP IN DINNER", systemImage: "arrow.triangle.2.circlepath")
+                                    Label("REROLL", systemImage: "arrow.triangle.2.circlepath")
                                         .font(.subheadline.weight(.bold))
                                         .tracking(0.3)
                                 }
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(Theme.cta)
+                            .disabled(swappingDay != nil)
                             .accessibilityHint("Picks a new dinner recipe for this day")
-                            Theme.SecondaryButton(title: "BROWSE", systemImage: "book") {
-                                showBrowse = true
+                            Theme.SecondaryButton(title: "SEARCH", systemImage: "magnifyingglass") {
+                                substituteDay = day
                             }
-                            .accessibilityHint("Browse cookbook to assign a recipe")
+                            .accessibilityHint("Search cookbooks and assign a recipe")
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Theme.Space.sm)
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("No dinner planned for \(day == todayIndex ? "tonight" : dayLabel(day)). Swap in dinner or browse cookbooks.")
+                    .accessibilityLabel("No dinner planned for \(day == todayIndex ? "tonight" : dayLabel(day)). Reroll or search cookbooks.")
                     .accessibilityHint("Choose an action below")
                 }
             }

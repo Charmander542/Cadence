@@ -34,10 +34,10 @@ enum CadenceSubAppRegistry {
             id: .spend,
             title: "Spend",
             systemImage: "creditcard",
-            blurb: "Bank purchases via Teller, categorize, and track cost-per-use.",
+            blurb: "Bank purchases via Plaid, categorize, and track cost-per-use.",
             wheelDestination: .spend,
             settingsRoute: .spend,
-            docsPath: "docs/TELLER_SETUP.md"
+            docsPath: "docs/PLAID_SETUP.md"
         ),
         CadenceSubAppManifest(
             id: .health,

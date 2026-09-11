@@ -242,8 +242,9 @@ enum WeekPlanner {
     }
 
     /// Swap one main for the next-best unused candidate.
+    /// Pass `current: nil` to fill an empty day (still avoids other week mains + cooldown).
     static func swapMain(
-        current: Recipe,
+        current: Recipe?,
         keep: [Recipe],
         store: RecipeDatabase,
         profile: UserProfileEntity,
@@ -253,12 +254,14 @@ enum WeekPlanner {
         let diet = settings.dietKey
         let complexity = RecipeComplexity.clamped(settings.cookingComplexity)
         let preferredProteins = preferredCoreProteins(diet: diet)
+        var banned = bannedIDs
+        if let current { banned.insert(current.id) }
         let candidates = candidatePool(
             store.allRecipes(),
             course: "main",
             diet: diet,
             exclude: settings.dislikes,
-            banned: bannedIDs.union([current.id]),
+            banned: banned,
             sources: Set(settings.enabledSources.map { $0.lowercased() }),
             complexity: complexity,
             minCount: 24,

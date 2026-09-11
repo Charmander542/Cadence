@@ -168,6 +168,9 @@ enum ShoppingRealism {
             return item.quantity <= 1
         case .taste:
             return true
+        case .package:
+            // Cans / fillets / packages are real shop lines, never garnish.
+            return false
         }
     }
 

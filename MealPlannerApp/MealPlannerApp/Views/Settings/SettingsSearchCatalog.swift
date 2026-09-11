@@ -53,7 +53,7 @@ struct SettingsSearchMatch: Identifiable {
             route: .spend,
             title: "Spend",
             subtitle: "Bank purchases, categories, and cost-per-use",
-            keywords: "spend budget teller bank purchases transactions cost per use tracking money"
+            keywords: "spend budget plaid bank card purchases transactions cost per use tracking money"
         ),
         SettingsSearchMatch(
             route: .health,

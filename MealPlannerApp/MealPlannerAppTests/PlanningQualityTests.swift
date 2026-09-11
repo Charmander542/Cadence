@@ -633,7 +633,21 @@ final class PlanningQualityTests: XCTestCase {
         let steaks = try! XCTUnwrap(clean.first { $0.ingredientName == "beef steak" })
         XCTAssertEqual(steaks.quantity, 8, accuracy: 0.1)
         let salmon = try! XCTUnwrap(clean.first { $0.ingredientName == "salmon" })
+        XCTAssertEqual(salmon.unit, "fillet")
         XCTAssertEqual(salmon.quantity, 2, accuracy: 0.1)
+
+        let canned: [ConsolidatedGroceryItem] = [
+            .init(ingredientName: "tuna", category: "protein", quantity: 1, unit: "count", isApproximate: false, note: "", isChecked: false, isManual: false),
+            .init(ingredientName: "1 can tuna", category: "protein", quantity: 1, unit: "can", isApproximate: false, note: "", isChecked: false, isManual: false),
+            .init(ingredientName: "tofu", category: "protein", quantity: 1, unit: "count", isApproximate: false, note: "", isChecked: false, isManual: false),
+        ]
+        let cannedClean = GroceryConsolidator.finalizeForShopping(canned)
+        let tuna = try! XCTUnwrap(cannedClean.first { $0.ingredientName == "tuna" })
+        XCTAssertEqual(tuna.unit, "can")
+        XCTAssertEqual(tuna.quantity, 2, accuracy: 0.1)
+        XCTAssertTrue(GroceryConsolidator.displayText(tuna).localizedCaseInsensitiveContains("can"))
+        let tofu = try! XCTUnwrap(cannedClean.first { $0.ingredientName == "tofu" })
+        XCTAssertEqual(tofu.unit, "package")
     }
 
     // MARK: - Dinner-only + realism

@@ -2,9 +2,14 @@ import Foundation
 
 enum SpendPreferences {
     private static let enabledKey = "spend_subapp_enabled"
-    private static let appIDKey = "teller_application_id"
-    private static let environmentKey = "teller_environment"
+    private static let clientIDKey = "plaid_client_id"
+    private static let environmentKey = "plaid_environment"
+    private static let redirectURIKey = "plaid_redirect_uri"
     private static let demoSeededKey = "spend_demo_seeded"
+    private static let clientUserIDKey = "plaid_client_user_id"
+
+    /// Prefill only — not a secret. Secret stays in Keychain / PlaidLocal.plist.
+    static let defaultClientID = "6aa4147dd8c4dd000dcfc579"
 
     static var isEnabled: Bool {
         get {
@@ -17,31 +22,57 @@ enum SpendPreferences {
         }
     }
 
-    /// Teller Connect `applicationId`. Prefer Info.plist `TellerApplicationID` in release builds.
-    static var applicationID: String {
+    /// Plaid `client_id`. Prefer Info.plist `PlaidClientID`, then UserDefaults, then bundled default.
+    static var clientID: String {
         get {
-            if let plist = Bundle.main.object(forInfoDictionaryKey: "TellerApplicationID") as? String,
+            if let plist = Bundle.main.object(forInfoDictionaryKey: "PlaidClientID") as? String,
                !plist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                !plist.contains("YOUR_") {
                 return plist
             }
-            return UserDefaults.standard.string(forKey: appIDKey) ?? ""
+            let stored = UserDefaults.standard.string(forKey: clientIDKey)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !stored.isEmpty { return stored }
+            return defaultClientID
         }
-        set { UserDefaults.standard.set(newValue, forKey: appIDKey) }
+        set { UserDefaults.standard.set(newValue, forKey: clientIDKey) }
     }
 
-    enum TellerEnvironment: String, CaseIterable, Identifiable {
-        case sandbox, development, production
+    enum PlaidEnvironment: String, CaseIterable, Identifiable {
+        case sandbox
+        case production
+
         var id: String { rawValue }
         var title: String { rawValue.capitalized }
+        var apiHost: String {
+            switch self {
+            case .sandbox: return "https://sandbox.plaid.com"
+            case .production: return "https://production.plaid.com"
+            }
+        }
     }
 
-    static var environment: TellerEnvironment {
+    static var environment: PlaidEnvironment {
         get {
-            let raw = UserDefaults.standard.string(forKey: environmentKey) ?? TellerEnvironment.sandbox.rawValue
-            return TellerEnvironment(rawValue: raw) ?? .sandbox
+            let raw = UserDefaults.standard.string(forKey: environmentKey) ?? PlaidEnvironment.production.rawValue
+            return PlaidEnvironment(rawValue: raw) ?? .production
         }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: environmentKey) }
+    }
+
+    /// Universal Link registered in the Plaid Dashboard (required for many OAuth banks).
+    static var redirectURI: String {
+        get { UserDefaults.standard.string(forKey: redirectURIKey) ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: redirectURIKey) }
+    }
+
+    /// Stable per-install user id for `/link/token/create`.
+    static var clientUserID: String {
+        if let existing = UserDefaults.standard.string(forKey: clientUserIDKey), !existing.isEmpty {
+            return existing
+        }
+        let id = "cadence-\(UUID().uuidString.lowercased())"
+        UserDefaults.standard.set(id, forKey: clientUserIDKey)
+        return id
     }
 
     static var hasDemoSeed: Bool {
@@ -50,6 +81,32 @@ enum SpendPreferences {
     }
 
     static var isConfigured: Bool {
-        !applicationID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !(KeychainStore.loadPlaidSecret()?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+    }
+
+    /// Loads gitignored `PlaidLocal.plist` once into prefs/Keychain (local only).
+    static func ingestLocalSecretsIfNeeded() {
+        guard let url = Bundle.main.url(forResource: "PlaidLocal", withExtension: "plist"),
+              let dict = NSDictionary(contentsOf: url) as? [String: Any] else { return }
+
+        if let id = dict["client_id"] as? String,
+           !id.isEmpty,
+           !id.contains("YOUR_") {
+            clientID = id
+        }
+        if let secret = dict["secret"] as? String,
+           !secret.isEmpty,
+           !secret.contains("YOUR_"),
+           (KeychainStore.loadPlaidSecret() ?? "").isEmpty {
+            try? KeychainStore.savePlaidSecret(secret)
+        }
+        if let env = dict["environment"] as? String,
+           let parsed = PlaidEnvironment(rawValue: env.lowercased()) {
+            environment = parsed
+        }
+        if let redirect = dict["redirect_uri"] as? String {
+            redirectURI = redirect
+        }
     }
 }

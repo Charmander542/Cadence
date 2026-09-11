@@ -31,8 +31,8 @@ struct MealPlannerApp: App {
             NewsArticleEntity.self,
             NewsBriefingEntity.self,
         ])
-        // v6: News daily digest (RSS + optional AI briefs).
-        let config = ModelConfiguration("musclemeal-v6", isStoredInMemoryOnly: false)
+        // v7: Spend Plaid enrollments (sync cursor).
+        let config = ModelConfiguration("musclemeal-v7", isStoredInMemoryOnly: false)
         do {
             return try ModelContainer(for: schema, configurations: [config])
         } catch {
@@ -64,6 +64,7 @@ struct MealPlannerApp: App {
                 }
                 .task {
                     await Task.yield()
+                    SpendPreferences.ingestLocalSecretsIfNeeded()
                     let context = sharedModelContainer.mainContext
                     PlannerStore.seedIfNeeded(in: context)
                     Pantry.seedIfNeeded(in: context)

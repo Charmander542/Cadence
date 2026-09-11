@@ -25,7 +25,7 @@ MealPlannerApp/MealPlannerApp/
 ## Rules
 
 - Do not put Spend/Health/News logic in meal planning or `WorkoutIntegration`.
-- Do not embed Teller mTLS keys or news API secrets in the app binary.
+- Do not embed Plaid secrets, Teller mTLS keys, or news API secrets in the app binary (Keychain / gitignored local plist only).
 - Visibility for **all** dial apps (Meals, Workout, Habits, Spend, …) uses `CadenceAppsPreferences` — swipe-up **Edit** / hold-to-edit grid + **Settings → Apps & wheel**.
 - Optional module manifests still live in `CadenceSubAppRegistry`; `isWheelEnabled` delegates to apps prefs.
 - Orange = nav/selection; blue = primary CTAs.
@@ -34,7 +34,7 @@ MealPlannerApp/MealPlannerApp/
 
 | Module | Status | Docs |
 |--------|--------|------|
-| **Spend** | Purchases + cost-per-use; Teller sandbox | `docs/TELLER_SETUP.md` |
+| **Spend** | Purchases + cost-per-use; Plaid Link | `docs/PLAID_SETUP.md` |
 | **Health** | Bevel-like rings; HealthKit + demo | `docs/APPLE_HEALTH_SETUP.md` |
 | **News** | Daily top-10 RSS + optional AI briefs + images | `docs/NEWS_SETUP.md` |
 

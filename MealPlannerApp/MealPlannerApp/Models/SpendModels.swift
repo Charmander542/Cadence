@@ -96,13 +96,16 @@ enum SpendUseMode: String, CaseIterable, Identifiable, Codable {
 @Model
 final class SpendEnrollmentEntity {
     var id: UUID = UUID()
-    /// Opaque Teller enrollment / access-token reference (never log raw tokens).
+    /// Opaque Plaid Item access-token Keychain account (never log raw tokens).
     var accessTokenKeychainAccount: String = ""
     var institutionName: String = ""
+    /// Plaid `item_id`.
     var enrollmentID: String = ""
     var connectedAt: Date = Date()
     var lastSyncedAt: Date?
     var isSandbox: Bool = true
+    /// `/transactions/sync` cursor for this Item.
+    var syncCursor: String = ""
 
     init(
         accessTokenKeychainAccount: String,
@@ -121,7 +124,7 @@ final class SpendEnrollmentEntity {
 @Model
 final class SpendTransactionEntity {
     var id: UUID = UUID()
-    /// Stable Teller transaction id when synced; local UUID string for manual rows.
+    /// Stable Plaid `transaction_id` when synced; local UUID string for manual rows.
     var remoteID: String = ""
     var accountName: String = ""
     var merchant: String = ""
