@@ -117,7 +117,7 @@ struct MainTabView: View {
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
                     RoundedRectangle(cornerRadius: Theme.Radius.xl + 4, style: .continuous)
-                        .fill(Theme.surface.opacity(min(0.95, wheelExpandPull / 120)))
+                        .fill(Theme.surface.opacity(min(1, wheelExpandPull / 100)))
                         .frame(height: min(wheelExpandPull * 0.85, 160))
                         .overlay(alignment: .top) {
                             Capsule()
@@ -331,20 +331,8 @@ struct MainTabView: View {
             expandPull: $wheelExpandPull,
             onSelect: handleWheelSelect
         )
-        // Soft fade so content remains readable under the dial — not a solid chrome bar.
-        // Keep fade inside the fixed dial bounds so safeAreaInset height never changes.
-        .background(
-            LinearGradient(
-                colors: [
-                    Theme.canvas.opacity(0),
-                    Theme.canvas.opacity(0.35),
-                    Theme.canvas.opacity(0.55),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .allowsHitTesting(false)
-        )
+        // Same charcoal plate as the swipe-up tile menu — solid, no fade gradient.
+        .background(Theme.surface.allowsHitTesting(false))
         .zIndex(2)
     }
 

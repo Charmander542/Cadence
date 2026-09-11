@@ -73,6 +73,8 @@ struct CalendarPlannerView: View {
                     focusScope
                 }
             }
+            .contentShape(Rectangle())
+            .simultaneousGesture(calendarDateSwipeGesture)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.canvas.ignoresSafeArea())
@@ -284,6 +286,20 @@ struct CalendarPlannerView: View {
         case .day:
             cursor = cal.date(byAdding: .day, value: dir, to: cursor) ?? cursor
         }
+    }
+
+    /// Swipe left → next period; swipe right → previous (matches header chevrons).
+    private var calendarDateSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 28)
+            .onEnded { value in
+                let dx = value.translation.width
+                let dy = value.translation.height
+                // Prefer horizontal; ignore mostly-vertical scrolls (hour grid / year list).
+                guard abs(dx) > 48, abs(dx) > abs(dy) * 1.25 else { return }
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    shift(dx < 0 ? 1 : -1)
+                }
+            }
     }
 
     private func openNewEvent(at start: Date) {

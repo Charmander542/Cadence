@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// Garmin Edit Tabs × X Custom navigation — show/hide modules and reorder the dial.
+/// Garmin Edit Tabs × WHOOP overview lists — show/hide modules and reorder the dial.
 struct AppsSettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var profile: UserProfileEntity
@@ -10,16 +10,7 @@ struct AppsSettingsView: View {
     @State private var statusMessage: String?
 
     var body: some View {
-        List {
-            Section {
-                SettingsPageHero(
-                    systemImage: "square.grid.2x2",
-                    title: "Apps & wheel",
-                    subtitle: "Choose what’s on the dial. Today stays pinned. Hold empty space in the swipe-up grid to edit and drag.",
-                    tint: Theme.accent
-                )
-            }
-
+        Form {
             Section {
                 ForEach(appsModel.orderedConfigurableVisible, id: \.rawValue) { dest in
                     appRow(dest, visible: true)
@@ -29,8 +20,7 @@ struct AppsSettingsView: View {
             } header: {
                 settingsDetailSectionHeader("On the dial")
             } footer: {
-                Text("Tap Edit to reorder. Minus or swipe removes from the dial (data is kept).")
-                    .accessibilityAddTraits(.isStaticText)
+                settingsDetailIntro("Today stays pinned. Tap Edit to reorder. Minus or swipe hides an app (data is kept). Lift lives under Body.")
             }
 
             if !appsModel.hiddenConfigurable.isEmpty {
@@ -50,9 +40,7 @@ struct AppsSettingsView: View {
                     Task { await PlannerSyncCoordinator.shared.refreshAll(in: modelContext) }
                     statusMessage = "Defaults restored."
                 } label: {
-                    Label("Restore defaults", systemImage: "arrow.counterclockwise")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.cta)
+                    settingsCTALabel("Restore defaults", systemImage: "arrow.counterclockwise")
                 }
                 .accessibilityHint("Shows all apps on the dial in the default order")
             }
@@ -65,6 +53,7 @@ struct AppsSettingsView: View {
             }
         }
         .navigationTitle("Apps & wheel")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 EditButton()
@@ -88,7 +77,14 @@ struct AppsSettingsView: View {
                     .foregroundStyle(visible ? Color.red.opacity(0.9) : Theme.cta)
                     .accessibilityHidden(true)
 
-                Theme.IconWell(systemImage: item.systemImage, tint: Theme.accent, size: 36)
+                ZStack {
+                    Circle().fill(Theme.accent)
+                    Image(systemName: item.systemImage)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 32, height: 32)
+                .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.label)
@@ -100,7 +96,9 @@ struct AppsSettingsView: View {
                         .lineLimit(2)
                 }
                 Spacer(minLength: 0)
-                Theme.MetaPill(text: visible ? "On dial" : "Add", tone: visible ? .accent : .cta)
+                Text(visible ? "On" : "Add")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Theme.muted)
             }
         }
         .buttonStyle(.plain)

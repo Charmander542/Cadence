@@ -123,9 +123,9 @@ struct WheelNav: View {
     // MARK: - Shared chrome (flat pill when idle)
 
     private var menuChrome: some View {
-        // Soft pill — avoid a near-opaque black plate that makes idle icons look brighter than the wheel.
+        // Match tile-menu charcoal (`Theme.surface`) so idle and expanded chrome share one plate.
         Capsule(style: .continuous)
-            .fill(Color.black.opacity(0.45))
+            .fill(Theme.surface)
             .frame(width: flatPillWidth, height: 78)
             .opacity(idleAmount)
             .offset(y: 3)

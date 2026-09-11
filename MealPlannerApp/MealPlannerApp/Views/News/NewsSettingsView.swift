@@ -14,15 +14,6 @@ struct NewsSettingsView: View {
     var body: some View {
         Form {
             Section {
-                SettingsPageHero(
-                    systemImage: "newspaper",
-                    title: "News digest",
-                    subtitle: "Ten stories a day from public RSS. Optional AI briefs use your Settings → AI key.",
-                    tint: Theme.cta
-                )
-            }
-
-            Section {
                 Toggle("Show News on wheel", isOn: $enabled)
                     .tint(Theme.cta)
                     .onChange(of: enabled) { _, value in
@@ -30,7 +21,9 @@ struct NewsSettingsView: View {
                         showStatus(value ? "News shown on dial." : "News hidden from dial.", tone: .neutral)
                     }
             } header: {
-                settingsDetailSectionHeader("Sub-app")
+                settingsDetailSectionHeader("On dial")
+            } footer: {
+                settingsDetailIntro("Ten stories a day from public RSS. Optional AI briefs use your AI key.")
             }
 
             Section {
@@ -39,27 +32,23 @@ struct NewsSettingsView: View {
                     .onChange(of: autoAI) { _, value in
                         NewsPreferences.autoSummarizeWithAI = value
                     }
-                Text(NewsPreferences.hasAIKey
-                     ? "Using \(KeychainStore.selectedProvider.title) from Settings → AI."
-                     : "Add an AI key in Settings → AI to rewrite digests. Feeds still work without it.")
-                    .font(.footnote)
-                    .foregroundStyle(Theme.muted)
-                    .accessibilityAddTraits(.isStaticText)
 
-                if !NewsPreferences.hasAIKey {
+                if NewsPreferences.hasAIKey {
+                    LabeledContent("Provider", value: KeychainStore.selectedProvider.title)
+                } else {
+                    Text("Add an AI key under Connections → AI to rewrite digests. Feeds still work without it.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .accessibilityAddTraits(.isStaticText)
                     NavigationLink(value: SettingsRoute.ai) {
-                        Label("Open AI settings", systemImage: "sparkles")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.cta)
+                        settingsCTALabel("Open AI settings", systemImage: "sparkles")
                     }
                 }
 
                 Button {
                     Task { await refresh() }
                 } label: {
-                    Label(busy ? "Working…" : "Refresh today’s 10", systemImage: "arrow.clockwise")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.cta)
+                    settingsCTALabel(busy ? "Working…" : "Refresh today’s 10", systemImage: "arrow.clockwise")
                 }
                 .disabled(busy)
                 .accessibilityHint("Fetches RSS feeds and optionally runs AI digests")
@@ -77,15 +66,12 @@ struct NewsSettingsView: View {
                     )
                     showStatus("Demo slate loaded.")
                 } label: {
-                    Label("Reload demo slate", systemImage: "sparkles")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.cta)
+                    settingsCTALabel("Reload demo slate", systemImage: "sparkles")
                 }
             } header: {
                 settingsDetailSectionHeader("Digest")
             } footer: {
-                Text("Stories come from public RSS (BBC, NPR, NASA, ScienceDaily, The Verge, CNBC, Smithsonian). See docs/NEWS_SETUP.md.")
-                    .accessibilityAddTraits(.isStaticText)
+                settingsDetailIntro("Sources: BBC, NPR, NASA, ScienceDaily, The Verge, CNBC, Smithsonian. See docs/NEWS_SETUP.md.")
             }
 
             if let status {
@@ -96,6 +82,7 @@ struct NewsSettingsView: View {
             }
         }
         .navigationTitle("News")
+        .navigationBarTitleDisplayMode(.inline)
         .settingsFormChrome()
         .onAppear {
             enabled = NewsPreferences.isEnabled

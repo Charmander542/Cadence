@@ -2389,14 +2389,45 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 | Field | Value |
 |-------|-------|
 | **Phase** | `RUNNING` |
-| **Next batch** | **JC** |
-| **Summary** | Body dial merges Health+Lift; Bevel-style scores + richer HealthKit sync. Continuing JC. |
+| **Next batch** | **JJ** |
+| **Summary** | Settings sub-pages Mobbin-cleaned (no heroes; intro footers; inline titles). Hub + details cohesive. Continuing JJ. |
 
-### Batch JC — Continue UX loop
+### Batch JJ — Continue UX loop
 
 - [ ] **Next Mobbin friction**.
 - [ ] **Implement + screenshot**.
 - [ ] **Append**.
+
+### Batch JH — Settings sub-pages Mobbin cleanup (user)
+
+- [x] **Detail chrome** — remove fat heroes; intro as first-section footer; `.inline` titles; `settingsCTALabel` CTAs. — 2026-09-10
+  → Refs: [Gentler Streak](https://mobbin.com/screens/07d9ec6a-cb0e-4cb3-9a3c-4505d32f74ab), [Telegram Data](https://mobbin.com/screens/454ba629-4f5e-4c00-ae0a-a0fa1c4325ee), [Future Pro](https://mobbin.com/screens/89b8a60f-b3fc-4dc9-beba-8c329632d511), [Wispr Flow](https://mobbin.com/screens/af36a034-bc88-48f0-90eb-8af699250f0d).
+- [x] **All sub-pages** — You, Meals, AI, Apps & wheel, Body, Spend, News, Reminders, Calendar. Titles match hub; “Sub-app” → “On dial”. — 2026-09-10
+  → Fix: `SettingsDetailViews`, `AppsSettingsView`, `HealthSettingsView`, `SpendSettingsView`, `NewsSettingsView`, `PlannerIntegrationsSettings`.
+  → Verified: 2026-09-10 sim — You / Apps / Body / Reminders / Calendar (no heroes, intro footers, inline titles).
+
+### Batch JI — Settings Mobbin redesign (user: MCP live)
+
+- [x] **Hub layout from Mobbin** — Amie profile card + colorful icon rows; Apple Fitness App / Modules / Connections groups; Calm version footer. — 2026-09-10
+  → Refs: [Amie](https://mobbin.com/screens/fc4d99c1-9a44-45a3-96e7-856a2ffa5909), [Apple Fitness](https://mobbin.com/screens/f618bfa8-e996-4cb6-b7b8-f138e29963b1), [Calm Settings](https://mobbin.com/flows/67004e47-8f00-4733-8c99-a650dd06a368).
+- [x] **Rows + heroes** — saturated circular glyphs + trailing status text; compact Bevel-style page heroes (blurb only). — 2026-09-10
+- [x] **No duplicate pages** — You / Meals / Apps canonical destinations retained. — 2026-09-10
+
+### Batch JF — Continue UX loop
+
+- [x] **Superseded by JI** — 2026-09-10.
+
+### Batch JG — Settings cohesion (user: Mobbin MCP + no doubles)
+
+- [x] **Deduped Settings destinations** — 2026-09-10.
+  → Fix: Profile+Nutrition → **You**; Meals+Recipes → **Meals**; Lift visibility → Apps & wheel only. Legacy routes canonicalize.
+- [x] **Hub layout** — Oura/Fitness style: profile card only (no second You row), Apps + Connections + About; removed quick chips. — 2026-09-10
+  → Note: Mobbin MCP plugin installed but server not connected in session; used backlog Oura/Fitness patterns.
+- [x] **Search catalog** — single entry per destination; nutrition/recipes/lift keywords map to You/Meals/Apps. — 2026-09-10
+
+### Batch JC — Continue UX loop
+
+- [x] **Superseded by JG / JE** — 2026-09-10.
 
 ### Batch JE — Body = Health + Workout (user)
 

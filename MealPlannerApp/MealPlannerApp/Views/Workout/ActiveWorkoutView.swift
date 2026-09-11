@@ -20,11 +20,11 @@ struct ActiveWorkoutView: View {
         Group {
             if isSaving || showDoneSheet {
                 savingPlaceholder
-            } else if let live = appModel.liveWorkout {
+            } else             if let live = appModel.liveWorkout {
                 LiveWorkoutScreen(
                     live: live,
                     isSaving: isSaving,
-                    onBack: { showCancelConfirm = true },
+                    onBack: { leaveWorkout(live: live) },
                     onFinish: { attemptFinish() },
                     onSetCompleted: { restSec in
                         appModel.startRest(seconds: restSec)
@@ -109,11 +109,21 @@ struct ActiveWorkoutView: View {
         .accessibilityAddTraits(.updatesFrequently)
     }
 
+    /// Empty sessions dismiss immediately; sessions with logged sets ask before leaving.
+    private func leaveWorkout(live: LiveWorkoutController) {
+        if live.completedSetCount == 0 {
+            appModel.clearLiveWorkout()
+            dismiss()
+            return
+        }
+        showCancelConfirm = true
+    }
+
     private func attemptFinish() {
         guard let live = appModel.liveWorkout, !isSaving else { return }
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         if live.completedSetCount == 0 {
-            showCancelConfirm = true
+            leaveWorkout(live: live)
             return
         }
         if live.completedSetCount < live.totalSetCount {
@@ -277,7 +287,11 @@ private struct LiveWorkoutScreen: View {
                         .frame(width: 32, height: 32)
                 }
                 .accessibilityLabel("Leave workout")
-                .accessibilityHint("Exit and keep progress, or discard the session")
+                .accessibilityHint(
+                    live.completedSetCount == 0
+                        ? "Closes this empty workout"
+                        : "Exit and keep progress, or discard the session"
+                )
 
                 Label(formatElapsed(elapsed), systemImage: "stopwatch")
                     .font(.subheadline.monospacedDigit().weight(.semibold))

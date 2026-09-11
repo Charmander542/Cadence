@@ -2,9 +2,12 @@ import Foundation
 
 enum SettingsRoute: Hashable {
     case profile
+    /// Legacy — opens the merged You page (profile + nutrition).
     case nutrition
     case meals
+    /// Legacy — opens the merged Meals page.
     case recipes
+    /// Legacy — opens Apps & wheel (lift visibility lives there).
     case lift
     case apps
     case spend
@@ -22,46 +25,33 @@ struct SettingsSearchMatch: Identifiable {
     let subtitle: String
     let keywords: String
 
+    /// Routes shown on the Settings hub (no duplicate pages).
+    static let hubRoutes: [SettingsRoute] = [
+        .profile, .apps, .meals, .health, .spend, .news, .reminders, .calendar, .ai,
+    ]
+
     static let catalog: [SettingsSearchMatch] = [
         SettingsSearchMatch(
             route: .profile,
-            title: "Profile & goals",
-            subtitle: "Weight, height, age, activity, and goals",
-            keywords: "profile weight height age sex activity goal metric imperial recalculate macros"
-        ),
-        SettingsSearchMatch(
-            route: .nutrition,
-            title: "Nutrition targets",
-            subtitle: "Calories, protein, BMR, and TDEE",
-            keywords: "nutrition calories protein carbs fat bmr tdee targets macros"
+            title: "You",
+            subtitle: "Weight, goals, calories, protein, BMR, and TDEE",
+            keywords: "profile you weight height age sex activity goal metric imperial recalculate macros nutrition calories protein carbs fat bmr tdee targets units"
         ),
         SettingsSearchMatch(
             route: .meals,
-            title: "Meals & cooking",
-            subtitle: "Diet, tools, cookbooks, and complexity",
-            keywords: "meals diet cooking complexity servings tools cookbooks restrictions skip foods"
-        ),
-        SettingsSearchMatch(
-            route: .recipes,
-            title: "Recipes & weekly plan",
-            subtitle: "Browse cookbooks and regenerate your plan",
-            keywords: "recipes plan weekly regenerate browse cookbooks shop grocery"
-        ),
-        SettingsSearchMatch(
-            route: .lift,
-            title: "Lift & workouts",
-            subtitle: "Show or hide the workout schedule",
-            keywords: "lift workout dumbbell schedule countdown training"
+            title: "Meals",
+            subtitle: "Diet, cookbooks, tools, and regenerate the weekly plan",
+            keywords: "meals diet cooking complexity servings tools cookbooks restrictions skip foods recipes plan weekly regenerate browse shop grocery"
         ),
         SettingsSearchMatch(
             route: .apps,
             title: "Apps & wheel",
-            subtitle: "Choose which apps appear on the dial",
-            keywords: "apps wheel customize navigation tabs hide meals workout spend health news grid edit"
+            subtitle: "Choose which apps appear on the dial, including Lift",
+            keywords: "apps wheel customize navigation tabs hide meals workout lift dumbbell spend health news grid edit schedule"
         ),
         SettingsSearchMatch(
             route: .spend,
-            title: "Spend & Teller",
+            title: "Spend",
             subtitle: "Bank purchases, categories, and cost-per-use",
             keywords: "spend budget teller bank purchases transactions cost per use tracking money"
         ),
@@ -69,11 +59,11 @@ struct SettingsSearchMatch: Identifiable {
             route: .health,
             title: "Body",
             subtitle: "Strain, recovery, sleep, Apple Health, and Lift",
-            keywords: "health body apple healthkit recovery strain sleep hrv heart energy bevel vitals workout lift dumbbell"
+            keywords: "health body apple healthkit recovery strain sleep hrv heart energy bevel vitals workout lift"
         ),
         SettingsSearchMatch(
             route: .news,
-            title: "News digest",
+            title: "News",
             subtitle: "Daily top stories, AI briefs, and article links",
             keywords: "news digest rss headlines science world ai summarize articles briefing"
         ),
@@ -85,7 +75,7 @@ struct SettingsSearchMatch: Identifiable {
         ),
         SettingsSearchMatch(
             route: .calendar,
-            title: "Calendar sync",
+            title: "Calendar",
             subtitle: "Apple Calendar and Google Calendar export",
             keywords: "calendar sync apple google export events tasks workouts meals integration"
         ),

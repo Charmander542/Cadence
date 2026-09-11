@@ -1,7 +1,9 @@
 import SwiftUI
 import SwiftData
 
-/// Settings hub — Apple Fitness pattern: profile card + searchable stacked categories.
+/// Settings hub — Mobbin: [Amie](https://mobbin.com/screens/fc4d99c1-9a44-45a3-96e7-856a2ffa5909)
+/// profile card + USER/APP sections; [Apple Fitness](https://mobbin.com/screens/f618bfa8-e996-4cb6-b7b8-f138e29963b1)
+/// grouped cards; no duplicate destinations.
 struct SettingsView: View {
     @EnvironmentObject private var appModel: AppModel
     @Environment(\.dismiss) private var dismiss
@@ -9,190 +11,168 @@ struct SettingsView: View {
     @State private var path = NavigationPath()
     @State private var searchText = ""
 
+    private var isSearching: Bool {
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var body: some View {
         NavigationStack(path: $path) {
             Form {
-                if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if !isSearching {
                     Section {
-                        NavigationLink(value: SettingsRoute.profile) {
-                            profileCard
-                        }
-                        .listRowInsets(EdgeInsets(top: Theme.Space.sm, leading: Theme.Space.md, bottom: Theme.Space.sm, trailing: Theme.Space.md))
-                        .listRowBackground(Color.clear)
-                    }
-
-                    Section {
-                        SettingsQuickTweaks(path: $path)
+                        settingsLink(.profile) { profileCard }
+                            .listRowInsets(EdgeInsets(
+                                top: Theme.Space.md,
+                                leading: Theme.Space.md,
+                                bottom: Theme.Space.sm,
+                                trailing: Theme.Space.md
+                            ))
+                            .listRowBackground(Color.clear)
                     }
                 }
 
-                if showsSection(.you) {
+                if isSearching, matches(.profile) {
                     Section {
-                        if matches(.profile) {
-                            NavigationLink(value: SettingsRoute.profile) {
-                                SettingsCategoryRow(
-                                    title: "Profile & goals",
-                                    subtitle: profileGoalsSubtitle,
-                                    systemImage: "person.crop.circle",
-                                    tint: Theme.accent
-                                )
-                            }
-                        }
-                        if matches(.nutrition) {
-                            NavigationLink(value: SettingsRoute.nutrition) {
-                                SettingsCategoryRow(
-                                    title: "Nutrition targets",
-                                    subtitle: nutritionSubtitle,
-                                    systemImage: "chart.bar.doc.horizontal",
-                                    tint: Theme.cta,
-                                    status: "\(Int(profile.targetCalories.rounded())) kcal",
-                                    statusTone: .cta
-                                )
-                            }
+                        settingsLink(.profile) {
+                            SettingsCategoryRow(
+                                title: "You",
+                                subtitle: profileGoalsSubtitle,
+                                systemImage: "person.fill",
+                                tint: Theme.accent,
+                                status: "\(Int(profile.targetCalories.rounded())) kcal"
+                            )
                         }
                     } header: {
                         settingsSectionHeader("You")
                     }
                 }
 
-                if showsSection(.apps) {
+                // Amie "APP SETTINGS" + Fitness "Health & Data" — dial + meals first
+                if showsSection(.app) {
                     Section {
                         if matches(.apps) {
-                            NavigationLink(value: SettingsRoute.apps) {
+                            settingsLink(.apps) {
                                 SettingsCategoryRow(
                                     title: "Apps & wheel",
                                     subtitle: appsSubtitle,
                                     systemImage: "square.grid.2x2",
                                     tint: Theme.accent,
-                                    status: "\(CadenceAppsPreferences.orderedVisibleDialDestinations.count)",
-                                    statusTone: .accent
+                                    status: "\(CadenceAppsPreferences.orderedVisibleDialDestinations.count)"
                                 )
                             }
                         }
                         if matches(.meals) {
-                            NavigationLink(value: SettingsRoute.meals) {
+                            settingsLink(.meals) {
                                 SettingsCategoryRow(
-                                    title: "Meals & cooking",
+                                    title: "Meals",
                                     subtitle: mealsSubtitle,
                                     systemImage: "fork.knife",
-                                    tint: Theme.cta
+                                    tint: Color(red: 0.95, green: 0.55, blue: 0.2)
                                 )
                             }
                         }
-                        if matches(.recipes) {
-                            NavigationLink(value: SettingsRoute.recipes) {
-                                SettingsCategoryRow(
-                                    title: "Recipes & weekly plan",
-                                    subtitle: recipesSubtitle,
-                                    systemImage: "book.closed",
-                                    tint: Theme.accent
-                                )
-                            }
-                        }
-                        if matches(.lift) {
-                            NavigationLink(value: SettingsRoute.lift) {
-                                SettingsCategoryRow(
-                                    title: "Lift & workouts",
-                                    subtitle: liftSubtitle,
-                                    systemImage: "dumbbell",
-                                    tint: Theme.accent,
-                                    status: CadenceAppsPreferences.isVisible(.workout) && profile.workoutsEnabled ? "On" : "In Body",
-                                    statusTone: .accent
-                                )
-                            }
-                        }
-                        if matches(.spend) {
-                            NavigationLink(value: SettingsRoute.spend) {
-                                SettingsCategoryRow(
-                                    title: "Spend & Teller",
-                                    subtitle: spendSubtitle,
-                                    systemImage: "creditcard",
-                                    tint: Theme.cta,
-                                    status: SpendPreferences.isEnabled ? (SpendPreferences.isConfigured ? "Linked" : "Setup") : "Hidden",
-                                    statusTone: SpendPreferences.isEnabled ? .cta : .neutral
-                                )
-                            }
-                        }
+                    } header: {
+                        settingsSectionHeader("App")
+                    }
+                }
+
+                // Fitness-style module group — Body / Spend / News (one page each)
+                if showsSection(.modules) {
+                    Section {
                         if matches(.health) {
-                            NavigationLink(value: SettingsRoute.health) {
+                            settingsLink(.health) {
                                 SettingsCategoryRow(
                                     title: "Body",
                                     subtitle: healthSubtitle,
                                     systemImage: "heart.text.square",
-                                    tint: Theme.accent,
-                                    status: HealthPreferences.isEnabled ? (HealthPreferences.didRequestAuthorization ? "Linked" : "Connect") : "Hidden",
-                                    statusTone: HealthPreferences.isEnabled ? .accent : .neutral
+                                    tint: Color(red: 0.95, green: 0.35, blue: 0.45),
+                                    status: HealthPreferences.isEnabled
+                                        ? (HealthPreferences.didRequestAuthorization ? "Linked" : "Connect")
+                                        : "Off"
+                                )
+                            }
+                        }
+                        if matches(.spend) {
+                            settingsLink(.spend) {
+                                SettingsCategoryRow(
+                                    title: "Spend",
+                                    subtitle: spendSubtitle,
+                                    systemImage: "creditcard",
+                                    tint: Theme.cta,
+                                    status: SpendPreferences.isEnabled
+                                        ? (SpendPreferences.isConfigured ? "Linked" : "Setup")
+                                        : "Off"
                                 )
                             }
                         }
                         if matches(.news) {
-                            NavigationLink(value: SettingsRoute.news) {
+                            settingsLink(.news) {
                                 SettingsCategoryRow(
-                                    title: "News digest",
+                                    title: "News",
                                     subtitle: newsSubtitle,
                                     systemImage: "newspaper",
-                                    tint: Theme.cta,
-                                    status: NewsPreferences.isEnabled ? (NewsPreferences.hasAIKey ? "AI" : "RSS") : "Hidden",
-                                    statusTone: NewsPreferences.isEnabled ? .cta : .neutral
+                                    tint: Color(red: 0.45, green: 0.55, blue: 0.95),
+                                    status: NewsPreferences.isEnabled
+                                        ? (NewsPreferences.hasAIKey ? "AI" : "RSS")
+                                        : "Off"
                                 )
                             }
                         }
                     } header: {
-                        settingsSectionHeader("Apps")
+                        settingsSectionHeader("Modules")
                     }
                 }
 
-                if showsSection(.integrations) {
+                // Amie "USER SETTINGS" / Integrations
+                if showsSection(.connections) {
                     Section {
                         if matches(.reminders) {
-                            NavigationLink(value: SettingsRoute.reminders) {
+                            settingsLink(.reminders) {
                                 SettingsCategoryRow(
                                     title: "Reminders",
                                     subtitle: remindersSubtitle,
                                     systemImage: "bell.badge",
-                                    tint: Theme.cta,
-                                    status: PlannerPreferences.notificationsEnabled ? "On" : "Off",
-                                    statusTone: PlannerPreferences.notificationsEnabled ? .cta : .neutral
+                                    tint: Color(red: 1.0, green: 0.55, blue: 0.2),
+                                    status: PlannerPreferences.notificationsEnabled ? "On" : "Off"
                                 )
                             }
                         }
                         if matches(.calendar) {
-                            NavigationLink(value: SettingsRoute.calendar) {
+                            settingsLink(.calendar) {
                                 SettingsCategoryRow(
-                                    title: "Calendar sync",
+                                    title: "Calendar",
                                     subtitle: calendarSubtitle,
-                                    systemImage: "calendar.badge.clock",
-                                    tint: Theme.accent
+                                    systemImage: "calendar",
+                                    tint: Color(red: 0.95, green: 0.75, blue: 0.2)
                                 )
                             }
                         }
                         if matches(.ai) {
-                            NavigationLink(value: SettingsRoute.ai) {
+                            settingsLink(.ai) {
                                 SettingsCategoryRow(
                                     title: "AI",
                                     subtitle: aiSubtitle,
                                     systemImage: "sparkles",
-                                    tint: Theme.cta,
-                                    status: appModel.hasKeyForSelectedProvider() ? "Key" : "Optional",
-                                    statusTone: appModel.hasKeyForSelectedProvider() ? .cta : .neutral
+                                    tint: Color(red: 0.65, green: 0.45, blue: 0.95),
+                                    status: appModel.hasKeyForSelectedProvider() ? "Key" : "Optional"
                                 )
                             }
                         }
                     } header: {
-                        settingsSectionHeader("Integrations")
+                        settingsSectionHeader("Connections")
                     }
                 }
 
-                if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if !isSearching {
+                    // Calm: version footer under About
                     Section {
-                        LabeledContent("App") {
-                            Text("Cadence")
-                                .foregroundStyle(Theme.ink)
+                        LabeledContent("Cadence") {
+                            if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
+                                Text("v\(version)")
+                                    .foregroundStyle(Theme.muted)
+                            }
                         }
-                        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
-                            LabeledContent("Version", value: version)
-                        }
-                        Text("Meal planning, workouts, habits, and optional Spend, Health, and News — all on one dial.")
+                        Text("One dial for meals, Body, habits, and optional Spend & News.")
                             .font(.footnote)
                             .foregroundStyle(Theme.muted)
                             .accessibilityAddTraits(.isStaticText)
@@ -229,26 +209,62 @@ struct SettingsView: View {
         }
     }
 
+    private func settingsLink<Label: View>(
+        _ route: SettingsRoute,
+        @ViewBuilder label: () -> Label
+    ) -> some View {
+        Button {
+            path.append(canonicalRoute(route))
+        } label: {
+            HStack(spacing: Theme.Space.sm) {
+                label()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.muted.opacity(0.7))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func canonicalRoute(_ route: SettingsRoute) -> SettingsRoute {
+        switch route {
+        case .nutrition: return .profile
+        case .recipes: return .meals
+        case .lift: return .apps
+        default: return route
+        }
+    }
+
+    /// Amie profile header — avatar + name + secondary meta.
     private var profileCard: some View {
-        HStack(spacing: Theme.Space.md + 2) {
-            Theme.IconWell(systemImage: "person.fill", tint: Theme.accent, size: 56)
-            VStack(alignment: .leading, spacing: Theme.Space.xs) {
-                Text("Your Cadence")
-                    .font(Theme.title(.title3))
+        HStack(spacing: Theme.Space.md) {
+            ZStack {
+                Circle()
+                    .fill(Theme.accent)
+                Image(systemName: "person.fill")
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 52, height: 52)
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("You")
+                    .font(.title3.weight(.bold))
                     .foregroundStyle(Theme.ink)
                 Text(profileGoalsSubtitle)
-                    .font(.footnote)
+                    .font(.subheadline)
                     .foregroundStyle(Theme.muted)
-                    .lineLimit(2)
-                Theme.MetaPill(text: nutritionSubtitle, tone: .cta)
+                    .lineLimit(1)
+                Text(nutritionSubtitle)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(Theme.cta)
             }
             Spacer(minLength: 0)
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Theme.muted)
         }
-        .padding(.vertical, Theme.Space.sm)
-        .padding(.horizontal, Theme.Space.md)
+        .padding(Theme.Space.md + 2)
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                 .fill(Theme.surface)
@@ -256,27 +272,20 @@ struct SettingsView: View {
                     RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                         .strokeBorder(Theme.hairline, lineWidth: 1)
                 )
-                .shadow(color: Theme.cardShadow, radius: 8, y: 3)
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Your Cadence. \(profileGoalsSubtitle). \(nutritionSubtitle)")
-        .accessibilityHint("Opens profile and goals")
+        .accessibilityLabel("You. \(profileGoalsSubtitle). \(nutritionSubtitle)")
+        .accessibilityHint("Opens profile, goals, and nutrition targets")
     }
 
     @ViewBuilder
     private func settingsDestination(for route: SettingsRoute) -> some View {
-        switch route {
-        case .profile:
+        switch canonicalRoute(route) {
+        case .profile, .nutrition:
             ProfileGoalsSettingsView(profile: profile)
-        case .nutrition:
-            NutritionTargetsSettingsView(profile: profile)
-        case .meals:
+        case .meals, .recipes:
             MealsCookingSettingsView(profile: profile)
-        case .recipes:
-            RecipesPlanSettingsView(profile: profile)
-        case .lift:
-            LiftWorkoutsSettingsView(profile: profile)
-        case .apps:
+        case .lift, .apps:
             AppsSettingsView(profile: profile)
         case .spend:
             SpendSettingsView()
@@ -295,39 +304,41 @@ struct SettingsView: View {
 
     private func openPendingRoute() {
         guard let route = appModel.pendingSettingsRoute else { return }
-        path.append(route)
+        path.append(canonicalRoute(route))
         appModel.pendingSettingsRoute = nil
     }
 
     private func settingsSectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
             .font(.caption2.weight(.bold))
-            .tracking(0.6)
+            .tracking(0.7)
             .foregroundStyle(Theme.muted)
             .accessibilityAddTraits(.isHeader)
     }
 
-    private enum HubSection { case you, apps, integrations }
+    private enum HubSection { case app, modules, connections }
 
     private var filteredRoutes: [SettingsRoute] {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return SettingsSearchMatch.catalog.map(\.route) }
-        return SettingsSearchMatch.matches(query: q).map(\.route)
+        guard !q.isEmpty else { return SettingsSearchMatch.hubRoutes }
+        return SettingsSearchMatch.matches(query: q).map { canonicalRoute($0.route) }
+            .reduce(into: [SettingsRoute]()) { result, route in
+                if !result.contains(route) { result.append(route) }
+            }
     }
 
     private func matches(_ route: SettingsRoute) -> Bool {
-        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if q.isEmpty { return true }
-        return filteredRoutes.contains(route)
+        if !isSearching { return SettingsSearchMatch.hubRoutes.contains(route) }
+        return filteredRoutes.contains(canonicalRoute(route))
     }
 
     private func showsSection(_ section: HubSection) -> Bool {
         switch section {
-        case .you: return matches(.profile) || matches(.nutrition)
-        case .apps:
-            return matches(.apps) || matches(.meals) || matches(.recipes) || matches(.lift)
-                || matches(.spend) || matches(.health) || matches(.news)
-        case .integrations:
+        case .app:
+            return matches(.apps) || matches(.meals)
+        case .modules:
+            return matches(.health) || matches(.spend) || matches(.news)
+        case .connections:
             return matches(.reminders) || matches(.calendar) || matches(.ai)
         }
     }
@@ -345,17 +356,6 @@ struct SettingsView: View {
     private var mealsSubtitle: String {
         let diet = DietProfile(rawValue: profile.dietRaw)?.title ?? "Any diet"
         return "\(diet) · \(RecipeComplexity.title(for: profile.cookingComplexity))"
-    }
-
-    private var recipesSubtitle: String {
-        let cookbooks = profile.enabledSources.isEmpty
-            ? "All cookbooks"
-            : "\(profile.enabledSources.count) cookbooks"
-        return "\(cookbooks) · \(appModel.recipeDB.count()) recipes"
-    }
-
-    private var liftSubtitle: String {
-        profile.workoutsEnabled ? "On Body · Lift tab" : "Hidden from Body"
     }
 
     private var healthSubtitle: String {
@@ -405,47 +405,5 @@ struct SettingsView: View {
         appModel.hasKeyForSelectedProvider()
             ? "\(appModel.selectedProvider.title) key saved"
             : "Optional · no key saved"
-    }
-}
-
-private struct SettingsQuickTweaks: View {
-    @Binding var path: NavigationPath
-
-    var body: some View {
-        HStack(spacing: Theme.Space.sm + 2) {
-            quickChip("Units", icon: "ruler") {
-                path.append(SettingsRoute.profile)
-            }
-            quickChip("Reminders", icon: "bell") {
-                path.append(SettingsRoute.reminders)
-            }
-            quickChip("Meals", icon: "fork.knife") {
-                path.append(SettingsRoute.meals)
-            }
-        }
-        .listRowInsets(EdgeInsets(top: Theme.Space.sm, leading: Theme.Space.md, bottom: Theme.Space.sm, trailing: Theme.Space.md))
-        .accessibilityElement(children: .contain)
-    }
-
-    private func quickChip(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: Theme.Space.sm) {
-                Theme.IconWell(systemImage: icon, tint: Theme.cta, size: 36)
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Theme.Space.md)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                    .strokeBorder(Theme.hairline, lineWidth: 1)
-            )
-            .shadow(color: Theme.cardShadow, radius: 6, y: 2)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityHint("Opens \(title.lowercased()) settings")
     }
 }

@@ -14,29 +14,12 @@ struct HealthSettingsView: View {
     var body: some View {
         Form {
             Section {
-                SettingsPageHero(
-                    systemImage: "heart.text.square",
-                    title: "Body · Apple Health",
-                    subtitle: "Bevel-style strain, recovery, and sleep from HealthKit / Apple Watch, plus the Lift program.",
-                    tint: Theme.accent
-                )
-            }
-
-            Section {
                 Toggle("Show Body on wheel", isOn: $enabled)
                     .tint(Theme.cta)
                     .onChange(of: enabled) { _, value in
                         CadenceAppsPreferences.setVisible(.health, value)
-                        showStatus(value ? "Health shown on dial." : "Health hidden from dial.", tone: .neutral)
+                        showStatus(value ? "Body shown on dial." : "Body hidden from dial.", tone: .neutral)
                     }
-            } header: {
-                settingsDetailSectionHeader("Sub-app")
-            } footer: {
-                Text("Turn off to hide Body (Health + Lift) without deleting snapshots or workout logs.")
-                    .accessibilityAddTraits(.isStaticText)
-            }
-
-            Section {
                 Stepper(
                     "Sleep goal: \(String(format: "%.1f", sleepGoal)) h",
                     value: $sleepGoal,
@@ -47,10 +30,9 @@ struct HealthSettingsView: View {
                     HealthPreferences.sleepGoalHours = value
                 }
             } header: {
-                settingsDetailSectionHeader("Goals")
+                settingsDetailSectionHeader("On dial")
             } footer: {
-                Text("Used by the Bevel-style sleep duration score (Time Asleep vs goal).")
-                    .accessibilityAddTraits(.isStaticText)
+                settingsDetailIntro("Hide Body without deleting Health snapshots or Lift logs. Sleep goal feeds Bevel-style duration scoring.")
             }
 
             Section {
@@ -63,15 +45,13 @@ struct HealthSettingsView: View {
                 Button {
                     Task { await connect() }
                 } label: {
-                    Label(busy ? "Working…" : "Connect Apple Health", systemImage: "heart.text.square")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.cta)
+                    settingsCTALabel(busy ? "Working…" : "Connect Apple Health", systemImage: "heart.text.square")
                 }
                 .disabled(busy)
                 .accessibilityHint("Requests HealthKit read access and pulls today’s samples")
 
                 if HealthPreferences.didRequestAuthorization {
-                    Theme.MetaPill(text: "Authorization requested", tone: .accent)
+                    LabeledContent("Authorization", value: "Requested")
                 }
 
                 Button {
@@ -83,15 +63,12 @@ struct HealthSettingsView: View {
                     )
                     showStatus("Demo day refreshed.")
                 } label: {
-                    Label("Reload demo day", systemImage: "sparkles")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.cta)
+                    settingsCTALabel("Reload demo day", systemImage: "sparkles")
                 }
             } header: {
                 settingsDetailSectionHeader("Apple Health")
             } footer: {
-                Text("Cadence reads sleep stages, overnight RHR, HRV, SpO₂, respiratory rate, workouts, exercise minutes, steps, and active energy. Scores follow Bevel’s published Strain / Recovery / Sleep components. See docs/APPLE_HEALTH_SETUP.md.")
-                    .accessibilityAddTraits(.isStaticText)
+                settingsDetailIntro("Reads sleep stages, overnight RHR, HRV, SpO₂, workouts, exercise minutes, steps, and active energy. See docs/APPLE_HEALTH_SETUP.md.")
             }
 
             if let status {
@@ -108,6 +85,7 @@ struct HealthSettingsView: View {
             }
         }
         .navigationTitle("Body")
+        .navigationBarTitleDisplayMode(.inline)
         .settingsFormChrome()
         .onAppear {
             enabled = HealthPreferences.isEnabled

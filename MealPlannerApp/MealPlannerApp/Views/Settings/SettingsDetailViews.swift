@@ -3,8 +3,11 @@ import SwiftData
 import UIKit
 
 // MARK: - Shared chrome
-// Patterns: Apple Fitness settings hub (avatar + stacked list), Tonal/WHOOP preference pages
-// (hero blurb, status toast, primary connect CTAs), system Settings deep-links when denied.
+// Mobbin detail patterns: [Gentler Streak Settings](https://mobbin.com/screens/07d9ec6a-cb0e-4cb3-9a3c-4505d32f74ab)
+// (grouped form + footers, no hero), [Telegram Data](https://mobbin.com/screens/454ba629-4f5e-4c00-ae0a-a0fa1c4325ee)
+// (intro as section footer), [Future Pro App Settings](https://mobbin.com/screens/89b8a60f-b3fc-4dc9-beba-8c329632d511)
+// (toggle + blurb), [Wispr Flow](https://mobbin.com/screens/af36a034-bc88-48f0-90eb-8af699250f0d)
+// (inline title + section cards).
 
 func settingsDetailSectionHeader(_ title: String) -> some View {
     Text(title.uppercased())
@@ -13,6 +16,22 @@ func settingsDetailSectionHeader(_ title: String) -> some View {
         .foregroundStyle(Theme.muted)
         .textCase(nil)
         .accessibilityAddTraits(.isHeader)
+}
+
+/// Alma-style page blurb — use as the first section’s `footer`, not a separate hero card.
+func settingsDetailIntro(_ text: String) -> some View {
+    Text(text)
+        .font(.footnote)
+        .foregroundStyle(Theme.muted)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityAddTraits(.isStaticText)
+}
+
+@ViewBuilder
+func settingsCTALabel(_ title: String, systemImage: String) -> some View {
+    Label(title, systemImage: systemImage)
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(Theme.cta)
 }
 
 struct SettingsCategoryRow: View {
@@ -26,7 +45,17 @@ struct SettingsCategoryRow: View {
 
     var body: some View {
         HStack(spacing: Theme.Space.md) {
-            Theme.IconWell(systemImage: systemImage, tint: tint, size: 36)
+            // Amie: saturated circular glyph wells, white symbol
+            ZStack {
+                Circle()
+                    .fill(tint)
+                Image(systemName: systemImage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: 32, height: 32)
+            .accessibilityHidden(true)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.body.weight(.semibold))
@@ -36,17 +65,22 @@ struct SettingsCategoryRow: View {
                     .foregroundStyle(Theme.muted)
                     .lineLimit(2)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: Theme.Space.sm)
             if let status {
-                Theme.MetaPill(text: status, tone: statusTone)
+                Text(status)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(Theme.muted)
+                    .lineLimit(1)
             }
         }
+        .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(status.map { "\(title). \(subtitle). \($0)" } ?? "\(title). \(subtitle)")
+        .contentShape(Rectangle())
     }
 }
 
-/// Compact page intro under the nav title (Fitness / Tonal preference pattern).
+/// Compact page intro — Bevel/WHOOP: one blurb under the nav title, no second headline.
 struct SettingsPageHero: View {
     let systemImage: String
     let title: String
@@ -55,16 +89,19 @@ struct SettingsPageHero: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Theme.Space.md) {
-            Theme.IconWell(systemImage: systemImage, tint: tint, size: 44)
-            VStack(alignment: .leading, spacing: Theme.Space.xs) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.ink)
-                Text(subtitle)
-                    .font(.footnote)
-                    .foregroundStyle(Theme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+            ZStack {
+                Circle().fill(tint.opacity(0.18))
+                Image(systemName: systemImage)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(tint)
             }
+            .frame(width: 36, height: 36)
+            .accessibilityHidden(true)
+
+            Text(subtitle)
+                .font(.footnote)
+                .foregroundStyle(Theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(.vertical, Theme.Space.xs)
@@ -126,22 +163,90 @@ extension View {
         scrollContentBackground(.hidden)
             .background(Theme.canvas)
             .tint(Theme.cta)
+            // Do NOT attach a SwiftUI tap gesture here — it steals NavigationLink taps.
             .scrollDismissesKeyboard(.interactively)
-            .cadenceDismissKeyboardOnTap()
     }
 
-    /// Tap outside fields to dismiss the system keyboard (and custom focus).
+    /// Dismiss keyboard on background taps without blocking buttons / NavigationLinks.
+    /// Uses a UIKit gesture with `cancelsTouchesInView = false` — SwiftUI `TapGesture`
+    /// / `simultaneousGesture` was swallowing Settings row taps.
     func cadenceDismissKeyboardOnTap() -> some View {
-        simultaneousGesture(
-            TapGesture().onEnded { _ in
-                UIApplication.shared.sendAction(
-                    #selector(UIResponder.resignFirstResponder),
-                    to: nil,
-                    from: nil,
-                    for: nil
-                )
+        background(CadenceKeyboardDismissInstaller())
+    }
+}
+
+/// Installs a non-cancelling tap recognizer on the nearest hosting view.
+private struct CadenceKeyboardDismissInstaller: UIViewRepresentable {
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView(frame: .zero)
+        view.isUserInteractionEnabled = true
+        view.backgroundColor = .clear
+        // Defer install until we're in the hierarchy so we can attach to a superview.
+        DispatchQueue.main.async {
+            context.coordinator.install(from: view)
+        }
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        DispatchQueue.main.async {
+            context.coordinator.install(from: uiView)
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        private weak var host: UIView?
+        private var recognizer: UITapGestureRecognizer?
+
+        func install(from probe: UIView) {
+            // Prefer the scroll/form container, not the zero-size probe itself.
+            guard let target = probe.superview ?? probe.window else { return }
+            if host === target, recognizer != nil { return }
+            if let old = recognizer {
+                old.view?.removeGestureRecognizer(old)
             }
-        )
+            let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+            tap.cancelsTouchesInView = false
+            tap.requiresExclusiveTouchType = false
+            tap.delegate = self
+            target.addGestureRecognizer(tap)
+            host = target
+            recognizer = tap
+        }
+
+        @objc func dismissKeyboard() {
+            UIApplication.shared.sendAction(
+                #selector(UIResponder.resignFirstResponder),
+                to: nil,
+                from: nil,
+                for: nil
+            )
+        }
+
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldReceive touch: UITouch
+        ) -> Bool {
+            // Don't fight controls — only dismiss when tapping non-control chrome.
+            if touch.view is UIControl { return false }
+            var view = touch.view
+            while let current = view {
+                if current is UITextField || current is UITextView { return false }
+                // UICollectionViewListCell / buttons inside list rows
+                if String(describing: type(of: current)).contains("Button") { return false }
+                view = current.superview
+            }
+            return true
+        }
+
+        func gestureRecognizer(
+            _ gestureRecognizer: UIGestureRecognizer,
+            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            true
+        }
     }
 }
 
@@ -185,15 +290,6 @@ struct ProfileGoalsSettingsView: View {
 
     var body: some View {
         Form {
-            Section {
-                SettingsPageHero(
-                    systemImage: "person.crop.circle",
-                    title: "Body & goals",
-                    subtitle: "Used to calculate BMR, TDEE, and daily macro targets.",
-                    tint: Theme.accent
-                )
-            }
-
             Section {
                 Toggle("Use metric units", isOn: $usesMetricUnits)
                     .accessibilityLabel("Use metric units, \(usesMetricUnits ? "on" : "off")")
@@ -255,18 +351,68 @@ struct ProfileGoalsSettingsView: View {
                 .accessibilityHint("Sets whether you cut, maintain, or bulk")
             } header: {
                 settingsDetailSectionHeader("Profile")
+            } footer: {
+                settingsDetailIntro("Body metrics and goals drive BMR, TDEE, and daily macro targets.")
+            }
+
+            Section {
+                HStack {
+                    Text("Calories / day")
+                    Spacer()
+                    TextField("3000", value: $profile.targetCalories, format: .number)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 100)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Calories per day, \(Int(profile.targetCalories.rounded()))")
+                .accessibilityHint("Daily calorie target for meal planning")
+                HStack {
+                    Text("Protein / day (g)")
+                    Spacer()
+                    TextField("165", value: $profile.targetProteinG, format: .number)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 100)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Protein grams per day, \(Int(profile.targetProteinG.rounded()))")
+                .accessibilityHint("Daily protein target in grams")
+                LabeledContent("BMR", value: String(format: "%.0f", profile.bmr))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("BMR, \(Int(profile.bmr.rounded())) calories per day")
+                    .accessibilityAddTraits(.isStaticText)
+                LabeledContent("TDEE", value: String(format: "%.0f", profile.tdee))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("TDEE, \(Int(profile.tdee.rounded())) calories per day")
+                    .accessibilityAddTraits(.isStaticText)
+                LabeledContent("Carbs", value: String(format: "%.0fg", profile.targetCarbsG))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Carbs, \(Int(profile.targetCarbsG.rounded())) grams per day")
+                    .accessibilityAddTraits(.isStaticText)
+                LabeledContent("Fat", value: String(format: "%.0fg", profile.targetFatG))
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Fat, \(Int(profile.targetFatG.rounded())) grams per day")
+                    .accessibilityAddTraits(.isStaticText)
+                if !profile.rationale.isEmpty {
+                    Text(profile.rationale)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted)
+                        .accessibilityLabel("Macro rationale, \(profile.rationale)")
+                        .accessibilityAddTraits(.isStaticText)
+                }
+            } header: {
+                settingsDetailSectionHeader("Nutrition")
             }
 
             Section {
                 Button {
                     Task { await recalculate(useAI: false) }
                 } label: {
-                    Label(
+                    settingsCTALabel(
                         appModel.isComputingMacros ? "Working…" : "Recalculate macros",
                         systemImage: "arrow.triangle.2.circlepath"
                     )
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.cta)
                 }
                 .disabled(appModel.isComputingMacros)
                 .accessibilityHint("Updates protein and calorie targets from profile")
@@ -275,16 +421,13 @@ struct ProfileGoalsSettingsView: View {
                     Button {
                         Task { await recalculate(useAI: true) }
                     } label: {
-                        Label("Recalculate with AI", systemImage: "sparkles")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.cta)
+                        settingsCTALabel("Recalculate with AI", systemImage: "sparkles")
                     }
                     .disabled(appModel.isComputingMacros)
                     .accessibilityHint("Uses your AI provider to refine macro targets")
                 }
             } footer: {
-                Text("Results show under Nutrition targets. Recalculate after changing weight, activity, or goal.")
-                    .accessibilityAddTraits(.isStaticText)
+                settingsDetailIntro("Edit targets above, or recalculate from weight, activity, and goal.")
             }
 
             if let statusMessage {
@@ -294,7 +437,8 @@ struct ProfileGoalsSettingsView: View {
                 .listRowBackground(Theme.surface)
             }
         }
-        .navigationTitle("Profile & goals")
+        .navigationTitle("You")
+        .navigationBarTitleDisplayMode(.inline)
         .settingsFormChrome()
     }
 
@@ -306,52 +450,15 @@ struct ProfileGoalsSettingsView: View {
     }
 }
 
-// MARK: - Lift & workouts
-
-struct LiftWorkoutsSettingsView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Bindable var profile: UserProfileEntity
-
-    private var showWorkout: Binding<Bool> {
-        Binding(
-            get: { CadenceAppsPreferences.isVisible(.workout) && profile.workoutsEnabled },
-            set: { on in
-                profile.workoutsEnabled = on
-                CadenceAppsPreferences.setVisible(.workout, on)
-                Task { await PlannerSyncCoordinator.shared.refreshAll(in: modelContext) }
-            }
-        )
-    }
-
-    var body: some View {
-        Form {
-            Section {
-                SettingsPageHero(
-                    systemImage: "dumbbell",
-                    title: "Lift on the dial",
-                    subtitle: "Hide the program without deleting past workout logs.",
-                    tint: Theme.accent
-                )
-            }
-
-            Section {
-                Toggle("Show workout schedule", isOn: showWorkout)
-                    .accessibilityLabel("Show workout schedule, \(showWorkout.wrappedValue ? "on" : "off")")
-                    .accessibilityHint("Shows or hides Lift on the wheel, Today, Habits, and Calendar")
-            } footer: {
-                Text("Also editable from the swipe-up app grid or Apps & wheel. Past workout logs are kept.")
-                    .accessibilityAddTraits(.isStaticText)
-            }
-        }
-        .navigationTitle("Lift & workouts")
-        .settingsFormChrome()
-    }
-}
-
 // MARK: - Meals & cooking
 
 struct MealsCookingSettingsView: View {
+    @EnvironmentObject private var appModel: AppModel
+    @Environment(\.modelContext) private var modelContext
     @Bindable var profile: UserProfileEntity
+    @Query private var grocery: [GroceryItemEntity]
+    @State private var confirmRegenerate = false
+    @State private var statusMessage: String?
 
     private let allSources = [
         "joy-of-cooking", "food-lab", "the-wok", "food-network-magazine",
@@ -361,15 +468,6 @@ struct MealsCookingSettingsView: View {
 
     var body: some View {
         Form {
-            Section {
-                SettingsPageHero(
-                    systemImage: "fork.knife",
-                    title: "How you cook",
-                    subtitle: "Diet filters, tools, and cookbooks shape weekly meal plans.",
-                    tint: Theme.cta
-                )
-            }
-
             Section {
                 Picker("Diet filter", selection: $profile.dietRaw) {
                     ForEach(DietProfile.allCases) { Text($0.title).tag($0.rawValue) }
@@ -382,7 +480,9 @@ struct MealsCookingSettingsView: View {
                     .accessibilityValue(profile.dietaryRestrictionsText.isEmpty ? "Empty" : profile.dietaryRestrictionsText)
                     .accessibilityHint("Comma-separated foods to exclude from meal plans")
             } header: {
-                settingsDetailSectionHeader("Diet & restrictions")
+                settingsDetailSectionHeader("Diet")
+            } footer: {
+                settingsDetailIntro("Diet filters, cookbooks, and regenerate this week’s plan — all in one place.")
             }
 
             Section {
@@ -432,7 +532,7 @@ struct MealsCookingSettingsView: View {
                     .accessibilityHint("Includes or excludes recipes requiring \(tool.title.lowercased())")
                 }
             } header: {
-                settingsDetailSectionHeader("Cooking preferences")
+                settingsDetailSectionHeader("Cooking")
             }
 
             Section {
@@ -461,149 +561,15 @@ struct MealsCookingSettingsView: View {
                 )
                 .accessibilityLabel("Avoid same recipe, \(profile.recipeCooldownDays) days")
                 .accessibilityHint("Minimum days before a recipe can repeat in your plan")
-            } header: {
-                settingsDetailSectionHeader("Variety")
-            }
-        }
-        .navigationTitle("Meals & cooking")
-        .settingsFormChrome()
-    }
-}
-
-// MARK: - Nutrition targets
-
-struct NutritionTargetsSettingsView: View {
-    @EnvironmentObject private var appModel: AppModel
-    @Bindable var profile: UserProfileEntity
-    @State private var statusMessage: String?
-
-    var body: some View {
-        Form {
-            Section {
-                SettingsPageHero(
-                    systemImage: "chart.bar.doc.horizontal",
-                    title: "Daily targets",
-                    subtitle: "Edit calories and protein directly, or recalculate from your profile.",
-                    tint: Theme.cta
-                )
-            }
-
-            Section {
-                HStack {
-                    Text("Calories / day")
-                    Spacer()
-                    TextField("3000", value: $profile.targetCalories, format: .number)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 100)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Calories per day, \(Int(profile.targetCalories.rounded()))")
-                .accessibilityHint("Daily calorie target for meal planning")
-                HStack {
-                    Text("Protein / day (g)")
-                    Spacer()
-                    TextField("165", value: $profile.targetProteinG, format: .number)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 100)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Protein grams per day, \(Int(profile.targetProteinG.rounded()))")
-                .accessibilityHint("Daily protein target in grams")
-            } header: {
-                settingsDetailSectionHeader("Daily targets")
-            }
-
-            Section {
-                LabeledContent("BMR", value: String(format: "%.0f", profile.bmr))
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("BMR, \(Int(profile.bmr.rounded())) calories per day")
-                    .accessibilityAddTraits(.isStaticText)
-                LabeledContent("TDEE", value: String(format: "%.0f", profile.tdee))
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("TDEE, \(Int(profile.tdee.rounded())) calories per day")
-                    .accessibilityAddTraits(.isStaticText)
-                LabeledContent("Carbs", value: String(format: "%.0fg", profile.targetCarbsG))
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Carbs, \(Int(profile.targetCarbsG.rounded())) grams per day")
-                    .accessibilityAddTraits(.isStaticText)
-                LabeledContent("Fat", value: String(format: "%.0fg", profile.targetFatG))
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Fat, \(Int(profile.targetFatG.rounded())) grams per day")
-                    .accessibilityAddTraits(.isStaticText)
-                if !profile.rationale.isEmpty {
-                    Text(profile.rationale)
-                        .font(.footnote)
-                        .foregroundStyle(Theme.muted)
-                        .accessibilityLabel("Macro rationale, \(profile.rationale)")
-                        .accessibilityAddTraits(.isStaticText)
-                }
-            } header: {
-                settingsDetailSectionHeader("Calculated")
-            }
-
-            Section {
-                Button {
-                    Task {
-                        await appModel.recomputeMacros(profile: profile, useAI: false)
-                        statusMessage = "Recalculated from profile · \(Int(profile.targetCalories.rounded())) kcal"
-                    }
-                } label: {
-                    Label(
-                        appModel.isComputingMacros ? "Working…" : "Recalculate from profile",
-                        systemImage: "arrow.triangle.2.circlepath"
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.cta)
-                }
-                .disabled(appModel.isComputingMacros)
-                .accessibilityHint("Updates targets from weight, activity, and goal")
-            }
-
-            if let statusMessage {
-                Section {
-                    SettingsStatusBanner(message: statusMessage)
-                }
-                .listRowBackground(Theme.surface)
-            }
-        }
-        .navigationTitle("Nutrition targets")
-        .settingsFormChrome()
-    }
-}
-
-// MARK: - Recipes & plan
-
-struct RecipesPlanSettingsView: View {
-    @EnvironmentObject private var appModel: AppModel
-    @Environment(\.modelContext) private var modelContext
-    @Bindable var profile: UserProfileEntity
-    @Query private var grocery: [GroceryItemEntity]
-    @State private var confirmRegenerate = false
-    @State private var statusMessage: String?
-
-    var body: some View {
-        Form {
-            Section {
-                SettingsPageHero(
-                    systemImage: "book.closed",
-                    title: "Recipes & plan",
-                    subtitle: "Browse cookbooks or rebuild this week’s meals and shop list.",
-                    tint: Theme.accent
-                )
-            }
-
-            Section {
                 NavigationLink {
                     BrowseView()
                 } label: {
-                    Label("Browse cookbooks", systemImage: "book")
+                    Text("Browse cookbooks")
                 }
                 .accessibilityHint("Browse bundled recipe cookbooks")
                 LabeledContent("Bundled recipes", value: "\(appModel.recipeDB.count())")
             } header: {
-                settingsDetailSectionHeader("Library")
+                settingsDetailSectionHeader("Plan & library")
             }
 
             Section {
@@ -614,18 +580,15 @@ struct RecipesPlanSettingsView: View {
                         Task { await regenerate() }
                     }
                 } label: {
-                    Label(
+                    settingsCTALabel(
                         appModel.isGeneratingPlan ? "Working…" : "Regenerate this week’s plan",
                         systemImage: "arrow.clockwise"
                     )
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.cta)
                 }
                 .disabled(appModel.isGeneratingPlan)
                 .accessibilityHint("Creates a new weekly meal plan and shop list")
             } footer: {
-                Text("Regenerating replaces this week’s meals and rebuilds the shop list.")
-                    .accessibilityAddTraits(.isStaticText)
+                settingsDetailIntro("Regenerating replaces this week’s meals and rebuilds the shop list.")
             }
 
             if let statusMessage {
@@ -635,7 +598,8 @@ struct RecipesPlanSettingsView: View {
                 .listRowBackground(Theme.surface)
             }
         }
-        .navigationTitle("Recipes & plan")
+        .navigationTitle("Meals")
+        .navigationBarTitleDisplayMode(.inline)
         .settingsFormChrome()
         .confirmationDialog("Replace grocery list?", isPresented: $confirmRegenerate, titleVisibility: .visible) {
             Button("Regenerate", role: .destructive) {
@@ -660,6 +624,26 @@ struct RecipesPlanSettingsView: View {
     }
 }
 
+// MARK: - Legacy aliases (search / deep links map here — no second pages)
+
+/// Kept so older search hits for “nutrition” land on the merged You page.
+struct NutritionTargetsSettingsView: View {
+    @Bindable var profile: UserProfileEntity
+    var body: some View { ProfileGoalsSettingsView(profile: profile) }
+}
+
+/// Kept so older search hits for “recipes” land on the merged Meals page.
+struct RecipesPlanSettingsView: View {
+    @Bindable var profile: UserProfileEntity
+    var body: some View { MealsCookingSettingsView(profile: profile) }
+}
+
+/// Lift visibility lives in Apps & wheel (and Body). No separate settings page.
+struct LiftWorkoutsSettingsView: View {
+    @Bindable var profile: UserProfileEntity
+    var body: some View { AppsSettingsView(profile: profile) }
+}
+
 // MARK: - AI
 
 struct AISettingsView: View {
@@ -670,15 +654,6 @@ struct AISettingsView: View {
 
     var body: some View {
         Form {
-            Section {
-                SettingsPageHero(
-                    systemImage: "sparkles",
-                    title: "Optional AI",
-                    subtitle: "Cadence meal plans work offline. Keys are only used when you choose AI.",
-                    tint: Theme.cta
-                )
-            }
-
             Section {
                 Picker("Provider", selection: $appModel.selectedProvider) {
                     ForEach(AIProvider.allCases) { provider in
@@ -703,18 +678,17 @@ struct AISettingsView: View {
                 Button {
                     saveKeys()
                 } label: {
-                    Label("Save keys to Keychain", systemImage: "key.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.cta)
+                    settingsCTALabel("Save keys to Keychain", systemImage: "key.fill")
                 }
                 .accessibilityHint("Stores API keys securely on this device")
             } header: {
                 settingsDetailSectionHeader("Providers")
             } footer: {
-                Text(appModel.hasKeyForSelectedProvider()
-                     ? "\(appModel.selectedProvider.title) key is ready for macro recalculation and News digests."
-                     : "Paste a key, then Save. Empty keys clear Keychain for that provider.")
-                    .accessibilityAddTraits(.isStaticText)
+                settingsDetailIntro(
+                    appModel.hasKeyForSelectedProvider()
+                        ? "\(appModel.selectedProvider.title) key is ready for macros and News digests."
+                        : "Meal plans work offline. Paste a key, then Save — empty keys clear Keychain."
+                )
             }
 
             if let statusMessage {
@@ -725,6 +699,7 @@ struct AISettingsView: View {
             }
         }
         .navigationTitle("AI")
+        .navigationBarTitleDisplayMode(.inline)
         .settingsFormChrome()
     }
 

@@ -18,15 +18,6 @@ struct SpendSettingsView: View {
     var body: some View {
         Form {
             Section {
-                SettingsPageHero(
-                    systemImage: "creditcard",
-                    title: "Spend & Teller",
-                    subtitle: "Bank purchases and cost-per-use trackers. Sandbox tokens stay on-device.",
-                    tint: Theme.cta
-                )
-            }
-
-            Section {
                 Toggle("Show Spend on wheel", isOn: $enabled)
                     .tint(Theme.cta)
                     .onChange(of: enabled) { _, value in
@@ -34,10 +25,9 @@ struct SpendSettingsView: View {
                         showStatus(value ? "Spend shown on dial." : "Spend hidden from dial.", tone: .neutral)
                     }
             } header: {
-                settingsDetailSectionHeader("Sub-app")
+                settingsDetailSectionHeader("On dial")
             } footer: {
-                Text("Turn off to hide Spend without deleting purchases or trackers.")
-                    .accessibilityAddTraits(.isStaticText)
+                settingsDetailIntro("Hide Spend without deleting purchases or cost-per-use trackers.")
             }
 
             Section {
@@ -58,28 +48,20 @@ struct SpendSettingsView: View {
             } header: {
                 settingsDetailSectionHeader("Teller")
             } footer: {
-                Text("Follow docs/TELLER_SETUP.md. Never embed your mTLS private key in the app — use sandbox tokens here, and a backend for development/production.")
-                    .accessibilityAddTraits(.isStaticText)
+                settingsDetailIntro("Follow docs/TELLER_SETUP.md. Never embed your mTLS private key — sandbox tokens stay on-device.")
             }
 
             Section {
                 if enrollments.isEmpty {
-                    Text("No enrollments yet. Paste a sandbox access token below to pull demo bank data, or wire TellerKit Connect.")
+                    Text("No enrollments yet. Paste a sandbox access token below, or wire TellerKit Connect.")
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
                         .accessibilityAddTraits(.isStaticText)
                 } else {
                     ForEach(enrollments, id: \.id) { enrollment in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(enrollment.institutionName)
-                                    .font(.subheadline.weight(.semibold))
-                                Text(enrollment.isSandbox ? "Sandbox" : "Live")
-                                    .font(.caption)
-                                    .foregroundStyle(Theme.muted)
-                            }
-                            Spacer()
-                            Theme.MetaPill(text: enrollment.isSandbox ? "Sandbox" : "Live", tone: .cta)
+                        LabeledContent(enrollment.institutionName) {
+                            Text(enrollment.isSandbox ? "Sandbox" : "Live")
+                                .foregroundStyle(Theme.muted)
                         }
                     }
                 }
@@ -91,9 +73,7 @@ struct SpendSettingsView: View {
                     Button {
                         Task { await connectSandboxToken() }
                     } label: {
-                        Label(isBusy ? "Working…" : "Sync sandbox accounts", systemImage: "arrow.triangle.2.circlepath")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.cta)
+                        settingsCTALabel(isBusy ? "Working…" : "Sync sandbox accounts", systemImage: "arrow.triangle.2.circlepath")
                     }
                     .disabled(sandboxToken.trimmingCharacters(in: .whitespaces).isEmpty || isBusy)
                 }
@@ -115,7 +95,8 @@ struct SpendSettingsView: View {
                 settingsDetailSectionHeader("Docs")
             }
         }
-        .navigationTitle("Spend & Teller")
+        .navigationTitle("Spend")
+        .navigationBarTitleDisplayMode(.inline)
         .settingsFormChrome()
         .onAppear {
             enabled = SpendPreferences.isEnabled

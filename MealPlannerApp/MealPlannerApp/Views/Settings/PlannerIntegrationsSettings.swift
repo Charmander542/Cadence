@@ -12,15 +12,6 @@ struct RemindersSettingsView: View {
     var body: some View {
         Form {
             Section {
-                SettingsPageHero(
-                    systemImage: "bell.badge",
-                    title: "Reminders",
-                    subtitle: "Task, habit, workout, and meal notifications on your schedule.",
-                    tint: Theme.cta
-                )
-            }
-
-            Section {
                 Toggle("Enable notifications", isOn: Binding(
                     get: { PlannerPreferences.notificationsEnabled },
                     set: { newValue in
@@ -28,6 +19,7 @@ struct RemindersSettingsView: View {
                         Task { await refreshNotifications() }
                     }
                 ))
+                .tint(Theme.cta)
                 .accessibilityLabel("Enable notifications, \(PlannerPreferences.notificationsEnabled ? "on" : "off")")
                 .accessibilityHint("Master switch for Cadence reminders")
 
@@ -45,20 +37,26 @@ struct RemindersSettingsView: View {
                 }
             } header: {
                 settingsDetailSectionHeader("Master")
+            } footer: {
+                settingsDetailIntro("Task, habit, workout, and meal notifications on your schedule.")
             }
 
             if PlannerPreferences.notificationsEnabled {
                 Section {
                     Toggle("Task reminders", isOn: boolBinding { PlannerPreferences.taskRemindersEnabled } set: { PlannerPreferences.taskRemindersEnabled = $0 })
+                        .tint(Theme.cta)
                         .accessibilityLabel("Task reminders, \(PlannerPreferences.taskRemindersEnabled ? "on" : "off")")
                         .accessibilityHint("Notifies before tasks are due")
                     Toggle("Habit reminders", isOn: boolBinding { PlannerPreferences.habitRemindersEnabled } set: { PlannerPreferences.habitRemindersEnabled = $0 })
+                        .tint(Theme.cta)
                         .accessibilityLabel("Habit reminders, \(PlannerPreferences.habitRemindersEnabled ? "on" : "off")")
                         .accessibilityHint("Notifies for daily and weekly habits")
                     Toggle("Workout reminders", isOn: boolBinding { PlannerPreferences.workoutRemindersEnabled } set: { PlannerPreferences.workoutRemindersEnabled = $0 })
+                        .tint(Theme.cta)
                         .accessibilityLabel("Workout reminders, \(PlannerPreferences.workoutRemindersEnabled ? "on" : "off")")
                         .accessibilityHint("Notifies before scheduled lift sessions")
                     Toggle("Meal reminders", isOn: boolBinding { PlannerPreferences.mealRemindersEnabled } set: { PlannerPreferences.mealRemindersEnabled = $0 })
+                        .tint(Theme.cta)
                         .accessibilityLabel("Meal reminders, \(PlannerPreferences.mealRemindersEnabled ? "on" : "off")")
                         .accessibilityHint("Notifies for lunch and dinner on plan days")
                 } header: {
@@ -117,9 +115,7 @@ struct RemindersSettingsView: View {
                 Button {
                     Task { await refreshNotifications() }
                 } label: {
-                    Label(isBusy ? "Working…" : "Refresh all reminders", systemImage: "arrow.clockwise")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.cta)
+                    settingsCTALabel(isBusy ? "Working…" : "Refresh all reminders", systemImage: "arrow.clockwise")
                 }
                 .disabled(isBusy)
                 .accessibilityHint("Reschedules task, habit, workout, and meal notifications")
@@ -133,6 +129,7 @@ struct RemindersSettingsView: View {
             }
         }
         .navigationTitle("Reminders")
+        .navigationBarTitleDisplayMode(.inline)
         .settingsFormChrome()
         .task { notificationStatus = await NotificationScheduler.authorizationStatus() }
     }
@@ -171,15 +168,6 @@ struct CalendarSyncSettingsView: View {
 
     var body: some View {
         Form {
-            Section {
-                SettingsPageHero(
-                    systemImage: "calendar.badge.clock",
-                    title: "Calendar sync",
-                    subtitle: "Export tasks, workouts, and meals to Apple or Google calendars.",
-                    tint: Theme.accent
-                )
-            }
-
             appleCalendarSection
             googleCalendarSection
             if let statusMessage {
@@ -189,7 +177,8 @@ struct CalendarSyncSettingsView: View {
                 .listRowBackground(Theme.surface)
             }
         }
-        .navigationTitle("Calendar sync")
+        .navigationTitle("Calendar")
+        .navigationBarTitleDisplayMode(.inline)
         .settingsFormChrome()
         .task { await onAppearLoad() }
     }
@@ -197,12 +186,15 @@ struct CalendarSyncSettingsView: View {
     private var appleCalendarSection: some View {
         Section {
             Toggle("Sync tasks", isOn: syncBinding { PlannerPreferences.syncTasksToAppleCalendar } set: { PlannerPreferences.syncTasksToAppleCalendar = $0 })
+                .tint(Theme.cta)
                 .accessibilityLabel("Sync tasks to Apple Calendar, \(PlannerPreferences.syncTasksToAppleCalendar ? "on" : "off")")
                 .accessibilityHint("Exports due tasks to Apple Calendar")
             Toggle("Sync workouts", isOn: syncBinding { PlannerPreferences.syncWorkoutsToAppleCalendar } set: { PlannerPreferences.syncWorkoutsToAppleCalendar = $0 })
+                .tint(Theme.cta)
                 .accessibilityLabel("Sync workouts to Apple Calendar, \(PlannerPreferences.syncWorkoutsToAppleCalendar ? "on" : "off")")
                 .accessibilityHint("Exports scheduled lift sessions to Apple Calendar")
             Toggle("Sync meals", isOn: syncBinding { PlannerPreferences.syncMealsToAppleCalendar } set: { PlannerPreferences.syncMealsToAppleCalendar = $0 })
+                .tint(Theme.cta)
                 .accessibilityLabel("Sync meals to Apple Calendar, \(PlannerPreferences.syncMealsToAppleCalendar ? "on" : "off")")
                 .accessibilityHint("Exports planned dinners to Apple Calendar")
 
@@ -224,6 +216,7 @@ struct CalendarSyncSettingsView: View {
                     Toggle(isOn: appleCalendarBinding(cal.id)) {
                         Text("\(cal.title) · \(cal.sourceKind.title)")
                     }
+                    .tint(Theme.cta)
                     .accessibilityLabel("\(cal.title), \(cal.sourceKind.title), \(PlannerPreferences.isAppleCalendarEnabled(cal.id) ? "on" : "off")")
                     .accessibilityHint("Exports Cadence items to this calendar when sync is enabled")
                 }
@@ -232,17 +225,14 @@ struct CalendarSyncSettingsView: View {
             Button {
                 Task { await requestCalendarAccess() }
             } label: {
-                Label(isBusy ? "Working…" : "Request calendar access", systemImage: "calendar.badge.plus")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.cta)
+                settingsCTALabel(isBusy ? "Working…" : "Request calendar access", systemImage: "calendar.badge.plus")
             }
             .disabled(isBusy)
             .accessibilityHint("Allows syncing tasks, workouts, and meals to Apple Calendar")
         } header: {
             settingsDetailSectionHeader("Apple Calendar")
         } footer: {
-            Text("Turn on any sub-calendars where Cadence should export. Google calendars added to iOS appear here too.")
-                .accessibilityAddTraits(.isStaticText)
+            settingsDetailIntro("Export tasks, workouts, and meals. Turn on any sub-calendars where Cadence should write — Google calendars added to iOS appear here too.")
         }
     }
 
@@ -263,21 +253,22 @@ struct CalendarSyncSettingsView: View {
                     Button {
                         Task { await connectGoogle() }
                     } label: {
-                        Label(isBusy ? "Working…" : "Connect Google account", systemImage: "person.crop.circle.badge.plus")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.cta)
+                        settingsCTALabel(isBusy ? "Working…" : "Connect Google account", systemImage: "person.crop.circle.badge.plus")
                     }
                     .disabled(isBusy)
                     .accessibilityHint("Signs in to sync with Google Calendar")
                 }
 
                 Toggle("Sync tasks", isOn: syncBinding { PlannerPreferences.syncTasksToGoogleCalendar } set: { PlannerPreferences.syncTasksToGoogleCalendar = $0 })
+                    .tint(Theme.cta)
                     .accessibilityLabel("Sync tasks to Google Calendar, \(PlannerPreferences.syncTasksToGoogleCalendar ? "on" : "off")")
                     .accessibilityHint("Exports due tasks to Google Calendar")
                 Toggle("Sync workouts", isOn: syncBinding { PlannerPreferences.syncWorkoutsToGoogleCalendar } set: { PlannerPreferences.syncWorkoutsToGoogleCalendar = $0 })
+                    .tint(Theme.cta)
                     .accessibilityLabel("Sync workouts to Google Calendar, \(PlannerPreferences.syncWorkoutsToGoogleCalendar ? "on" : "off")")
                     .accessibilityHint("Exports scheduled lift sessions to Google Calendar")
                 Toggle("Sync meals", isOn: syncBinding { PlannerPreferences.syncMealsToGoogleCalendar } set: { PlannerPreferences.syncMealsToGoogleCalendar = $0 })
+                    .tint(Theme.cta)
                     .accessibilityLabel("Sync meals to Google Calendar, \(PlannerPreferences.syncMealsToGoogleCalendar ? "on" : "off")")
                     .accessibilityHint("Exports planned dinners to Google Calendar")
 
@@ -285,9 +276,7 @@ struct CalendarSyncSettingsView: View {
                     Button {
                         Task { await loadGoogleCalendars() }
                     } label: {
-                        Label("Load calendars", systemImage: "arrow.down.circle")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.cta)
+                        settingsCTALabel("Load calendars", systemImage: "arrow.down.circle")
                     }
                     .accessibilityHint("Fetches available Google calendars to sync")
                 } else if GoogleCalendarService.shared.isSignedIn {
@@ -295,6 +284,7 @@ struct CalendarSyncSettingsView: View {
                         Toggle(isOn: googleCalendarBinding(cal.id)) {
                             Text(cal.title)
                         }
+                        .tint(Theme.cta)
                         .accessibilityLabel("\(cal.title), \(PlannerPreferences.isGoogleCalendarEnabled(cal.id) ? "on" : "off")")
                         .accessibilityHint("Exports Cadence items to this Google calendar when sync is enabled")
                     }
@@ -312,8 +302,7 @@ struct CalendarSyncSettingsView: View {
             if !GoogleCalendarService.shared.isConfigured {
                 EmptyView()
             } else {
-                Text("Turn on any Google calendars where Cadence should export. Workout and meal sync to Google creates new events; toggling a calendar off does not yet remove past events from it.")
-                    .accessibilityAddTraits(.isStaticText)
+                settingsDetailIntro("Turn on any Google calendars where Cadence should export. Workout and meal sync creates new events; toggling off does not yet remove past events.")
             }
         }
     }
