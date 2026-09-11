@@ -46,7 +46,6 @@ struct WheelNav: View {
     /// Visual dial (~1.5× original). Page inset stays `PlannerChromeMetrics.dialLayoutHeight`.
     private let dialHeight: CGFloat = 87
     private let hitSlop: CGFloat = 21
-    private let flatPillWidth: CGFloat = 360
     private let flatIconSpacing: CGFloat = 72
     private let idleDelaySeconds: Double = 5.0
 
@@ -67,7 +66,6 @@ struct WheelNav: View {
         // Dial only — fixed height so safeAreaInset never pushes page content.
         // Pull-up peek is drawn by RootView (sibling overlay), not as dial background.
         ZStack(alignment: .bottom) {
-            menuChrome
             dialInterior
         }
         .frame(maxWidth: .infinity)
@@ -118,19 +116,6 @@ struct WheelNav: View {
             }
             commit(to: next, haptic: true)
         }
-    }
-
-    // MARK: - Shared chrome (flat pill when idle)
-
-    private var menuChrome: some View {
-        // Match tile-menu charcoal (`Theme.surface`) so idle and expanded chrome share one plate.
-        Capsule(style: .continuous)
-            .fill(Theme.surface)
-            .frame(width: flatPillWidth, height: 78)
-            .opacity(idleAmount)
-            .offset(y: 3)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            .allowsHitTesting(false)
     }
 
     // MARK: - Dial (collapsed)
@@ -584,13 +569,14 @@ struct WheelAppMenuOverlay: View {
             Capsule()
                 .fill(Theme.muted.opacity(0.4))
                 .frame(width: 36, height: 5)
+                .frame(maxWidth: .infinity)
                 .padding(.top, Theme.Space.md + 2)
                 .padding(.bottom, Theme.Space.md + 2)
-                .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .accessibilityLabel("Collapse menu")
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction { dismiss() }
+                .accessibilityHint("Swipe down to close the app menu")
 
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: Theme.Space.xs) {
@@ -599,7 +585,7 @@ struct WheelAppMenuOverlay: View {
                         .foregroundStyle(Theme.ink)
                     Text(isEditing
                          ? "Drag to reorder · tap − / +"
-                         : "Hold empty space to edit · swipe down to collapse")
+                         : "Hold empty space to edit · swipe down to close")
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
                         .accessibilityHidden(true)
@@ -617,36 +603,19 @@ struct WheelAppMenuOverlay: View {
             .padding(.horizontal, Theme.Space.xl + 4)
             .padding(.bottom, Theme.Space.sm)
 
-            ScrollView(showsIndicators: false) {
-                ZStack(alignment: .top) {
-                    // Hold *around* apps (not on icons) to enter edit mode.
-                    Color.clear
-                        .frame(maxWidth: .infinity, minHeight: max(panelHeight - 120, 420))
-                        .contentShape(Rectangle())
-                        .onLongPressGesture(minimumDuration: 0.45) {
-                            enterEditing()
-                        }
-                        .accessibilityHidden(true)
-
-                    VStack(alignment: .leading, spacing: Theme.Space.xl) {
-                        appGrid(visibleItems, mode: .onDial)
-
-                        if isEditing, !availableItems.isEmpty {
-                            VStack(alignment: .leading, spacing: Theme.Space.md) {
-                                Text("AVAILABLE")
-                                    .font(.caption2.weight(.bold))
-                                    .tracking(0.6)
-                                    .foregroundStyle(Theme.muted)
-                                    .padding(.horizontal, Theme.Space.xl)
-                                appGrid(availableItems, mode: .available)
-                            }
-                        }
+            // Fixed grid while browsing — vertical drag dismisses the whole sheet.
+            // Scroll only when editing (Available list can overflow).
+            Group {
+                if isEditing {
+                    ScrollView(showsIndicators: false) {
+                        appMenuBody
                     }
-                    .padding(.top, Theme.Space.lg)
-                    .padding(.bottom, Theme.Space.xl * 2)
+                    .scrollDisabled(draggingId != nil)
+                } else {
+                    appMenuBody
                 }
             }
-            .scrollDisabled(draggingId != nil)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity)
         .frame(height: panelHeight, alignment: .top)
@@ -664,7 +633,8 @@ struct WheelAppMenuOverlay: View {
         )
         .padding(.bottom, 0)
         .offset(y: max(0, dragOffset))
-        .gesture(collapseGesture)
+        // Whole sheet swipes down as one unit (not scroll/reorder the apps).
+        .gesture(collapseGesture, isEnabled: !isEditing)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("App menu")
         .accessibilityHint(
@@ -674,6 +644,36 @@ struct WheelAppMenuOverlay: View {
         )
         .onReceive(NotificationCenter.default.publisher(for: CadenceAppsPreferences.didChange)) { _ in
             appsRevision += 1
+        }
+    }
+
+    private var appMenuBody: some View {
+        ZStack(alignment: .top) {
+            // Hold *around* apps (not on icons) to enter edit mode.
+            Color.clear
+                .frame(maxWidth: .infinity, minHeight: max(panelHeight - 120, 420))
+                .contentShape(Rectangle())
+                .onLongPressGesture(minimumDuration: 0.45) {
+                    enterEditing()
+                }
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: Theme.Space.xl) {
+                appGrid(visibleItems, mode: .onDial)
+
+                if isEditing, !availableItems.isEmpty {
+                    VStack(alignment: .leading, spacing: Theme.Space.md) {
+                        Text("AVAILABLE")
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.6)
+                            .foregroundStyle(Theme.muted)
+                            .padding(.horizontal, Theme.Space.xl)
+                        appGrid(availableItems, mode: .available)
+                    }
+                }
+            }
+            .padding(.top, Theme.Space.lg)
+            .padding(.bottom, Theme.Space.xl * 2)
         }
     }
 
@@ -897,21 +897,23 @@ struct WheelAppMenuOverlay: View {
     }
 
     private var collapseGesture: some Gesture {
-        DragGesture(minimumDistance: 8)
+        DragGesture(minimumDistance: 16, coordinateSpace: .local)
             .onChanged { value in
                 guard !isEditing, draggingId == nil else { return }
-                if value.translation.height > 0 {
-                    dragOffset = value.translation.height
-                }
+                let dx = value.translation.width
+                let dy = value.translation.height
+                // Only pull the sheet down — ignore sideways / upward noise.
+                guard dy > 0, dy > abs(dx) * 0.85 else { return }
+                dragOffset = dy
             }
             .onEnded { value in
                 guard !isEditing, draggingId == nil else {
                     dragOffset = 0
                     return
                 }
-                let shouldClose = value.translation.height > 90
-                    || value.predictedEndTranslation.height > 160
-                    || dragOffset > 140
+                let dy = max(value.translation.height, dragOffset)
+                let predicted = value.predictedEndTranslation.height
+                let shouldClose = dy > 90 || predicted > 160 || dragOffset > 140
                 if shouldClose {
                     dismiss()
                 } else {
