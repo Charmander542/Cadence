@@ -35,6 +35,7 @@ struct SpendHomeView: View {
     /// Set when a tap hit the donut so overview-wide dismiss doesn’t immediately undo it.
     @State private var pieTapConsumed = false
     @State private var showAddTracked = false
+    @State private var showAddPurchase = false
     @State private var showConnectInfo = false
     @State private var showBudgets = false
     @State private var showCategories = false
@@ -195,7 +196,7 @@ struct SpendHomeView: View {
                         .padding(.horizontal, Theme.Space.lg)
                 }
                 .padding(.top, Theme.Space.sm)
-                .padding(.bottom, 110)
+                .padding(.bottom, PlannerChromeMetrics.dialFABClearance)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -209,13 +210,24 @@ struct SpendHomeView: View {
             if !enrollments.isEmpty, !hasPlaidTxs, !isSyncing {
                 Task { await syncNow() }
             }
+            if appModel.requestedFABAction == .addSpendItem {
+                showAddPurchase = true
+                appModel.requestedFABAction = nil
+            }
+            if appModel.requestedOpenSpendCategories {
+                showCategories = true
+                appModel.requestedOpenSpendCategories = false
+            }
+            if appModel.requestedOpenSpendCategoryPurchase {
+                openFirstCategoryPurchase()
+            }
         }
         .onChange(of: monthOffset) { _, _ in
             collapsePieFocus()
         }
         .onChange(of: appModel.requestedFABAction) { _, action in
             guard action == .addSpendItem else { return }
-            showAddTracked = true
+            showAddPurchase = true
             appModel.requestedFABAction = nil
         }
         .onChange(of: appModel.requestedOpenSpendCategories) { _, open in
@@ -226,15 +238,6 @@ struct SpendHomeView: View {
         .onChange(of: appModel.requestedOpenSpendCategoryPurchase) { _, open in
             guard open else { return }
             openFirstCategoryPurchase()
-        }
-        .onAppear {
-            if appModel.requestedOpenSpendCategories {
-                showCategories = true
-                appModel.requestedOpenSpendCategories = false
-            }
-            if appModel.requestedOpenSpendCategoryPurchase {
-                openFirstCategoryPurchase()
-            }
         }
         .sheet(item: $selectedTransaction) { tx in
             SpendTransactionSheet(transaction: tx, subcategories: subcategories, userCategories: userCategories)
@@ -249,6 +252,9 @@ struct SpendHomeView: View {
             if let user = userCategories.first(where: { $0.id == item.id }) {
                 SpendCategoryDetailView(category: .other, userCategory: user, month: focusMonth)
             }
+        }
+        .sheet(isPresented: $showAddPurchase) {
+            AddPurchaseSheet(userCategories: userCategories, subcategories: subcategories)
         }
         .sheet(isPresented: $showAddTracked) {
             AddTrackedItemSheet()
@@ -675,6 +681,8 @@ struct SpendHomeView: View {
                                 }
                             } label: {
                                 categoryRow(slice)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             if slice.id != breakdownSlices.last?.id {
@@ -742,7 +750,8 @@ struct SpendHomeView: View {
             }
         }
         .padding(.horizontal, Theme.Space.md)
-        .padding(.vertical, Theme.Space.sm + 2)
+        .padding(.vertical, Theme.Space.md)
+        .frame(minHeight: 56, alignment: .center)
         .accessibilityElement(children: .combine)
         .accessibilityHint("Opens \(slice.title) details and subcategories")
     }
@@ -1188,6 +1197,144 @@ private struct SpendTransactionSheet: View {
             }
             .settingsFormChrome()
         }
+    }
+}
+
+// MARK: - Add purchase (FAB)
+
+private struct AddPurchaseSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    var userCategories: [SpendUserCategoryEntity]
+    var subcategories: [SpendSubcategoryEntity]
+
+    @State private var merchant = ""
+    @State private var amountText = ""
+    @State private var postedAt = Date()
+    @State private var notes = ""
+    @State private var categoryTag = "b-\(SpendCategory.shopping.rawValue)"
+    @State private var subcategoryID: UUID?
+
+    private var categorySubs: [SpendSubcategoryEntity] {
+        guard categoryTag.hasPrefix("b-"),
+              let raw = categoryTag.split(separator: "-", maxSplits: 1).last,
+              let cat = SpendCategory(rawValue: String(raw))
+        else { return [] }
+        return subcategories.filter { $0.parentCategory == cat }
+            .sorted { $0.sortOrder < $1.sortOrder }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Store or merchant", text: $merchant)
+                        .font(.body.weight(.semibold))
+                        .textInputAutocapitalization(.words)
+                        .accessibilityLabel("Merchant")
+                    TextField("Amount", text: $amountText)
+                        .keyboardType(.decimalPad)
+                        .accessibilityLabel("Amount")
+                    DatePicker(
+                        "Date",
+                        selection: $postedAt,
+                        in: ...Date(),
+                        displayedComponents: .date
+                    )
+                } header: {
+                    spendSheetSectionHeader("PURCHASE")
+                }
+
+                Section {
+                    Picker("Category", selection: $categoryTag) {
+                        ForEach(SpendCategory.spendingCases) { cat in
+                            Label(cat.title, systemImage: cat.systemImage).tag("b-\(cat.rawValue)")
+                        }
+                        ForEach(userCategories, id: \.id) { cat in
+                            Label(cat.name, systemImage: cat.systemImage).tag("u-\(cat.id.uuidString)")
+                        }
+                    }
+                    .onChange(of: categoryTag) { _, _ in
+                        subcategoryID = nil
+                    }
+
+                    if !categorySubs.isEmpty {
+                        Picker("Subcategory", selection: $subcategoryID) {
+                            Text("None").tag(Optional<UUID>.none)
+                            ForEach(categorySubs, id: \.id) { sub in
+                                Text(sub.name).tag(Optional(sub.id))
+                            }
+                        }
+                    }
+
+                    TextField("Note (optional)", text: $notes, axis: .vertical)
+                        .lineLimit(2...4)
+                } header: {
+                    spendSheetSectionHeader("CATEGORY")
+                } footer: {
+                    Text("Shows up in this month’s purchases and pie. Cost / use tracking stays under ADD ITEM.")
+                        .font(.caption)
+                }
+            }
+            .navigationTitle("Add purchase")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("CANCEL") { dismiss() }
+                        .font(.caption.weight(.bold))
+                        .tracking(0.5)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("SAVE") { save() }
+                        .font(.caption.weight(.bold))
+                        .tracking(0.5)
+                        .foregroundStyle(Theme.cta)
+                        .disabled(!canSave)
+                }
+            }
+            .settingsFormChrome()
+        }
+    }
+
+    private var canSave: Bool {
+        !merchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && (Double(amountText) ?? 0) > 0
+    }
+
+    private func save() {
+        guard let amount = Double(amountText), amount > 0 else { return }
+        let name = merchant.trimmingCharacters(in: .whitespacesAndNewlines)
+        if categoryTag.hasPrefix("u-"),
+           let uuid = UUID(uuidString: String(categoryTag.dropFirst(2))) {
+            _ = SpendStore.addManualPurchase(
+                merchant: name,
+                amount: amount,
+                postedAt: postedAt,
+                userCategoryID: uuid,
+                notes: notes,
+                in: modelContext
+            )
+        } else if let raw = categoryTag.split(separator: "-", maxSplits: 1).last,
+                  let cat = SpendCategory(rawValue: String(raw)) {
+            _ = SpendStore.addManualPurchase(
+                merchant: name,
+                amount: amount,
+                postedAt: postedAt,
+                category: cat,
+                subcategoryID: subcategoryID,
+                notes: notes,
+                in: modelContext
+            )
+        } else {
+            _ = SpendStore.addManualPurchase(
+                merchant: name,
+                amount: amount,
+                postedAt: postedAt,
+                notes: notes,
+                in: modelContext
+            )
+        }
+        dismiss()
     }
 }
 

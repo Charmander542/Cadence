@@ -46,12 +46,7 @@ struct SpendCategoryDetailView: View {
     }
 
     private var categoryBudget: Double? {
-        SpendStore.budgetAmount(
-            for: category,
-            subcategoryID: nil,
-            userCategoryID: userCategory?.id,
-            budgets: budgets
-        )
+        SpendStore.budgetAmount(for: category, subcategoryID: nil, budgets: budgets)
     }
 
     private var kids: [SpendSubcategoryEntity] {
@@ -94,10 +89,9 @@ struct SpendCategoryDetailView: View {
                         subList
                     }
 
-                    budgetEditor
-                        .padding(.horizontal, Theme.Space.lg)
-
                     if userCategory == nil {
+                        budgetEditor
+                            .padding(.horizontal, Theme.Space.lg)
                         subManage
                     }
                     purchasesSection
@@ -156,7 +150,7 @@ struct SpendCategoryDetailView: View {
                     Text(SpendFormat.money(total))
                         .font(Theme.display(.title))
                         .foregroundStyle(Theme.ink)
-                    if let budget = categoryBudget {
+                    if userCategory == nil, let budget = categoryBudget {
                         let left = budget - total
                         Text(left >= 0
                              ? "\(SpendFormat.money(left)) left of \(SpendFormat.money(budget))"
@@ -264,17 +258,11 @@ struct SpendCategoryDetailView: View {
                     Spacer()
                     Button("SAVE") {
                         let value = Double(budgetText) ?? 0
-                        SpendStore.setBudget(
-                            value,
-                            for: category,
-                            subcategoryID: nil,
-                            userCategoryID: userCategory?.id,
-                            in: modelContext
-                        )
+                        SpendStore.setBudget(value, for: category, subcategoryID: nil, in: modelContext)
                     }
                     .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.cta)
-                    .accessibilityHint("Saves \(displayTitle) monthly budget")
+                    .accessibilityHint("Saves \(category.title) monthly budget")
                 }
                 Text("Optional. Clear and save 0 to remove.")
                     .font(.caption)

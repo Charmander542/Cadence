@@ -1,0 +1,38 @@
+---
+description: Cadence UX loop — single agent, never stop until user ends task
+alwaysApply: true
+---
+
+# Cadence UX loop
+
+One agent owns the full cycle via `docs/CADENCE_UX_BACKLOG.md`. **Never stop the loop on your own.** The user ends the task when they want to.
+
+## Cycle (repeat forever)
+
+Each **iteration** = implement then test, back-to-back in the same session:
+
+| Step | Do |
+|------|-----|
+| **1. Implement** | Fix the next **batch** (P0 all, then 3–5 related P1/P2 items). Add `→ Fix:` under each item. Build must succeed. |
+| **2. Test** | Build + verify the flows touched by the batch (simulator or code review as appropriate). Mark verified items Done with date. **Do not** run `scripts/cadence_sim*`, spot-check JSON flows, or other auto UX scripting. |
+
+Then **immediately** start the next iteration. Do not pause, poll, or hand off.
+
+## When backlog is empty
+
+Run a **fresh UX audit** (all tabs, key flows, code skim) → append new P2 batches → implement → test → repeat.
+
+## Loop signal
+
+Update `docs/CADENCE_UX_BACKLOG.md` each iteration (next batch, summary). **Do not set Phase to stop.** Keep `Phase: RUNNING` unless the user explicitly says to pause.
+
+**Never:** sleep/poll loops, wait for another agent, or stop because backlog is clear — audit and add more work.
+
+## Batches
+
+- Work in **batches**, not one item per pass.
+- Priority: P0 → P1 → P2 (A, B, C… groups in backlog).
+
+## App
+
+Cadence is dark-first — prefer dark appearance when checking UI.

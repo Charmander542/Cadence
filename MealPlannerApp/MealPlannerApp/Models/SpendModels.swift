@@ -381,7 +381,7 @@ final class SpendUserCategoryEntity {
     }
 }
 
-/// Monthly budget for a parent category, subcategory, or custom user category.
+/// Monthly budget for a parent category or a subcategory.
 @Model
 final class SpendBudgetEntity {
     var id: UUID = UUID()
@@ -389,8 +389,6 @@ final class SpendBudgetEntity {
     var categoryRaw: String = SpendCategory.other.rawValue
     /// When set, this budget applies to the subcategory instead of the whole category.
     var subcategoryID: UUID?
-    /// When set, this budget applies to a custom user category (pie slice).
-    var userCategoryID: UUID?
     var monthlyAmount: Double = 0
     var updatedAt: Date = Date()
 
@@ -399,15 +397,9 @@ final class SpendBudgetEntity {
         set { categoryRaw = newValue.rawValue }
     }
 
-    init(
-        category: SpendCategory,
-        subcategoryID: UUID? = nil,
-        userCategoryID: UUID? = nil,
-        monthlyAmount: Double
-    ) {
+    init(category: SpendCategory, subcategoryID: UUID? = nil, monthlyAmount: Double) {
         categoryRaw = category.rawValue
         self.subcategoryID = subcategoryID
-        self.userCategoryID = userCategoryID
         self.monthlyAmount = monthlyAmount
         updatedAt = Date()
     }

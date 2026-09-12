@@ -213,15 +213,7 @@ struct HabitsHomeView: View {
 
     private func habitRowAccessibilityLabel(_ habit: HabitEntity, scheduled: Bool, done: Bool) -> String {
         var parts = [habit.name, habitSubtitle(habit), habitMiniWeekLabel(habit)]
-        if done {
-            if Calendar.current.isDateInToday(selectedDay) {
-                parts.append("completed today")
-            } else {
-                let f = DateFormatter()
-                f.dateFormat = "EEEE"
-                parts.append("completed on \(f.string(from: selectedDay))")
-            }
-        }
+        if done { parts.append("completed today") }
         if !scheduled { parts.append("not scheduled on this day") }
         return parts.joined(separator: ", ")
     }

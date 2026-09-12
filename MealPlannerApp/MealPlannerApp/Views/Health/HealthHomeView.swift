@@ -35,6 +35,7 @@ struct HealthHomeView: View {
 
     private var snapshot: HealthDaySnapshotEntity? {
         snapshots.first { Calendar.current.isDate($0.dayStart, inSameDayAs: selectedDay) }
+            ?? snapshots.first
     }
 
     var body: some View {
@@ -143,19 +144,7 @@ struct HealthHomeView: View {
     }
 
     private var dayHeader: some View {
-        HStack(alignment: .center, spacing: Theme.Space.sm) {
-            Button {
-                shiftDay(-1)
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Theme.cta)
-                    .frame(width: 36, height: 36)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Previous day")
-
+        HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(dayTitle)
                     .font(Theme.display(.title2))
@@ -164,29 +153,9 @@ struct HealthHomeView: View {
                     Text(snapshot.source == .healthKit ? "Apple Health · Watch sync" : "Demo · Bevel-style scoring")
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
-                } else {
-                    Text("Refresh to load this day")
-                        .font(.caption)
-                        .foregroundStyle(Theme.muted)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(dayTitle)
-
-            Button {
-                shiftDay(1)
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(canGoNextDay ? Theme.cta : Theme.muted.opacity(0.35))
-                    .frame(width: 36, height: 36)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(!canGoNextDay)
-            .accessibilityLabel("Next day")
-
+            Spacer()
             Button {
                 Task { await sync(forcePrompt: true) }
             } label: {
@@ -208,20 +177,6 @@ struct HealthHomeView: View {
             }
             .accessibilityLabel("Health settings")
         }
-    }
-
-    private var canGoNextDay: Bool {
-        let cal = Calendar.current
-        let tomorrow = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: selectedDay)) ?? selectedDay
-        return tomorrow <= cal.startOfDay(for: Date())
-    }
-
-    private func shiftDay(_ delta: Int) {
-        let cal = Calendar.current
-        guard let next = cal.date(byAdding: .day, value: delta, to: cal.startOfDay(for: selectedDay)) else { return }
-        let capped = min(cal.startOfDay(for: Date()), next)
-        selectedDay = capped
-        Task { await sync(forcePrompt: false) }
     }
 
     private var dayTitle: String {

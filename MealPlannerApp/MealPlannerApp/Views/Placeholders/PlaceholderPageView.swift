@@ -6,7 +6,7 @@ struct BrowseHomeView: View {
 
     var body: some View {
         NavigationStack {
-            BrowseView(pickTitle: "Browse")
+            BrowseView()
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button(action: onOpenDrawer) {

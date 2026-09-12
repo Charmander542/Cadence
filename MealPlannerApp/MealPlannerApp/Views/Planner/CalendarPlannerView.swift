@@ -672,19 +672,6 @@ struct CalendarPlannerView: View {
                     }
                 })
         )
-        .contextMenu {
-            Button("Open day agenda") {
-                openDayDetail(for: day)
-            }
-            Button("Open 3-day focus") {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    cursor = Calendar.current.startOfDay(for: day)
-                    previewDay = cursor
-                    scope = .threeDay
-                    monthPickerExpanded = false
-                }
-            }
-        }
         .padding(.horizontal, Theme.Space.xs)
         .padding(.vertical, Theme.Space.sm - 2)
         .frame(width: width, height: height, alignment: .top)
@@ -701,19 +688,8 @@ struct CalendarPlannerView: View {
         .opacity(inMonth ? 1 : 0.35)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(monthCellAccessibilityLabel(day: day, items: items, isToday: isToday, inMonth: inMonth))
-        .accessibilityHint("Opens 3-day focus. Use actions for day agenda.")
+        .accessibilityHint("Single tap opens 3-day focus. Double tap opens day agenda.")
         .accessibilityAddTraits(isToday ? [.isButton, .isSelected] : .isButton)
-        .accessibilityAction(named: "Open day agenda") {
-            openDayDetail(for: day)
-        }
-        .accessibilityAction(named: "Open 3-day focus") {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                cursor = Calendar.current.startOfDay(for: day)
-                previewDay = cursor
-                scope = .threeDay
-                monthPickerExpanded = false
-            }
-        }
     }
 
     private func monthCellAccessibilityLabel(day: Date, items: [CalendarDayItem], isToday: Bool, inMonth: Bool) -> String {

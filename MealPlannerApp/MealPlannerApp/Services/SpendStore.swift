@@ -147,10 +147,6 @@ enum SpendStore {
         for tx in txs where tx.userCategoryID == category.id {
             tx.userCategoryID = nil
         }
-        let budgets = (try? context.fetch(FetchDescriptor<SpendBudgetEntity>())) ?? []
-        for budget in budgets where budget.userCategoryID == category.id {
-            context.delete(budget)
-        }
         context.delete(category)
         try? context.save()
     }
@@ -191,17 +187,11 @@ enum SpendStore {
         _ amount: Double,
         for category: SpendCategory,
         subcategoryID: UUID?,
-        userCategoryID: UUID? = nil,
         in context: ModelContext
     ) {
         let budgets = (try? context.fetch(FetchDescriptor<SpendBudgetEntity>())) ?? []
         let match = budgets.first { budget in
-            if let userCategoryID {
-                return budget.userCategoryID == userCategoryID
-            }
-            return budget.userCategoryID == nil
-                && budget.category == category
-                && budget.subcategoryID == subcategoryID
+            budget.category == category && budget.subcategoryID == subcategoryID
         }
         if amount <= 0 {
             if let match { context.delete(match) }
@@ -212,12 +202,7 @@ enum SpendStore {
             match.monthlyAmount = amount
             match.updatedAt = Date()
         } else {
-            context.insert(SpendBudgetEntity(
-                category: category,
-                subcategoryID: subcategoryID,
-                userCategoryID: userCategoryID,
-                monthlyAmount: amount
-            ))
+            context.insert(SpendBudgetEntity(category: category, subcategoryID: subcategoryID, monthlyAmount: amount))
         }
         try? context.save()
     }
@@ -225,15 +210,9 @@ enum SpendStore {
     static func budgetAmount(
         for category: SpendCategory,
         subcategoryID: UUID?,
-        userCategoryID: UUID? = nil,
         budgets: [SpendBudgetEntity]
     ) -> Double? {
-        if let userCategoryID {
-            return budgets.first { $0.userCategoryID == userCategoryID }?.monthlyAmount
-        }
-        return budgets.first {
-            $0.userCategoryID == nil && $0.category == category && $0.subcategoryID == subcategoryID
-        }?.monthlyAmount
+        budgets.first { $0.category == category && $0.subcategoryID == subcategoryID }?.monthlyAmount
     }
 
     /// Outflows in `[start, end)`.
@@ -305,7 +284,7 @@ enum SpendStore {
                 systemImage: cat.systemImage,
                 color: cat.tint,
                 amount: entry.amount,
-                budget: budgetAmount(for: .other, subcategoryID: nil, userCategoryID: cat.id, budgets: budgets),
+                budget: nil,
                 transactionCount: entry.count
             )
         }
@@ -911,39 +890,6 @@ enum SpendStore {
         try? context.save()
     }
 
-    static func deleteUseLog(_ log: SpendUseLogEntity, in context: ModelContext) {
-        let itemID = log.itemID
-        context.delete(log)
-        let items = (try? context.fetch(FetchDescriptor<SpendTrackedItemEntity>())) ?? []
-        guard let item = items.first(where: { $0.id == itemID }) else {
-            try? context.save()
-            return
-        }
-        item.useCount = max(0, item.useCount - 1)
-        let remaining = ((try? context.fetch(FetchDescriptor<SpendUseLogEntity>())) ?? [])
-            .filter { $0.itemID == itemID }
-            .sorted { $0.usedAt > $1.usedAt }
-        item.lastUsedAt = remaining.first?.usedAt
-        try? context.save()
-    }
-
-    static func deleteTrackedItem(_ item: SpendTrackedItemEntity, in context: ModelContext) {
-        let itemID = item.id
-        let remoteID = item.linkedTransactionRemoteID
-        let logs = (try? context.fetch(FetchDescriptor<SpendUseLogEntity>())) ?? []
-        for log in logs where log.itemID == itemID {
-            context.delete(log)
-        }
-        if !remoteID.isEmpty {
-            let txs = (try? context.fetch(FetchDescriptor<SpendTransactionEntity>())) ?? []
-            for tx in txs where tx.remoteID == remoteID {
-                tx.isTracked = false
-            }
-        }
-        context.delete(item)
-        try? context.save()
-    }
-
     @discardableResult
     static func addManualTrackedItem(
         title: String,
@@ -963,6 +909,41 @@ enum SpendStore {
         context.insert(item)
         try? context.save()
         return item
+    }
+
+    /// Manual cash / card purchase (not from bank sync). Amount is money out (stored negative).
+    @discardableResult
+    static func addManualPurchase(
+        merchant: String,
+        amount: Double,
+        postedAt: Date = Date(),
+        category: SpendCategory = .other,
+        userCategoryID: UUID? = nil,
+        subcategoryID: UUID? = nil,
+        notes: String = "",
+        in context: ModelContext
+    ) -> SpendTransactionEntity {
+        let spend = -abs(amount)
+        let tx = SpendTransactionEntity(
+            remoteID: "manual-\(UUID().uuidString)",
+            accountName: "Manual",
+            merchant: merchant.trimmingCharacters(in: .whitespacesAndNewlines),
+            amount: spend,
+            postedAt: postedAt,
+            category: category,
+            subcategoryID: subcategoryID,
+            tellerCategory: "Manual"
+        )
+        if let userCategoryID {
+            tx.assign(userCategoryID: userCategoryID)
+        }
+        let trimmed = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            tx.notes = trimmed
+        }
+        context.insert(tx)
+        try? context.save()
+        return tx
     }
 
     static func disconnectEnrollment(_ enrollment: SpendEnrollmentEntity, in context: ModelContext) {

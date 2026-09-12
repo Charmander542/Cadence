@@ -89,32 +89,31 @@ struct MainTabView: View {
                 .animation(nil, value: isAppGridExpanded)
                 .animation(nil, value: wheelExpandPull)
 
-            // Dial + FAB: hosted in a pass-through layer so only real controls claim taps.
-            // A full-screen VStack/Spacer overlay otherwise steals hits from visible page content
-            // (SwiftUI contentShape does not punch holes through to ZStack siblings).
+            // Larger dial overlays the reserved band (may extend slightly into content).
             if showWheelDock {
-                CadenceHitPassThrough {
-                    VStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        if let fab = contentDestination.fabAction {
-                            CreateFAB(
-                                accessibilityLabel: fab.accessibilityLabel,
-                                accessibilityHint: fab.accessibilityHint
-                            ) {
-                                appModel.requestedFABAction = fab
-                            }
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                            .padding(.trailing, PlannerChromeMetrics.dialFABTrailingPadding)
-                            .padding(.bottom, PlannerChromeMetrics.dialFABBottomPadding)
-                        }
-                        wheelDock
-                            .frame(maxWidth: .infinity)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .ignoresSafeArea(edges: .bottom)
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                        .allowsHitTesting(false)
+                    wheelDock
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea(edges: .bottom)
                 .transition(.opacity)
+            }
+
+            // FAB above the dial — ZStack positions the + without expanding its hit box
+            // across the trailing band (that blocked Spend category rows above the menu).
+            if showWheelDock, let fab = contentDestination.fabAction {
+                ZStack(alignment: .bottomTrailing) {
+                    CreateFAB(
+                        accessibilityLabel: fab.accessibilityLabel,
+                        accessibilityHint: fab.accessibilityHint
+                    ) {
+                        appModel.requestedFABAction = fab
+                    }
+                    .padding(.trailing, PlannerChromeMetrics.dialFABTrailingPadding)
+                    .padding(.bottom, PlannerChromeMetrics.dialFABBottomPadding + PlannerChromeMetrics.dialLayoutHeight)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 .zIndex(3)
             }
 
