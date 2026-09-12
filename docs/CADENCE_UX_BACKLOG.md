@@ -2390,8 +2390,14 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 | Field | Value |
 |-------|-------|
 | **Phase** | `RUNNING` |
-| **Next batch** | **LC** |
-| **Summary** | LB: FAB hit box no longer blocks Spend category rows above dial. Next: LC. |
+| **Next batch** | **LD** |
+| **Summary** | LC: tap subcategory → rename/budget/delete; removed CUSTOMIZE. Next: LD. |
+
+### Batch LC — Tap subcategory to edit (user)
+
+- [x] **Customize section separate from subcategory list** — tap a subcategory to rename, set budget, delete. — 2026-09-12
+  → Fix: `SpendCategoryDetailView` tappable sub list + `EditSubcategorySheet`; dropped CUSTOMIZE / inline budget rows.
+- [x] **Append**.
 
 ### Batch LB — Spend category taps near dial (user)
 
