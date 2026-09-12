@@ -45,6 +45,9 @@ struct CalendarPlannerView: View {
     @State private var pickerMonth = Date()
     /// When the pull-down month picker is open, tap the month title to jump years.
     @State private var pickerShowsYears = false
+    /// Shared 3-day/week/day page offset so hour labels stay pinned while columns slide.
+    @State private var periodDragX: CGFloat = 0
+    @State private var periodSettling = false
 
     private let weekdaySymbols = ["S", "M", "Tu", "W", "Th", "F", "S"]
     private let hourRowHeight: CGFloat = 52
@@ -66,15 +69,17 @@ struct CalendarPlannerView: View {
             Group {
                 switch scope {
                 case .year:
-                    yearScope
+                    CalendarPeriodPager(onPage: shift) { step in
+                        yearGrid(at: dateByShifting(cursor, steps: step))
+                    }
                 case .month:
-                    monthScope
+                    CalendarPeriodPager(onPage: shift) { step in
+                        monthGrid(at: dateByShifting(cursor, steps: step))
+                    }
                 case .week, .threeDay, .day:
                     focusScope
                 }
             }
-            .contentShape(Rectangle())
-            .simultaneousGesture(calendarDateSwipeGesture)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Theme.canvas.ignoresSafeArea())
@@ -247,34 +252,25 @@ struct CalendarPlannerView: View {
         return cal.date(from: comps) ?? cursor
     }
 
-    private func shift(_ dir: Int) {
+    private func dateByShifting(_ date: Date, steps: Int) -> Date {
+        guard steps != 0 else { return date }
         let cal = Calendar.current
         switch scope {
         case .year:
-            cursor = cal.date(byAdding: .year, value: dir, to: cursor) ?? cursor
+            return cal.date(byAdding: .year, value: steps, to: date) ?? date
         case .month:
-            cursor = cal.date(byAdding: .month, value: dir, to: cursor) ?? cursor
+            return cal.date(byAdding: .month, value: steps, to: date) ?? date
         case .week:
-            cursor = cal.date(byAdding: .weekOfYear, value: dir, to: cursor) ?? cursor
+            return cal.date(byAdding: .weekOfYear, value: steps, to: date) ?? date
         case .threeDay:
-            cursor = cal.date(byAdding: .day, value: dir * 3, to: cursor) ?? cursor
+            return cal.date(byAdding: .day, value: steps * 3, to: date) ?? date
         case .day:
-            cursor = cal.date(byAdding: .day, value: dir, to: cursor) ?? cursor
+            return cal.date(byAdding: .day, value: steps, to: date) ?? date
         }
     }
 
-    /// Swipe left → next period; swipe right → previous (matches header chevrons).
-    private var calendarDateSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 28)
-            .onEnded { value in
-                let dx = value.translation.width
-                let dy = value.translation.height
-                // Prefer horizontal; ignore mostly-vertical scrolls (hour grid / year list).
-                guard abs(dx) > 48, abs(dx) > abs(dy) * 1.25 else { return }
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    shift(dx < 0 ? 1 : -1)
-                }
-            }
+    private func shift(_ dir: Int) {
+        cursor = dateByShifting(cursor, steps: dir)
     }
 
     private func openNewEvent(at start: Date) {
@@ -332,7 +328,7 @@ struct CalendarPlannerView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
             monthPickerHandle
-            weekScope(days: days)
+            focusWeekBoard(days: days)
                 .padding(.bottom, calendarFABClearance * 0.35)
         }
     }
@@ -600,13 +596,13 @@ struct CalendarPlannerView: View {
 
     // MARK: - Month
 
-    private var monthScope: some View {
+    private func monthGrid(at pageCursor: Date) -> some View {
         GeometryReader { geo in
             let gridWidth = max(0, geo.size.width)
             let colWidth = gridWidth / 7
             let headerHeight: CGFloat = 28
             let cellHeight = max(44, (geo.size.height - headerHeight - calendarFABClearance) / 6)
-            let days = monthDays(for: cursor)
+            let days = monthDays(for: pageCursor)
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 0) {
                     ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, sym in
@@ -620,7 +616,7 @@ struct CalendarPlannerView: View {
                 .frame(width: gridWidth, alignment: .leading)
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(colWidth), spacing: 0), count: 7), spacing: 0) {
                     ForEach(days, id: \.self) { day in
-                        monthCell(day, width: colWidth, height: cellHeight)
+                        monthCell(day, cursor: pageCursor, width: colWidth, height: cellHeight)
                     }
                 }
                 .frame(width: gridWidth, alignment: .leading)
@@ -631,8 +627,8 @@ struct CalendarPlannerView: View {
         }
     }
 
-    private func monthCell(_ day: Date, width: CGFloat, height: CGFloat) -> some View {
-        let inMonth = Calendar.current.isDate(day, equalTo: cursor, toGranularity: .month)
+    private func monthCell(_ day: Date, cursor pageCursor: Date, width: CGFloat, height: CGFloat) -> some View {
+        let inMonth = Calendar.current.isDate(day, equalTo: pageCursor, toGranularity: .month)
         let isToday = Calendar.current.isDateInToday(day)
         let isPreview = Calendar.current.isDate(previewDay, inSameDayAs: day)
         let items = dayCalendarItems(for: day)
@@ -730,59 +726,112 @@ struct CalendarPlannerView: View {
 
     // MARK: - Week / day
 
-    private func weekScope(days: Int) -> some View {
-        GeometryReader { geo in
-            let colWidth = (geo.size.width - timeGutter) / CGFloat(days)
-            let start = weekStart(days: days)
-            let columns = (0..<days).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: start) }
-            let hours = Array(6...22)
+    /// Hour labels stay pinned; only the day columns page horizontally.
+    private func focusWeekBoard(days: Int) -> some View {
+        let hours = Array(6...22)
+        let showAllDay = focusPagesHaveAllDay(days: days)
+        return GeometryReader { geo in
+            let columnWidth = max(geo.size.width - timeGutter, 1)
+            let colWidth = columnWidth / CGFloat(days)
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
                     Color.clear
                         .frame(width: timeGutter, height: 32)
-                    ForEach(columns, id: \.self) { day in
-                        dayColumnHeader(day, width: colWidth)
+                        .background(Theme.canvas)
+                    CalendarPeriodStrip(pageWidth: columnWidth, dragX: periodDragX) { step in
+                        focusDayHeaders(days: days, at: dateByShifting(cursor, steps: step), colWidth: colWidth)
                     }
                 }
-                allDayRow(columns: columns, colWidth: colWidth)
+                if showAllDay {
+                    HStack(alignment: .top, spacing: 0) {
+                        Text("all-day")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.muted)
+                            .frame(width: timeGutter, alignment: .topLeading)
+                            .padding(.top, Theme.Space.xs)
+                            .background(Theme.canvas)
+                        CalendarPeriodStrip(pageWidth: columnWidth, dragX: periodDragX) { step in
+                            focusAllDayCells(days: days, at: dateByShifting(cursor, steps: step), colWidth: colWidth)
+                        }
+                    }
+                    Divider().overlay(Theme.gridDivider)
+                }
                 ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(hours, id: \.self) { hour in
-                            HStack(alignment: .top, spacing: 0) {
+                    HStack(alignment: .top, spacing: 0) {
+                        VStack(spacing: 0) {
+                            ForEach(hours, id: \.self) { hour in
                                 Text(hourLabel(hour))
                                     .font(.caption2)
                                     .foregroundStyle(Theme.muted)
                                     .frame(width: timeGutter, height: hourRowHeight, alignment: .topLeading)
                                     .padding(.top, Theme.Space.xs)
-                                ForEach(columns, id: \.self) { day in
-                                    weekHourCell(day: day, hour: hour, width: colWidth)
-                                }
                             }
+                        }
+                        .background(Theme.canvas)
+                        .zIndex(1)
+                        CalendarPeriodStrip(pageWidth: columnWidth, dragX: periodDragX) { step in
+                            focusHourGrid(days: days, at: dateByShifting(cursor, steps: step), colWidth: colWidth, hours: hours)
                         }
                     }
                 }
             }
+            .contentShape(Rectangle())
+            .modifier(
+                CalendarPagerDragModifier(
+                    width: columnWidth,
+                    dragX: $periodDragX,
+                    isSettling: $periodSettling,
+                    onPage: shift
+                )
+            )
+        }
+        .onChange(of: scope) { _, _ in
+            periodDragX = 0
+            periodSettling = false
         }
     }
 
-    private func allDayRow(columns: [Date], colWidth: CGFloat) -> some View {
-        let hasAny = columns.contains { !allDayEvents(on: $0).isEmpty }
-        guard hasAny else { return AnyView(EmptyView()) }
-        return AnyView(
-            VStack(spacing: 0) {
+    private func focusPageColumns(days: Int, at pageCursor: Date) -> [Date] {
+        let start = weekStart(days: days, cursor: pageCursor)
+        return (0..<days).compactMap { Calendar.current.date(byAdding: .day, value: $0, to: start) }
+    }
+
+    private func focusPagesHaveAllDay(days: Int) -> Bool {
+        (-1...1).contains { step in
+            focusPageColumns(days: days, at: dateByShifting(cursor, steps: step))
+                .contains { !allDayEvents(on: $0).isEmpty }
+        }
+    }
+
+    private func focusDayHeaders(days: Int, at pageCursor: Date, colWidth: CGFloat) -> some View {
+        let columns = focusPageColumns(days: days, at: pageCursor)
+        return HStack(spacing: 0) {
+            ForEach(columns, id: \.self) { day in
+                dayColumnHeader(day, width: colWidth)
+            }
+        }
+    }
+
+    private func focusAllDayCells(days: Int, at pageCursor: Date, colWidth: CGFloat) -> some View {
+        let columns = focusPageColumns(days: days, at: pageCursor)
+        return HStack(alignment: .top, spacing: 0) {
+            ForEach(columns, id: \.self) { day in
+                allDayCell(day: day, width: colWidth)
+            }
+        }
+    }
+
+    private func focusHourGrid(days: Int, at pageCursor: Date, colWidth: CGFloat, hours: [Int]) -> some View {
+        let columns = focusPageColumns(days: days, at: pageCursor)
+        return VStack(spacing: 0) {
+            ForEach(hours, id: \.self) { hour in
                 HStack(alignment: .top, spacing: 0) {
-                    Text("all-day")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.muted)
-                        .frame(width: timeGutter, alignment: .topLeading)
-                        .padding(.top, Theme.Space.xs)
                     ForEach(columns, id: \.self) { day in
-                        allDayCell(day: day, width: colWidth)
+                        weekHourCell(day: day, hour: hour, width: colWidth)
                     }
                 }
-                Divider().overlay(Theme.gridDivider)
             }
-        )
+        }
     }
 
     private func allDayCell(day: Date, width: CGFloat) -> some View {
@@ -942,17 +991,18 @@ struct CalendarPlannerView: View {
             .accessibilityLabel(label)
     }
 
-    private func weekStart(days: Int) -> Date {
+    private func weekStart(days: Int, cursor pageCursor: Date? = nil) -> Date {
+        let ref = pageCursor ?? cursor
         if days == 7 {
-            return Calendar.current.dateInterval(of: .weekOfYear, for: cursor)?.start ?? cursor
+            return Calendar.current.dateInterval(of: .weekOfYear, for: ref)?.start ?? ref
         }
-        return Calendar.current.startOfDay(for: cursor)
+        return Calendar.current.startOfDay(for: ref)
     }
 
     // MARK: - Year
 
-    private var yearScope: some View {
-        let months = (0..<12).compactMap { Calendar.current.date(byAdding: .month, value: $0, to: yearStart(cursor)) }
+    private func yearGrid(at pageCursor: Date) -> some View {
+        let months = (0..<12).compactMap { Calendar.current.date(byAdding: .month, value: $0, to: yearStart(pageCursor)) }
         let columns = Array(repeating: GridItem(.flexible(), spacing: Theme.Space.sm + 2), count: 3)
         return ScrollView {
             LazyVGrid(columns: columns, spacing: Theme.Space.lg) {
@@ -1074,5 +1124,135 @@ struct CalendarPlannerView: View {
     private func hourLabel(_ hour: Int) -> String {
         let h = hour % 12 == 0 ? 12 : hour % 12
         return "\(h) \(hour < 12 ? "AM" : "PM")"
+    }
+}
+
+/// Offset-only previous / current / next strip. Parent owns the drag.
+private struct CalendarPeriodStrip<Page: View>: View {
+    var pageWidth: CGFloat
+    var height: CGFloat?
+    var dragX: CGFloat
+    @ViewBuilder var page: (Int) -> Page
+
+    var body: some View {
+        let width = max(pageWidth, 1)
+        HStack(spacing: 0) {
+            page(-1)
+                .frame(width: width, height: height)
+                .allowsHitTesting(false)
+            page(0)
+                .frame(width: width, height: height)
+            page(1)
+                .frame(width: width, height: height)
+                .allowsHitTesting(false)
+        }
+        .frame(width: width, height: height, alignment: .leading)
+        .offset(x: -width + dragX)
+        .clipped()
+    }
+}
+
+private struct CalendarPagerDragModifier: ViewModifier {
+    var width: CGFloat
+    @Binding var dragX: CGFloat
+    @Binding var isSettling: Bool
+    var onPage: (Int) -> Void
+
+    private enum DragAxis {
+        case undecided, horizontal, vertical
+    }
+
+    @State private var axis: DragAxis = .undecided
+
+    func body(content: Content) -> some View {
+        content
+            .simultaneousGesture(pagerGesture)
+            .accessibilityAdjustableAction { direction in
+                guard !isSettling else { return }
+                switch direction {
+                case .increment: commit(1)
+                case .decrement: commit(-1)
+                @unknown default: break
+                }
+            }
+    }
+
+    private var pagerGesture: some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .local)
+            .onChanged { value in
+                guard !isSettling else { return }
+                let tx = value.translation.width
+                let ty = value.translation.height
+                if axis == .undecided, hypot(tx, ty) > 10 {
+                    axis = abs(tx) > abs(ty) * 1.15 ? .horizontal : .vertical
+                }
+                if axis == .horizontal {
+                    dragX = tx
+                }
+            }
+            .onEnded { value in
+                let locked = axis
+                axis = .undecided
+                guard locked == .horizontal, !isSettling else {
+                    if dragX != 0 {
+                        withAnimation(.interactiveSpring(response: 0.32, dampingFraction: 0.88)) {
+                            dragX = 0
+                        }
+                    }
+                    return
+                }
+                let tx = value.translation.width
+                let predicted = value.predictedEndTranslation.width
+                if tx < -width * 0.18 || predicted < -width * 0.42 {
+                    commit(1)
+                } else if tx > width * 0.18 || predicted > width * 0.42 {
+                    commit(-1)
+                } else {
+                    withAnimation(.interactiveSpring(response: 0.32, dampingFraction: 0.88)) {
+                        dragX = 0
+                    }
+                }
+            }
+    }
+
+    private func commit(_ dir: Int) {
+        guard !isSettling else { return }
+        isSettling = true
+        withAnimation(.interactiveSpring(response: 0.34, dampingFraction: 0.88)) {
+            dragX = -width * CGFloat(dir)
+        } completion: {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                onPage(dir)
+                dragX = 0
+            }
+            isSettling = false
+        }
+    }
+}
+
+/// Standalone pager (month / year) — previous / current / next with a finger-following spring.
+private struct CalendarPeriodPager<Page: View>: View {
+    var onPage: (Int) -> Void
+    @ViewBuilder var page: (Int) -> Page
+
+    @State private var dragX: CGFloat = 0
+    @State private var isSettling = false
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = max(geo.size.width, 1)
+            CalendarPeriodStrip(pageWidth: width, height: geo.size.height, dragX: dragX, page: page)
+                .contentShape(Rectangle())
+                .modifier(
+                    CalendarPagerDragModifier(
+                        width: width,
+                        dragX: $dragX,
+                        isSettling: $isSettling,
+                        onPage: onPage
+                    )
+                )
+        }
     }
 }

@@ -140,7 +140,7 @@ struct WheelNav: View {
                     Rectangle()
                         .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06))
                         .frame(height: 1)
-                        .opacity(1 - awake * 0.85)
+                        .opacity(1 - Double(awake) * 0.85)
                 }
         }
         .ignoresSafeArea(edges: .bottom)

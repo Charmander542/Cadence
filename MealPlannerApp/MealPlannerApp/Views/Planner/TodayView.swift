@@ -209,7 +209,8 @@ struct TodayView: View {
                             Button { showQuickAdd = true } label: {
                                 HStack(spacing: Theme.Space.sm + 2) {
                                     Image(systemName: "plus.circle.fill")
-                                        .font(.body.weight(.semibold))
+                                        .font(.body)
+                                        .symbolRenderingMode(.hierarchical)
                                         .foregroundStyle(Theme.cta)
                                     Text("ADD TASK")
                                         .font(.caption.weight(.bold))
@@ -217,7 +218,8 @@ struct TodayView: View {
                                         .foregroundStyle(Theme.cta)
                                     Spacer(minLength: 0)
                                 }
-                                .padding(.vertical, Theme.Space.sm)
+                                .padding(.horizontal, Theme.Space.md + 2)
+                                .padding(.vertical, Theme.Space.sm + 2)
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel("Add task")
@@ -399,6 +401,7 @@ struct TodayView: View {
             RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                 .strokeBorder(Theme.hairline, lineWidth: 1)
         )
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
     }
 
     private var tagColorMap: [String: Color] {

@@ -62,7 +62,6 @@
 		A20000000000000000000052 /* SpendPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000052 /* SpendPreferences.swift */; };
 		A20000000000000000000053 /* PlaidClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000053 /* PlaidClient.swift */; };
 		A20000000000000000000058 /* PlaidLinkCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000058 /* PlaidLinkCoordinator.swift */; };
-		A20000000000000000000059 /* PlaidLocal.plist in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000059 /* PlaidLocal.plist */; };
 		PLAID00000000000000000003 /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = PLAID00000000000000000002 /* LinkKit */; };
 		A20000000000000000000054 /* SpendStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000054 /* SpendStore.swift */; };
 		A20000000000000000000055 /* SpendHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000055 /* SpendHomeView.swift */; };
@@ -223,7 +222,7 @@
 		A10000000000000000000052 /* SpendPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendPreferences.swift; sourceTree = "<group>"; };
 		A10000000000000000000053 /* PlaidClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaidClient.swift; sourceTree = "<group>"; };
 		A10000000000000000000058 /* PlaidLinkCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaidLinkCoordinator.swift; sourceTree = "<group>"; };
-		A10000000000000000000059 /* PlaidLocal.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PlaidLocal.plist; sourceTree = "<group>"; };
+		A10000000000000000000059 /* PlaidLocal.plist.example */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PlaidLocal.plist.example; sourceTree = "<group>"; };
 		A10000000000000000000054 /* SpendStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendStore.swift; sourceTree = "<group>"; };
 		A10000000000000000000055 /* SpendHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendHomeView.swift; sourceTree = "<group>"; };
 		A10000000000000000000056 /* SpendItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendItemDetailView.swift; sourceTree = "<group>"; };
@@ -345,7 +344,7 @@
 			children = (
 				A10000000000000000000001 /* MealPlannerAppApp.swift */,
 				A10000000000000000000012 /* Info.plist */,
-				A10000000000000000000059 /* PlaidLocal.plist */,
+				A10000000000000000000059 /* PlaidLocal.plist.example */,
 				W10000000000000000000011 /* MealPlannerApp.entitlements */,
 				A1000000000000000000000F /* Assets.xcassets */,
 				C10000000000000000000012 /* SubApps */,
@@ -643,6 +642,7 @@
 				E6D0707D14F74DC89F541E35 /* Sources */,
 				07707BB997D44D6296A48DDC /* Frameworks */,
 				EDB432E633C64B529E2AFD97 /* Resources */,
+				A2000000000000000000005A /* Copy PlaidLocal.plist if present */,
 				WEDB432E633C64B529E2AFD98 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
@@ -742,11 +742,32 @@
 				A20000000000000000000019 /* recipes.sqlite3 in Resources */,
 				A2000000000000000000002F /* exercise_catalog.json in Resources */,
 				A20000000000000000000030 /* ExerciseImages in Resources */,
-				A20000000000000000000059 /* PlaidLocal.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A2000000000000000000005A /* Copy PlaidLocal.plist if present */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy PlaidLocal.plist if present";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "PLIST=\"${SRCROOT}/MealPlannerApp/PlaidLocal.plist\"\nDEST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/PlaidLocal.plist\"\nif [ -f \"$PLIST\" ]; then\n  cp -f \"$PLIST\" \"$DEST\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		B6D0707D14F74DC89F541E40 /* Sources */ = {
