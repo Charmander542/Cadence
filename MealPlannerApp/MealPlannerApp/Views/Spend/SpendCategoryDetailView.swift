@@ -46,7 +46,12 @@ struct SpendCategoryDetailView: View {
     }
 
     private var categoryBudget: Double? {
-        SpendStore.budgetAmount(for: category, subcategoryID: nil, budgets: budgets)
+        SpendStore.budgetAmount(
+            for: category,
+            subcategoryID: nil,
+            userCategoryID: userCategory?.id,
+            budgets: budgets
+        )
     }
 
     private var kids: [SpendSubcategoryEntity] {
@@ -89,9 +94,10 @@ struct SpendCategoryDetailView: View {
                         subList
                     }
 
+                    budgetEditor
+                        .padding(.horizontal, Theme.Space.lg)
+
                     if userCategory == nil {
-                        budgetEditor
-                            .padding(.horizontal, Theme.Space.lg)
                         subManage
                     }
                     purchasesSection
@@ -150,7 +156,7 @@ struct SpendCategoryDetailView: View {
                     Text(SpendFormat.money(total))
                         .font(Theme.display(.title))
                         .foregroundStyle(Theme.ink)
-                    if userCategory == nil, let budget = categoryBudget {
+                    if let budget = categoryBudget {
                         let left = budget - total
                         Text(left >= 0
                              ? "\(SpendFormat.money(left)) left of \(SpendFormat.money(budget))"
@@ -258,11 +264,17 @@ struct SpendCategoryDetailView: View {
                     Spacer()
                     Button("SAVE") {
                         let value = Double(budgetText) ?? 0
-                        SpendStore.setBudget(value, for: category, subcategoryID: nil, in: modelContext)
+                        SpendStore.setBudget(
+                            value,
+                            for: category,
+                            subcategoryID: nil,
+                            userCategoryID: userCategory?.id,
+                            in: modelContext
+                        )
                     }
                     .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.cta)
-                    .accessibilityHint("Saves \(category.title) monthly budget")
+                    .accessibilityHint("Saves \(displayTitle) monthly budget")
                 }
                 Text("Optional. Clear and save 0 to remove.")
                     .font(.caption)
@@ -388,6 +400,7 @@ private struct SubcategoryBudgetRow: View {
     @Bindable var subcategory: SpendSubcategoryEntity
     @Query private var budgets: [SpendBudgetEntity]
     @State private var text = ""
+    @State private var confirmDelete = false
 
     private var current: Double? {
         SpendStore.budgetAmount(for: category, subcategoryID: subcategory.id, budgets: budgets)
@@ -405,6 +418,18 @@ private struct SubcategoryBudgetRow: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer()
+                Button {
+                    confirmDelete = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.danger)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Delete \(subcategory.name)")
+                .accessibilityHint("Removes this subcategory. Purchases stay under \(category.title).")
             }
             HStack {
                 Text("Budget $")
@@ -426,6 +451,18 @@ private struct SubcategoryBudgetRow: View {
             if let current {
                 text = String(format: "%.0f", current)
             }
+        }
+        .confirmationDialog(
+            "Delete \(subcategory.name)?",
+            isPresented: $confirmDelete,
+            titleVisibility: .visible
+        ) {
+            Button("Delete subcategory", role: .destructive) {
+                SpendStore.deleteSubcategory(subcategory, in: modelContext)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Purchases stay in \(category.title). This subcategory’s budget is removed.")
         }
     }
 }

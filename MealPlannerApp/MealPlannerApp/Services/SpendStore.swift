@@ -147,6 +147,10 @@ enum SpendStore {
         for tx in txs where tx.userCategoryID == category.id {
             tx.userCategoryID = nil
         }
+        let budgets = (try? context.fetch(FetchDescriptor<SpendBudgetEntity>())) ?? []
+        for budget in budgets where budget.userCategoryID == category.id {
+            context.delete(budget)
+        }
         context.delete(category)
         try? context.save()
     }
@@ -187,11 +191,17 @@ enum SpendStore {
         _ amount: Double,
         for category: SpendCategory,
         subcategoryID: UUID?,
+        userCategoryID: UUID? = nil,
         in context: ModelContext
     ) {
         let budgets = (try? context.fetch(FetchDescriptor<SpendBudgetEntity>())) ?? []
         let match = budgets.first { budget in
-            budget.category == category && budget.subcategoryID == subcategoryID
+            if let userCategoryID {
+                return budget.userCategoryID == userCategoryID
+            }
+            return budget.userCategoryID == nil
+                && budget.category == category
+                && budget.subcategoryID == subcategoryID
         }
         if amount <= 0 {
             if let match { context.delete(match) }
@@ -202,7 +212,12 @@ enum SpendStore {
             match.monthlyAmount = amount
             match.updatedAt = Date()
         } else {
-            context.insert(SpendBudgetEntity(category: category, subcategoryID: subcategoryID, monthlyAmount: amount))
+            context.insert(SpendBudgetEntity(
+                category: category,
+                subcategoryID: subcategoryID,
+                userCategoryID: userCategoryID,
+                monthlyAmount: amount
+            ))
         }
         try? context.save()
     }
@@ -210,9 +225,15 @@ enum SpendStore {
     static func budgetAmount(
         for category: SpendCategory,
         subcategoryID: UUID?,
+        userCategoryID: UUID? = nil,
         budgets: [SpendBudgetEntity]
     ) -> Double? {
-        budgets.first { $0.category == category && $0.subcategoryID == subcategoryID }?.monthlyAmount
+        if let userCategoryID {
+            return budgets.first { $0.userCategoryID == userCategoryID }?.monthlyAmount
+        }
+        return budgets.first {
+            $0.userCategoryID == nil && $0.category == category && $0.subcategoryID == subcategoryID
+        }?.monthlyAmount
     }
 
     /// Outflows in `[start, end)`.
@@ -284,7 +305,7 @@ enum SpendStore {
                 systemImage: cat.systemImage,
                 color: cat.tint,
                 amount: entry.amount,
-                budget: nil,
+                budget: budgetAmount(for: .other, subcategoryID: nil, userCategoryID: cat.id, budgets: budgets),
                 transactionCount: entry.count
             )
         }
@@ -551,16 +572,24 @@ enum SpendStore {
         )
         let accountNames = Dictionary(uniqueKeysWithValues: accounts.accounts.map { ($0.account_id, $0.displayName) })
 
+        // User SYNC (and store-wipe heal) always clears the cursor so Plaid returns the full
+        // available history as "added", not just deltas since the last cursor.
         var cursor = enrollment.syncCursor.isEmpty
             ? KeychainStore.plaidSyncCursor(itemID: enrollment.enrollmentID)
             : enrollment.syncCursor
-
-        // After a store wipe we can keep a Keychain cursor with no local txs — force a full pull.
-        let shouldResetCursor = forceFullResync || (!cursor.isEmpty && !hasLocalPlaidTransactions(in: context))
-        if shouldResetCursor {
+        if forceFullResync || (!cursor.isEmpty && !hasLocalPlaidTransactions(in: context)) {
             cursor = ""
             enrollment.syncCursor = ""
             KeychainStore.savePlaidSyncCursor("", itemID: enrollment.enrollmentID)
+            // Ask the institution for a fresh extract before re-reading history.
+            try? await client.refreshTransactions(
+                clientID: SpendPreferences.clientID,
+                secret: secret,
+                environment: env,
+                accessToken: accessToken
+            )
+            // Give Plaid a beat to finish the refresh before the empty-cursor pull.
+            try? await Task.sleep(for: .milliseconds(800))
         }
 
         let result = try await client.syncAllTransactions(
@@ -591,11 +620,20 @@ enum SpendStore {
         return rows.contains { !$0.remoteID.hasPrefix("demo-") }
     }
 
-    static func syncAllEnrollments(in context: ModelContext) async throws -> Int {
+    /// Count of non-demo transactions currently stored (for SYNC status copy).
+    static func localPlaidTransactionCount(in context: ModelContext) -> Int {
+        let rows = (try? context.fetch(FetchDescriptor<SpendTransactionEntity>())) ?? []
+        return rows.filter { !$0.remoteID.hasPrefix("demo-") }.count
+    }
+
+    static func syncAllEnrollments(
+        in context: ModelContext,
+        forceFullResync: Bool = false
+    ) async throws -> Int {
         let enrollments = try context.fetch(FetchDescriptor<SpendEnrollmentEntity>())
         var total = 0
         for enrollment in enrollments {
-            total += try await syncEnrollment(enrollment, in: context)
+            total += try await syncEnrollment(enrollment, in: context, forceFullResync: forceFullResync)
         }
         return total
     }
@@ -606,17 +644,27 @@ enum SpendStore {
         in context: ModelContext
     ) throws {
         let existing = try context.fetch(FetchDescriptor<SpendTransactionEntity>())
-        let byRemote = Dictionary(uniqueKeysWithValues: existing.map { ($0.remoteID, $0) })
+        var byRemote: [String: SpendTransactionEntity] = [:]
+        byRemote.reserveCapacity(existing.count)
+        for row in existing {
+            byRemote[row.remoteID] = row
+        }
+        let ruleMap = merchantRuleMap(in: context)
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
 
         for dto in remote {
-            if dto.pending == true { continue }
+            // Include pending — otherwise early syncs look almost empty.
             let posted = formatter.date(from: dto.date) ?? Date()
             let merchant = dto.merchantName
-            let category = SpendCategory.infer(from: merchant, tellerCategory: dto.categoryLabel)
+            let plaidLabel = dto.categoryLabel ?? ""
+            let resolved = resolveCategory(
+                merchant: merchant,
+                plaidLabel: plaidLabel,
+                rules: ruleMap
+            )
             // Plaid: positive = money out. Cadence UI: negative = money out.
             let amount = -dto.amount
             let accountName = accountNames[dto.account_id ?? ""] ?? enrollmentFallbackAccountName(dto.account_id)
@@ -625,11 +673,9 @@ enum SpendStore {
                 row.merchant = merchant
                 row.amount = amount
                 row.postedAt = posted
-                row.tellerCategory = dto.categoryLabel ?? ""
+                row.tellerCategory = plaidLabel
                 row.accountName = accountName
-                if row.categoryRaw == SpendCategory.other.rawValue {
-                    row.category = category
-                }
+                applyResolvedCategory(resolved, to: row, overwriteManual: ruleMap[normalizeMerchantKey(merchant)] != nil)
             } else {
                 let row = SpendTransactionEntity(
                     remoteID: dto.id,
@@ -637,13 +683,174 @@ enum SpendStore {
                     merchant: merchant,
                     amount: amount,
                     postedAt: posted,
-                    category: category,
-                    tellerCategory: dto.categoryLabel ?? ""
+                    category: resolved.category,
+                    tellerCategory: plaidLabel
                 )
+                if let uid = resolved.userCategoryID {
+                    row.assign(userCategoryID: uid)
+                }
                 context.insert(row)
             }
         }
         try context.save()
+    }
+
+    // MARK: - Merchant category rules
+
+    /// Collapse merchant strings so "STARBUCKS #123" and "Starbucks Store" can share a rule.
+    static func normalizeMerchantKey(_ merchant: String) -> String {
+        var key = merchant.lowercased()
+        key = key.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+        // Drop store numbers / trailing codes.
+        key = key.replacingOccurrences(of: #"[#*]?\s*\d{2,}.*$"#, with: "", options: .regularExpression)
+        key = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        return key
+    }
+
+    private static func merchantRuleMap(in context: ModelContext) -> [String: SpendMerchantRuleEntity] {
+        let rules = (try? context.fetch(FetchDescriptor<SpendMerchantRuleEntity>())) ?? []
+        var map: [String: SpendMerchantRuleEntity] = [:]
+        for rule in rules where !rule.merchantKey.isEmpty {
+            map[rule.merchantKey] = rule
+        }
+        return map
+    }
+
+    static func merchantRule(for merchant: String, in context: ModelContext) -> SpendMerchantRuleEntity? {
+        let key = normalizeMerchantKey(merchant)
+        guard !key.isEmpty else { return nil }
+        return merchantRuleMap(in: context)[key]
+    }
+
+    private struct ResolvedCategory {
+        var category: SpendCategory
+        var userCategoryID: UUID?
+    }
+
+    private static func resolveCategory(
+        merchant: String,
+        plaidLabel: String,
+        rules: [String: SpendMerchantRuleEntity]
+    ) -> ResolvedCategory {
+        let key = normalizeMerchantKey(merchant)
+        if let rule = rules[key] {
+            if let uid = rule.userCategoryID {
+                return ResolvedCategory(category: .other, userCategoryID: uid)
+            }
+            return ResolvedCategory(category: rule.category, userCategoryID: nil)
+        }
+        return ResolvedCategory(
+            category: SpendCategory.infer(from: merchant, tellerCategory: plaidLabel.isEmpty ? nil : plaidLabel),
+            userCategoryID: nil
+        )
+    }
+
+    private static func applyResolvedCategory(
+        _ resolved: ResolvedCategory,
+        to row: SpendTransactionEntity,
+        overwriteManual: Bool
+    ) {
+        if overwriteManual {
+            if let uid = resolved.userCategoryID {
+                row.assign(userCategoryID: uid)
+            } else {
+                row.assign(builtIn: resolved.category)
+            }
+            return
+        }
+        // Auto-fill only when still uncategorized / default Other.
+        guard row.userCategoryID == nil, row.category == .other else { return }
+        if let uid = resolved.userCategoryID {
+            row.assign(userCategoryID: uid)
+        } else if resolved.category != .other {
+            row.assign(builtIn: resolved.category)
+        }
+    }
+
+    /// Pin a store to a category for all current + future purchases.
+    @discardableResult
+    static func setMerchantRule(
+        merchant: String,
+        category: SpendCategory?,
+        userCategoryID: UUID?,
+        applyToExisting: Bool = true,
+        in context: ModelContext
+    ) -> SpendMerchantRuleEntity? {
+        let key = normalizeMerchantKey(merchant)
+        guard !key.isEmpty else { return nil }
+        let display = merchant.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rules = (try? context.fetch(FetchDescriptor<SpendMerchantRuleEntity>())) ?? []
+        let rule: SpendMerchantRuleEntity
+        if let existing = rules.first(where: { $0.merchantKey == key }) {
+            rule = existing
+        } else {
+            rule = SpendMerchantRuleEntity(
+                merchantKey: key,
+                merchantDisplay: display.isEmpty ? key : display
+            )
+            context.insert(rule)
+        }
+        rule.merchantDisplay = display.isEmpty ? rule.merchantDisplay : display
+        rule.updatedAt = Date()
+        if let uid = userCategoryID {
+            rule.userCategoryID = uid
+            rule.category = .other
+        } else if let category {
+            rule.userCategoryID = nil
+            rule.category = category
+        }
+        if applyToExisting {
+            applyMerchantRule(rule, in: context)
+        }
+        try? context.save()
+        return rule
+    }
+
+    static func clearMerchantRule(for merchant: String, in context: ModelContext) {
+        let key = normalizeMerchantKey(merchant)
+        guard !key.isEmpty else { return }
+        let rules = (try? context.fetch(FetchDescriptor<SpendMerchantRuleEntity>())) ?? []
+        for rule in rules where rule.merchantKey == key {
+            context.delete(rule)
+        }
+        try? context.save()
+    }
+
+    static func applyMerchantRule(_ rule: SpendMerchantRuleEntity, in context: ModelContext) {
+        let txs = (try? context.fetch(FetchDescriptor<SpendTransactionEntity>())) ?? []
+        for tx in txs where normalizeMerchantKey(tx.merchant) == rule.merchantKey {
+            if let uid = rule.userCategoryID {
+                tx.assign(userCategoryID: uid)
+            } else {
+                tx.assign(builtIn: rule.category)
+            }
+        }
+    }
+
+    /// Re-run Plaid/PFC auto-categorization for purchases still on Other (no merchant rule).
+    static func refreshAutoCategories(in context: ModelContext) {
+        let ruleMap = merchantRuleMap(in: context)
+        let txs = (try? context.fetch(FetchDescriptor<SpendTransactionEntity>())) ?? []
+        for tx in txs {
+            let key = normalizeMerchantKey(tx.merchant)
+            if let rule = ruleMap[key] {
+                if let uid = rule.userCategoryID {
+                    tx.assign(userCategoryID: uid)
+                } else {
+                    tx.assign(builtIn: rule.category)
+                }
+                continue
+            }
+            guard tx.userCategoryID == nil, tx.category == .other else { continue }
+            let inferred = SpendCategory.infer(
+                from: tx.merchant,
+                tellerCategory: tx.tellerCategory.isEmpty ? nil : tx.tellerCategory
+            )
+            if inferred != .other {
+                tx.assign(builtIn: inferred)
+            }
+        }
+        try? context.save()
     }
 
     private static func enrollmentFallbackAccountName(_ accountID: String?) -> String {
@@ -701,6 +908,39 @@ enum SpendStore {
         item.useCount += 1
         item.lastUsedAt = Date()
         context.insert(SpendUseLogEntity(itemID: item.id, note: note))
+        try? context.save()
+    }
+
+    static func deleteUseLog(_ log: SpendUseLogEntity, in context: ModelContext) {
+        let itemID = log.itemID
+        context.delete(log)
+        let items = (try? context.fetch(FetchDescriptor<SpendTrackedItemEntity>())) ?? []
+        guard let item = items.first(where: { $0.id == itemID }) else {
+            try? context.save()
+            return
+        }
+        item.useCount = max(0, item.useCount - 1)
+        let remaining = ((try? context.fetch(FetchDescriptor<SpendUseLogEntity>())) ?? [])
+            .filter { $0.itemID == itemID }
+            .sorted { $0.usedAt > $1.usedAt }
+        item.lastUsedAt = remaining.first?.usedAt
+        try? context.save()
+    }
+
+    static func deleteTrackedItem(_ item: SpendTrackedItemEntity, in context: ModelContext) {
+        let itemID = item.id
+        let remoteID = item.linkedTransactionRemoteID
+        let logs = (try? context.fetch(FetchDescriptor<SpendUseLogEntity>())) ?? []
+        for log in logs where log.itemID == itemID {
+            context.delete(log)
+        }
+        if !remoteID.isEmpty {
+            let txs = (try? context.fetch(FetchDescriptor<SpendTransactionEntity>())) ?? []
+            for tx in txs where tx.remoteID == remoteID {
+                tx.isTracked = false
+            }
+        }
+        context.delete(item)
         try? context.save()
     }
 

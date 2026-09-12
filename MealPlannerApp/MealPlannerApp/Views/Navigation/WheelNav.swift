@@ -48,7 +48,9 @@ struct WheelNav: View {
     private let maxCoastSegments: Double = 2.4
     /// Visual dial (~1.5× original). Page inset stays `PlannerChromeMetrics.dialLayoutHeight`.
     private let dialHeight: CGFloat = 104
-    private let hitSlop: CGFloat = 40
+    /// Solid dock plate height — the only region that claims touches. Soft arc above is visual-only
+    /// so page controls that show through the fade stay tappable.
+    private var solidDockHeight: CGFloat { dialHeight + 12 }
     private let flatIconSpacing: CGFloat = 72
     private let idleDelaySeconds: Double = 5.0
 
@@ -89,35 +91,24 @@ struct WheelNav: View {
     }
 
     private var dialStack: some View {
-        ZStack(alignment: .bottom) {
-            dockPlate
+        let awake = max(0, 1 - idleAmount)
+        let arcRise: CGFloat = 40 * awake
+
+        return ZStack(alignment: .bottom) {
+            solidDockPlate(awake: awake)
             dialInterior
         }
         .frame(maxWidth: .infinity)
-        .frame(height: dialHeight + hitSlop, alignment: .bottom)
-        .animation(idleSpring, value: idleAmount)
-        .onAppear(perform: handleAppear)
-        .onChange(of: selectedId) { _, _ in
-            if !isDragging { syncPositionToSelection(animated: false) }
-        }
-        .onChange(of: isExpanded, perform: handleExpandedChange)
-        .onChange(of: dialGestureActive, perform: handleGestureActiveChange)
-        .onDisappear(perform: handleDisappear)
-    }
-
-    /// Solid theme plate behind the icons — idle bar sized so icons sit evenly; arc while scrolling.
-    /// Circle mode: the arc tip fades in opacity so page content soft-blends above the icons.
-    private var dockPlate: some View {
-        let awake = max(0, 1 - idleAmount)
-        // Prior taller idle was dialHeight + 8; a couple px shorter for even icon padding.
-        let idleBarHeight: CGFloat = dialHeight + 12
-        let arcRise: CGFloat = 40 * awake
-
-        return VStack(spacing: 0) {
+        .frame(height: solidDockHeight, alignment: .bottom)
+        // Opaque dock only — no hitSlop band above that steals page taps.
+        .contentShape(Rectangle())
+        .gesture(dialGesture)
+        // Soft arc draws above the solid dock without expanding the hit frame —
+        // content visible through the fade should receive taps.
+        .overlay(alignment: .top) {
             DockScrollArc(rise: max(arcRise, 0.01))
                 .fill(dockFill)
                 .frame(height: max(arcRise, 0.01))
-                // Fade only the curved lip — icons live below this band.
                 .mask(
                     LinearGradient(
                         colors: [
@@ -130,22 +121,36 @@ struct WheelNav: View {
                     )
                 )
                 .opacity(awake)
+                .offset(y: -max(arcRise, 0.01))
                 .allowsHitTesting(false)
-
-            Rectangle()
-                .fill(dockFill)
-                .frame(height: idleBarHeight)
-                .frame(maxWidth: .infinity)
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06))
-                        .frame(height: 1)
-                        .opacity(1 - Double(awake) * 0.85)
-                }
+                .accessibilityHidden(true)
         }
-        .ignoresSafeArea(edges: .bottom)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        .frame(maxWidth: .infinity)
+        .animation(idleSpring, value: idleAmount)
+        .onAppear(perform: handleAppear)
+        .onChange(of: selectedId) { _, _ in
+            if !isDragging { syncPositionToSelection(animated: false) }
+        }
+        .onChange(of: isExpanded, perform: handleExpandedChange)
+        .onChange(of: dialGestureActive, perform: handleGestureActiveChange)
+        .onDisappear(perform: handleDisappear)
+    }
+
+    /// Solid theme plate behind the icons — idle bar sized so icons sit evenly.
+    private func solidDockPlate(awake: CGFloat) -> some View {
+        Rectangle()
+            .fill(dockFill)
+            .frame(height: solidDockHeight)
+            .frame(maxWidth: .infinity)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06))
+                    .frame(height: 1)
+                    .opacity(1 - Double(awake) * 0.85)
+            }
+            .ignoresSafeArea(edges: .bottom)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 
     private func handleAppear() {
@@ -214,7 +219,7 @@ struct WheelNav: View {
 
             GeometryReader { geo in
                 let midX = geo.size.width / 2
-                let midY = hitSlop + dialHeight * 0.48
+                let midY = solidDockHeight * 0.42
 
                 ZStack {
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -222,21 +227,13 @@ struct WheelNav: View {
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                // Only the dock band takes hits — the hitSlop above is visual/layout only so
-                // page controls (Focus Start, etc.) win over the dial scroller like the FAB.
-                .contentShape(
-                    Path { path in
-                        let bandTop = max(0, geo.size.height - dialHeight)
-                        path.addRect(CGRect(x: 0, y: bandTop, width: geo.size.width, height: dialHeight))
-                    }
-                )
-                .gesture(dialGesture)
+                .allowsHitTesting(false)
                 .onAppear { dialWidth = geo.size.width }
                 .onChange(of: geo.size.width) { _, w in dialWidth = w }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        .padding(.top, -hitSlop)
+        .allowsHitTesting(false)
     }
 
     @ViewBuilder

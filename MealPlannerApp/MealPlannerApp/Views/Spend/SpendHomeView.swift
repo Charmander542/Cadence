@@ -203,6 +203,7 @@ struct SpendHomeView: View {
         .onAppear {
             SpendPreferences.ingestLocalSecretsIfNeeded()
             SpendStore.seedDemoIfNeeded(in: modelContext)
+            SpendStore.refreshAutoCategories(in: modelContext)
             // Heal empty Plaid history after a store wipe left a stale sync cursor.
             let hasPlaidTxs = transactions.contains { !$0.remoteID.hasPrefix("demo-") }
             if !enrollments.isEmpty, !hasPlaidTxs, !isSyncing {
@@ -466,9 +467,13 @@ struct SpendHomeView: View {
                         .font(.subheadline)
                         .foregroundStyle(Theme.muted)
                 } else {
-                    Text("Tap a slice to expand · tap elsewhere or wait 7s to collapse")
+                    Text("Tap a slice to expand")
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
+                        .multilineTextAlignment(.center)
+                    Text("Tap outside or wait to collapse")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.muted.opacity(0.85))
                         .multilineTextAlignment(.center)
                 }
             }
@@ -1050,11 +1055,41 @@ struct SpendHomeView: View {
         isSyncing = true
         defer { isSyncing = false }
         do {
-            let count = try await SpendStore.syncAllEnrollments(in: modelContext)
-            syncMessage = count == 0 ? "Up to date" : "Synced \(count) updates"
+            // Always clear the cursor so SYNC re-pulls full available history, not just deltas.
+            let updates = try await SpendStore.syncAllEnrollments(in: modelContext, forceFullResync: true)
+            SpendStore.refreshAutoCategories(in: modelContext)
+            let total = SpendStore.localPlaidTransactionCount(in: modelContext)
+            if total == 0 {
+                syncMessage = updates == 0
+                    ? "No purchases yet — try again in a minute while Plaid loads history"
+                    : "Synced, waiting on bank history…"
+            } else {
+                syncMessage = "Loaded \(total) purchase\(total == 1 ? "" : "s")"
+                jumpToNewestSpendingMonth()
+            }
         } catch {
             syncMessage = error.localizedDescription
         }
+    }
+
+    /// Month navigator defaults to “this month”; after a full sync, jump to the newest spend month.
+    private func jumpToNewestSpendingMonth() {
+        let cal = Calendar.current
+        let spending = transactions.filter {
+            !$0.remoteID.hasPrefix("demo-")
+                && !$0.isHidden
+                && $0.amount < 0
+                && $0.category != .income
+                && $0.category != .transfer
+        }
+        guard let newest = spending.map(\.postedAt).max() else { return }
+        let nowComps = cal.dateComponents([.year, .month], from: Date())
+        let txComps = cal.dateComponents([.year, .month], from: newest)
+        guard let nowMonth = cal.date(from: nowComps),
+              let txMonth = cal.date(from: txComps),
+              let delta = cal.dateComponents([.month], from: nowMonth, to: txMonth).month
+        else { return }
+        monthOffset = min(0, delta)
     }
 }
 
@@ -1113,7 +1148,7 @@ private struct SpendTransactionSheet: View {
                 } header: {
                     spendSheetSectionHeader("CATEGORY")
                 } footer: {
-                    Text("Create your own categories from Overview → Categories. Subcategories like Kitchen live under a parent.")
+                    Text("Bank feed categories apply automatically. Turn on “Always for …” so a store keeps the same category every time.")
                         .font(.caption)
                 }
 

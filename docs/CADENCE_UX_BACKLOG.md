@@ -1,20 +1,12 @@
 # Cadence UX Backlog
 
-**Status:** Audit round 5–6 complete 2026-08-30 — Batches H–J implemented + verified
+**Status:** Loop **STOPPED** 2026-09-12 — history only; do not auto-continue audits or batches.
 
 ---
 
 ## How to use this file
 
-**One agent** cycles forever: **Implement batch → Test in simulator → repeat.** When P0/P1/P2 are all Done, run a fresh audit, append new P2 batches, and keep going.
-
-| Step | Action |
-|------|--------|
-| **Implement** | Fix the next batch. Add `→ Fix:` under items. Never check Done boxes yet. |
-| **Test** | Build + simulator. Mark Done with date. Note failures on the item. |
-| **Audit** | Only when nothing is open — full-app pass, append new P2 groups. |
-
-Set **Phase** → `RUNNING` always. **Do not stop** — audit and add more work when backlog clears. User ends the task when they want to.
+Optional reference for past UX work. **Do not** run implement→test→audit loops unless the user explicitly asks.
 
 ---
 
@@ -2389,9 +2381,71 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 
 | Field | Value |
 |-------|-------|
-| **Phase** | `RUNNING` |
-| **Next batch** | **KU** |
-| **Summary** | Plaid spend history heal: clear stale sync cursor after store wipe so old txs re-pull. Next: KU. |
+| **Phase** | `STOPPED` |
+| **Next batch** | — |
+| **Summary** | User stopped the Cadence UX loop (2026-09-12). Rules `.cursor/rules/cadence-ux-loop.mdc` and `cadence-ux-implementer.mdc` removed. Backlog retained as history only — do not auto-audit or continue batches. |
+
+### Batch LD — Fresh UX audit (post-LC)
+
+- [x] **News topic filter shows “No stories yet”** — Clear filter when digest has other stories. — 2026-09-12
+  → Fix: `NewsHomeView` topic-empty vs true-empty CTAs.
+- [x] **Body Overview can’t change days** — prev/next + sync selected day; no wrong-day fallback. — 2026-09-12
+  → Fix: `HealthHomeView.dayHeader` / `shiftDay`.
+- [x] **Habits VoiceOver says “completed today” on other days** — weekday-aware. — 2026-09-12
+  → Fix: `HabitsView.habitRowAccessibilityLabel`.
+- [x] **Month calendar day agenda undiscoverable** — context menu + VO actions. — 2026-09-12
+  → Fix: `CalendarPlannerView` month cell.
+- [x] **Matrix empty quadrants blank** — muted Add task well → Quick Add. — 2026-09-12
+  → Fix: `MatrixView.quadrant`.
+- [x] **Dial Browse title says “Recipes”** — `pickTitle: "Browse"`. — 2026-09-12
+  → Fix: `BrowseHomeView`.
+- [x] **Append**.
+
+### Batch LC — Inbox empty + custom budgets (audit)
+
+- [x] **Inbox empty mentions Meals dinner** — destination-specific copy + tray icon. — 2026-09-12
+  → Fix: `TodayView` Inbox empty CTA.
+- [x] **Custom categories can’t take budgets** — `userCategoryID` on `SpendBudgetEntity`; Budgets + detail editor. — 2026-09-12
+  → Fix: `SpendStore.setBudget` / `budgetAmount`; `SpendBudgetsView` Your categories; detail budget for custom.
+- [x] **Append**.
+
+### Batch LB — Spend Cost/Use + Focus Record (audit)
+
+- [x] **Cost/Use item has no delete** — DONE only; can’t remove tracked item. — 2026-09-12
+  → Fix: Delete (confirm) + `SpendStore.deleteTrackedItem` (clear logs, unset `isTracked`).
+- [x] **Mistaken Cost/Use taps can’t be undone** — LOG USE has no reverse. — 2026-09-12
+  → Fix: Trash on use-log rows; `SpendStore.deleteUseLog` decrements count.
+- [x] **Focus session delete is long-press only** — contextMenu only. — 2026-09-12
+  → Fix: Visible trash on Focus Record rows → `FocusStore.delete`.
+- [x] **Focus Record empty state dead-end** — muted text, no CTA. — 2026-09-12
+  → Fix: Compact empty + Add session CTA.
+- [x] **Append**.
+
+### Batch LA — Bottom tap pass-through (user)
+
+- [x] **Visible controls near bottom untappable** — dial/FAB full-screen overlay + hitSlop stole taps; faded arc counted as chrome. — 2026-09-12
+  → Fix: `WheelNav` hit frame = solid dock only (soft arc visual); `CadenceHitPassThrough` so empty overlay pixels reach page content; FAB stacked above dock.
+- [x] **Append**.
+
+### Batch KY — Delete subcategories (user)
+
+- [x] **No way to remove subcategories** — category detail had add-only; Categories list swipe was hard to discover. — 2026-09-12
+  → Fix: Trash + confirm on `SpendCategoryDetailView` `SubcategoryBudgetRow`; trash / swipe / Edit-mode delete on `SpendCategoriesManageView` (subs + custom categories).
+- [x] **Append**.
+
+### Batch KX — Merchant categories (user)
+
+- [x] **Auto category from bank PFC** — map Plaid personal_finance_category (+ merchant keywords); refresh Other on appear/SYNC. — 2026-09-12
+  → Fix: `SpendCategory.infer`, `SpendStore.refreshAutoCategories`, sync stores primary+detailed label.
+- [x] **Always for this store** — `SpendMerchantRuleEntity`; toggle on purchase editor; applies to matching merchants. — 2026-09-12
+  → Fix: `SpendStore.setMerchantRule` / `SpendCategoryAssignmentFields`.
+- [x] **Append**.
+
+### Batch KV — Plaid full history SYNC (user)
+
+- [x] **SYNC only pulled deltas after 1 tx** — force empty-cursor full resync on every SYNC; `/transactions/refresh` first; include pending; report total loaded; jump month navigator. — 2026-09-12
+  → Fix: `SpendStore.syncEnrollment(forceFullResync:)`, `PlaidClient.refreshTransactions` + sync pagination harden, `SpendHomeView.syncNow`.
+- [x] **Append**.
 
 ### Batch KU — Plaid spend sync (user)
 
@@ -2407,8 +2461,9 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 
 ### Batch KS — Fresh UX audit (post-KR)
 
-- [ ] **Spend pie hint wraps tightly** — “Tap a slice to expand · tap elsewhere or wait 7s…” is cramped under the donut.
-- [ ] **Append**.
+- [x] **Spend pie hint wraps tightly** — split into two short centered lines under the donut. — 2026-09-12
+  → Fix: `SpendHomeView` pie caption “Tap a slice to expand” + “Tap outside or wait to collapse”.
+- [x] **Append**.
 
 ### Batch KR — Fresh UX audit (post-KQ)
 

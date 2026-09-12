@@ -34,8 +34,10 @@ struct MealPlannerApp: App {
             SpendSubcategoryEntity.self,
             SpendBudgetEntity.self,
             SpendUserCategoryEntity.self,
+            SpendMerchantRuleEntity.self,
         ])
         // v10: Import Apple/Google calendar events into Cadence.
+        // Merchant rules added via lightweight schema expansion (no store rename).
         let config = ModelConfiguration("musclemeal-v10", isStoredInMemoryOnly: false)
         do {
             return try ModelContainer(for: schema, configurations: [config])

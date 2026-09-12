@@ -7,6 +7,8 @@ struct SpendBudgetsView: View {
     @Query private var budgets: [SpendBudgetEntity]
     @Query(sort: \SpendSubcategoryEntity.sortOrder)
     private var subcategories: [SpendSubcategoryEntity]
+    @Query(sort: \SpendUserCategoryEntity.sortOrder)
+    private var userCategories: [SpendUserCategoryEntity]
     @Query(sort: \SpendTransactionEntity.postedAt, order: .reverse)
     private var transactions: [SpendTransactionEntity]
 
@@ -15,7 +17,12 @@ struct SpendBudgetsView: View {
     }
 
     private var monthSpend: Double {
-        SpendStore.categorySlices(transactions: transactions, budgets: budgets, in: range)
+        SpendStore.categorySlices(
+            transactions: transactions,
+            budgets: budgets,
+            userCategories: userCategories,
+            in: range
+        )
             .map(\.amount).reduce(0, +)
     }
 
@@ -48,6 +55,35 @@ struct SpendBudgetsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .listRowBackground(Theme.surface)
+            }
+
+            if !userCategories.isEmpty {
+                Section {
+                    ForEach(userCategories, id: \.id) { cat in
+                        BudgetAmountRow(
+                            title: cat.name,
+                            tint: cat.tint,
+                            systemImage: cat.systemImage,
+                            amount: SpendStore.budgetAmount(
+                                for: .other,
+                                subcategoryID: nil,
+                                userCategoryID: cat.id,
+                                budgets: budgets
+                            ),
+                            spent: spent(userCategoryID: cat.id)
+                        ) { value in
+                            SpendStore.setBudget(
+                                value,
+                                for: .other,
+                                subcategoryID: nil,
+                                userCategoryID: cat.id,
+                                in: modelContext
+                            )
+                        }
+                    }
+                } header: {
+                    Text("Your categories")
+                }
             }
 
             ForEach(SpendCategory.spendingCases) { cat in
@@ -90,6 +126,16 @@ struct SpendBudgetsView: View {
             in: range,
             category: category,
             subcategoryID: subcategoryID
+        )
+        .map { abs($0.amount) }
+        .reduce(0, +)
+    }
+
+    private func spent(userCategoryID: UUID) -> Double {
+        SpendStore.spendingTransactions(
+            transactions,
+            in: range,
+            userCategoryID: userCategoryID
         )
         .map { abs($0.amount) }
         .reduce(0, +)

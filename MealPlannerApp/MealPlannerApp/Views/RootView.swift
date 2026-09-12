@@ -89,36 +89,32 @@ struct MainTabView: View {
                 .animation(nil, value: isAppGridExpanded)
                 .animation(nil, value: wheelExpandPull)
 
-            // Larger dial overlays the reserved band (may extend slightly into content).
+            // Dial + FAB: hosted in a pass-through layer so only real controls claim taps.
+            // A full-screen VStack/Spacer overlay otherwise steals hits from visible page content
+            // (SwiftUI contentShape does not punch holes through to ZStack siblings).
             if showWheelDock {
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    wheelDock
-                }
-                .ignoresSafeArea(edges: .bottom)
-                .transition(.opacity)
-            }
-
-            // FAB above the dial as a trailing-only control — must not cover the wheel hit target.
-            if showWheelDock, let fab = contentDestination.fabAction {
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                        .allowsHitTesting(false)
-                    HStack(spacing: 0) {
+                CadenceHitPassThrough {
+                    VStack(spacing: 0) {
                         Spacer(minLength: 0)
-                            .allowsHitTesting(false)
-                        CreateFAB(
-                            accessibilityLabel: fab.accessibilityLabel,
-                            accessibilityHint: fab.accessibilityHint
-                        ) {
-                            appModel.requestedFABAction = fab
+                        if let fab = contentDestination.fabAction {
+                            CreateFAB(
+                                accessibilityLabel: fab.accessibilityLabel,
+                                accessibilityHint: fab.accessibilityHint
+                            ) {
+                                appModel.requestedFABAction = fab
+                            }
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .padding(.trailing, PlannerChromeMetrics.dialFABTrailingPadding)
+                            .padding(.bottom, PlannerChromeMetrics.dialFABBottomPadding)
                         }
-                        .padding(.trailing, PlannerChromeMetrics.dialFABTrailingPadding)
+                        wheelDock
+                            .frame(maxWidth: .infinity)
                     }
-                    .padding(.bottom, PlannerChromeMetrics.dialFABBottomPadding)
-                    // Match page content bottom (safeAreaInset dial band).
-                    .padding(.bottom, PlannerChromeMetrics.dialLayoutHeight)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .ignoresSafeArea(edges: .bottom)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.opacity)
                 .zIndex(3)
             }
 

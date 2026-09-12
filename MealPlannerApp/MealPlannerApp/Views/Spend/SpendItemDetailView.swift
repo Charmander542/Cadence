@@ -7,6 +7,7 @@ struct SpendItemDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var item: SpendTrackedItemEntity
     @Query private var allLogs: [SpendUseLogEntity]
+    @State private var confirmDeleteItem = false
 
     private var logs: [SpendUseLogEntity] {
         allLogs
@@ -36,6 +37,16 @@ struct SpendItemDetailView: View {
                         .accessibilityHint("Adds one use and updates cost per use")
                     }
                     history
+                    Button(role: .destructive) {
+                        confirmDeleteItem = true
+                    } label: {
+                        Text("Delete item")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Theme.Space.sm)
+                    }
+                    .padding(.horizontal, Theme.Space.lg)
+                    .accessibilityHint("Removes this cost-per-use item and its use log")
                 }
                 .padding(.vertical, Theme.Space.md)
             }
@@ -49,6 +60,19 @@ struct SpendItemDetailView: View {
                         .tracking(0.5)
                         .foregroundStyle(Theme.cta)
                 }
+            }
+            .confirmationDialog(
+                "Delete \(item.title)?",
+                isPresented: $confirmDeleteItem,
+                titleVisibility: .visible
+            ) {
+                Button("Delete item", role: .destructive) {
+                    SpendStore.deleteTrackedItem(item, in: modelContext)
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Use history is removed. Linked purchases stay in Purchases.")
             }
         }
     }
@@ -161,6 +185,17 @@ struct SpendItemDetailView: View {
                                             .font(.caption)
                                             .foregroundStyle(Theme.muted)
                                     }
+                                    Button {
+                                        SpendStore.deleteUseLog(log, in: modelContext)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(Theme.danger)
+                                            .frame(width: 32, height: 32)
+                                            .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Delete use")
                                 }
                                 .padding(.vertical, Theme.Space.sm)
                                 if log.id != logs.prefix(20).last?.id {

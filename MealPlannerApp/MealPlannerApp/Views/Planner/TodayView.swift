@@ -163,9 +163,11 @@ struct TodayView: View {
                     }
                     if visibleTasks.isEmpty && overdue.isEmpty && completedCount == 0 && destination != .today {
                         Theme.EmptyState(
-                            systemImage: "checkmark.circle",
-                            title: "Nothing scheduled",
-                            message: "Tap + to add a task, or open Meals to plan dinner.",
+                            systemImage: destination == .inbox ? "tray" : "checkmark.circle",
+                            title: destination == .inbox ? "Inbox is empty" : "Nothing scheduled",
+                            message: destination == .inbox
+                                ? "Capture undated tasks here. Tap + to add one."
+                                : "Tap + to add a task, or open Meals to plan dinner.",
                             cta: "Add task",
                             ctaHint: "Opens quick add for a new task"
                         ) {
@@ -173,7 +175,11 @@ struct TodayView: View {
                         }
                         .frame(minHeight: 220)
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Nothing scheduled. Tap add task or open Meals to plan dinner.")
+                        .accessibilityLabel(
+                            destination == .inbox
+                                ? "Inbox is empty. Tap add task to capture an undated task."
+                                : "Nothing scheduled. Tap add task or open Meals to plan dinner."
+                        )
                     }
                     if !overdue.isEmpty {
                         sectionCard(id: "overdue", title: "Overdue", count: overdue.count, trailing: postponeMenu) {

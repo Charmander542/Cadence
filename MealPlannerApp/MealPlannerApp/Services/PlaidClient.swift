@@ -67,8 +67,12 @@ actor PlaidClient {
         }
 
         var categoryLabel: String? {
-            personal_finance_category?.detailed
-                ?? personal_finance_category?.primary
+            let pfc = personal_finance_category
+            if let primary = pfc?.primary, let detailed = pfc?.detailed {
+                return "\(primary) \(detailed)"
+            }
+            return pfc?.detailed
+                ?? pfc?.primary
                 ?? category?.first
         }
     }
@@ -82,6 +86,19 @@ actor PlaidClient {
 
         struct Removed: Decodable, Sendable {
             let transaction_id: String?
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case added, modified, removed, next_cursor, has_more
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            added = try c.decodeIfPresent([TransactionDTO].self, forKey: .added) ?? []
+            modified = try c.decodeIfPresent([TransactionDTO].self, forKey: .modified) ?? []
+            removed = try c.decodeIfPresent([Removed].self, forKey: .removed) ?? []
+            next_cursor = try c.decodeIfPresent(String.self, forKey: .next_cursor) ?? ""
+            has_more = try c.decodeIfPresent(Bool.self, forKey: .has_more) ?? false
         }
     }
 
@@ -104,6 +121,7 @@ actor PlaidClient {
         case http(Int, String)
         case decoding
         case emptyLinkToken
+        case syncMutationDuringPagination
 
         var errorDescription: String? {
             switch self {
@@ -115,6 +133,8 @@ actor PlaidClient {
                 return "Could not read Plaid response."
             case .emptyLinkToken:
                 return "Plaid did not return a link token."
+            case .syncMutationDuringPagination:
+                return "Plaid transactions changed mid-sync — retrying."
             }
         }
     }
@@ -208,7 +228,27 @@ actor PlaidClient {
         return response.institution?.name
     }
 
+    /// Ask Plaid to pull fresh data from the institution before a full sync.
+    func refreshTransactions(
+        clientID: String,
+        secret: String,
+        environment: SpendPreferences.PlaidEnvironment,
+        accessToken: String
+    ) async throws {
+        struct Empty: Decodable {}
+        let _: Empty = try await post(
+            path: "/transactions/refresh",
+            environment: environment,
+            json: [
+                "client_id": clientID,
+                "secret": secret,
+                "access_token": accessToken,
+            ]
+        )
+    }
+
     /// Pulls all available pages from `/transactions/sync`.
+    /// Pass an empty `cursor` to re-download the Item’s full available history.
     func syncAllTransactions(
         clientID: String,
         secret: String,
@@ -216,7 +256,31 @@ actor PlaidClient {
         accessToken: String,
         cursor: String
     ) async throws -> (added: [TransactionDTO], modified: [TransactionDTO], removedIDs: [String], nextCursor: String) {
-        var cursor = cursor
+        var attempt = 0
+        while true {
+            attempt += 1
+            do {
+                return try await syncAllTransactionsOnce(
+                    clientID: clientID,
+                    secret: secret,
+                    environment: environment,
+                    accessToken: accessToken,
+                    cursor: cursor
+                )
+            } catch PlaidError.syncMutationDuringPagination where attempt < 4 {
+                continue
+            }
+        }
+    }
+
+    private func syncAllTransactionsOnce(
+        clientID: String,
+        secret: String,
+        environment: SpendPreferences.PlaidEnvironment,
+        accessToken: String,
+        cursor: String
+    ) async throws -> (added: [TransactionDTO], modified: [TransactionDTO], removedIDs: [String], nextCursor: String) {
+        var requestCursor = cursor
         var added: [TransactionDTO] = []
         var modified: [TransactionDTO] = []
         var removed: [String] = []
@@ -224,28 +288,37 @@ actor PlaidClient {
 
         while true {
             guardPages += 1
-            if guardPages > 40 { break }
+            if guardPages > 80 { break }
             var body: [String: Any] = [
                 "client_id": clientID,
                 "secret": secret,
                 "access_token": accessToken,
                 "count": 500,
+                "options": [
+                    "include_personal_finance_category": true,
+                    "personal_finance_category_version": "v2",
+                ],
             ]
-            if !cursor.isEmpty {
-                body["cursor"] = cursor
+            if !requestCursor.isEmpty {
+                body["cursor"] = requestCursor
             }
-            let page: SyncResponse = try await post(
-                path: "/transactions/sync",
-                environment: environment,
-                json: body
-            )
-            added.append(contentsOf: page.added)
-            modified.append(contentsOf: page.modified)
-            removed.append(contentsOf: page.removed.compactMap(\.transaction_id))
-            cursor = page.next_cursor
-            if !page.has_more { break }
+            do {
+                let page: SyncResponse = try await post(
+                    path: "/transactions/sync",
+                    environment: environment,
+                    json: body
+                )
+                added.append(contentsOf: page.added)
+                modified.append(contentsOf: page.modified)
+                removed.append(contentsOf: page.removed.compactMap(\.transaction_id))
+                requestCursor = page.next_cursor
+                if !page.has_more { break }
+            } catch PlaidError.http(_, let body) where body.contains("TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION") {
+                // Restart entire pagination from the original cursor.
+                throw PlaidError.syncMutationDuringPagination
+            }
         }
-        return (added, modified, removed, cursor)
+        return (added, modified, removed, requestCursor)
     }
 
     /// Instant sandbox Item without Link UI (First Platypus Bank).

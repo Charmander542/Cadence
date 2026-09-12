@@ -50,6 +50,17 @@ struct SpendCategoriesManageView: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(Theme.ink)
                             Spacer()
+                            Button {
+                                SpendStore.deleteUserCategory(cat, in: modelContext)
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Theme.danger)
+                                    .frame(width: 36, height: 36)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Delete \(cat.name)")
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
@@ -59,6 +70,13 @@ struct SpendCategoriesManageView: View {
                             }
                         }
                         .listRowBackground(Theme.surface)
+                    }
+                    .onDelete { offsets in
+                        let ordered = userCategories
+                        for index in offsets {
+                            guard ordered.indices.contains(index) else { continue }
+                            SpendStore.deleteUserCategory(ordered[index], in: modelContext)
+                        }
                     }
                 }
             } header: {
@@ -70,33 +88,20 @@ struct SpendCategoriesManageView: View {
                 if !kids.isEmpty {
                     Section {
                         ForEach(kids, id: \.id) { sub in
-                            HStack(spacing: Theme.Space.sm) {
-                                Image(systemName: sub.systemImage)
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(sub.tint)
-                                    .frame(width: 32, height: 32)
-                                    .background(Circle().fill(sub.tint.opacity(0.22)))
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(sub.name)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(Theme.ink)
-                                    Text(cat.title)
-                                        .font(.caption2)
-                                        .foregroundStyle(Theme.muted)
-                                }
-                                Spacer()
+                            subcategoryRow(sub, parentTitle: cat.title)
+                        }
+                        .onDelete { offsets in
+                            let ordered = kids
+                            for index in offsets {
+                                guard ordered.indices.contains(index) else { continue }
+                                SpendStore.deleteSubcategory(ordered[index], in: modelContext)
                             }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    SpendStore.deleteSubcategory(sub, in: modelContext)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                            .listRowBackground(Theme.surface)
                         }
                     } header: {
                         Label(cat.title, systemImage: cat.systemImage)
+                    } footer: {
+                        Text("Swipe left or tap trash to remove a subcategory. Purchases stay under \(cat.title).")
+                            .font(.caption2)
                     }
                 }
             }
@@ -132,6 +137,53 @@ struct SpendCategoriesManageView: View {
                 presentNewCategory()
             }
         }
+    }
+
+    @ViewBuilder
+    private func subcategoryRow(_ sub: SpendSubcategoryEntity, parentTitle: String) -> some View {
+        HStack(spacing: Theme.Space.sm) {
+            Image(systemName: sub.systemImage)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(sub.tint)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(sub.tint.opacity(0.22)))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(sub.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.ink)
+                Text(parentTitle)
+                    .font(.caption2)
+                    .foregroundStyle(Theme.muted)
+            }
+            Spacer()
+            Button {
+                SpendStore.deleteSubcategory(sub, in: modelContext)
+            } label: {
+                Image(systemName: "trash")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.danger)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Delete \(sub.name)")
+            .accessibilityHint("Removes this subcategory")
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                SpendStore.deleteSubcategory(sub, in: modelContext)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                SpendStore.deleteSubcategory(sub, in: modelContext)
+            } label: {
+                Label("Delete subcategory", systemImage: "trash")
+            }
+        }
+        .listRowBackground(Theme.surface)
     }
 
     private func presentNewCategory() {
@@ -341,6 +393,15 @@ struct SpendCategoryAssignmentFields: View {
     var userCategories: [SpendUserCategoryEntity]
     var subcategories: [SpendSubcategoryEntity]
 
+    private var merchantLabel: String {
+        let name = transaction.merchant.trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "this store" : name
+    }
+
+    private var hasMerchantRule: Bool {
+        SpendStore.merchantRule(for: transaction.merchant, in: modelContext) != nil
+    }
+
     var body: some View {
         Picker("Category", selection: Binding(
             get: { currentTag },
@@ -366,6 +427,34 @@ struct SpendCategoryAssignmentFields: View {
                 }
             }
         }
+
+        if !transaction.merchant.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            Toggle(isOn: Binding(
+                get: { hasMerchantRule },
+                set: { enabled in
+                    if enabled {
+                        pinCurrentCategoryAsMerchantRule()
+                    } else {
+                        SpendStore.clearMerchantRule(for: transaction.merchant, in: modelContext)
+                    }
+                }
+            )) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Always for \(merchantLabel)")
+                    Text("Future purchases from this store use this category")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+            .tint(Theme.cta)
+            .accessibilityHint("Saves a rule so every purchase from this store gets the same category")
+        }
+
+        if !transaction.tellerCategory.isEmpty {
+            LabeledContent("Bank category", value: friendlyPlaidLabel(transaction.tellerCategory))
+                .font(.caption)
+                .foregroundStyle(Theme.muted)
+        }
     }
 
     private var currentTag: String {
@@ -381,5 +470,26 @@ struct SpendCategoryAssignmentFields: View {
             transaction.assign(builtIn: cat)
         }
         try? modelContext.save()
+        // Keep an existing store rule in sync with the new pick.
+        if hasMerchantRule {
+            pinCurrentCategoryAsMerchantRule()
+        }
+    }
+
+    private func pinCurrentCategoryAsMerchantRule() {
+        _ = SpendStore.setMerchantRule(
+            merchant: transaction.merchant,
+            category: transaction.userCategoryID == nil ? transaction.category : nil,
+            userCategoryID: transaction.userCategoryID,
+            applyToExisting: true,
+            in: modelContext
+        )
+    }
+
+    private func friendlyPlaidLabel(_ raw: String) -> String {
+        raw
+            .replacingOccurrences(of: "_", with: " ")
+            .lowercased()
+            .capitalized
     }
 }

@@ -29,6 +29,77 @@ enum PlannerChromeMetrics {
     static let dialFABBottomPadding: CGFloat = 28
 }
 
+/// Full-screen SwiftUI chrome that only claims touches on interactive descendants.
+/// Empty pixels (Spacers, clear frames) pass through to content behind.
+struct CadenceHitPassThrough<Content: View>: UIViewRepresentable {
+    @ViewBuilder var content: () -> Content
+
+    func makeUIView(context: Context) -> CadenceHitPassThroughView {
+        let view = CadenceHitPassThroughView()
+        let host = UIHostingController(rootView: content())
+        host.view.backgroundColor = .clear
+        view.embed(host)
+        context.coordinator.host = host
+        return view
+    }
+
+    func updateUIView(_ uiView: CadenceHitPassThroughView, context: Context) {
+        context.coordinator.host?.rootView = content()
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator {
+        var host: UIHostingController<Content>?
+    }
+}
+
+final class CadenceHitPassThroughView: UIView {
+    private weak var hostedView: UIView?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isOpaque = false
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    func embed(_ host: UIHostingController<some View>) {
+        hostedView?.removeFromSuperview()
+        let child = host.view!
+        child.backgroundColor = .clear
+        child.isOpaque = false
+        addSubview(child)
+        child.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            child.leadingAnchor.constraint(equalTo: leadingAnchor),
+            child.trailingAnchor.constraint(equalTo: trailingAnchor),
+            child.topAnchor.constraint(equalTo: topAnchor),
+            child.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+        hostedView = child
+    }
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard !isHidden, isUserInteractionEnabled, alpha > 0.01 else { return nil }
+        guard let hostedView else { return nil }
+        let local = convert(point, to: hostedView)
+        guard let hit = hostedView.hitTest(local, with: event) else { return nil }
+        // Blank areas resolve to the hosting root — let those fall through to page content.
+        if hit === hostedView { return nil }
+        // Full-screen clear layout containers (Spacer plates) without gestures also pass through.
+        let hasGestures = !(hit.gestureRecognizers?.isEmpty ?? true)
+        if !hasGestures,
+           !(hit is UIControl),
+           hit.frame.width >= bounds.width * 0.95,
+           hit.frame.height >= bounds.height * 0.45 {
+            return nil
+        }
+        return hit
+    }
+}
+
 enum FABAction: Equatable {
     case todayQuickAdd
     case matrixQuickAdd

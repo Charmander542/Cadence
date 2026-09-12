@@ -73,18 +73,69 @@ enum SpendCategory: String, CaseIterable, Identifiable, Codable {
         allCases.filter { $0 != .income && $0 != .transfer }
     }
 
+    /// Map Plaid `personal_finance_category` (+ merchant keywords) → Cadence category.
+    /// Prefers PFC primary/detailed labels from the bank feed, then falls back to merchant text.
     static func infer(from merchant: String, tellerCategory: String?) -> SpendCategory {
+        let pfc = (tellerCategory ?? "").uppercased()
+
+        // --- Plaid PFC detailed (most specific) ---
+        if pfc.contains("GROCER") || pfc.contains("SUPERMARKET") { return .groceries }
+        if pfc.contains("RESTAURANT") || pfc.contains("FAST_FOOD")
+            || pfc.contains("COFFEE") || pfc.contains("BEER")
+            || pfc.contains("WINE") || pfc.contains("BAR") { return .dining }
+        if pfc.contains("GAS") || pfc.contains("PARKING")
+            || pfc.contains("TAXIS") || pfc.contains("RIDE")
+            || pfc.contains("PUBLIC_TRANSIT") || pfc.contains("TOLLS") { return .transport }
+        if pfc.contains("GYM") || pfc.contains("PHARMACY")
+            || pfc.contains("DENTAL") || pfc.contains("EYECARE")
+            || pfc.contains("PRIMARY_CARE") || pfc.contains("HOSPITAL") { return .health }
+        if pfc.contains("STREAMING") || pfc.contains("VIDEO_GAMES")
+            || pfc.contains("MUSIC") || pfc.contains("CASINO")
+            || pfc.contains("TV_AND_MOVIES") || pfc.contains("SPORTING") { return .entertainment }
+        if pfc.contains("RENT") || pfc.contains("UTILITIES")
+            || pfc.contains("INTERNET") || pfc.contains("TELEPHONE")
+            || pfc.contains("HOME_IMPROVEMENT") || pfc.contains("FURNITURE") { return .home }
+        if pfc.contains("LOAN") || pfc.contains("CREDIT_CARD_PAYMENT") { return .transfer }
+        if pfc.contains("SUBSCRIPTION") || pfc.contains("TELECOMMUNICATION") { return .subscriptions }
+
+        // --- Plaid PFC primary ---
+        if pfc.hasPrefix("INCOME") { return .income }
+        if pfc.contains("TRANSFER") { return .transfer }
+        if pfc.hasPrefix("FOOD_AND_DRINK") {
+            return (pfc.contains("GROCER") || pfc.contains("SUPERMARKET")) ? .groceries : .dining
+        }
+        if pfc.hasPrefix("TRANSPORTATION") || pfc.hasPrefix("TRAVEL") { return .transport }
+        if pfc.hasPrefix("GENERAL_MERCHANDISE") { return .shopping }
+        if pfc.hasPrefix("ENTERTAINMENT") { return .entertainment }
+        if pfc.hasPrefix("PERSONAL_CARE") || pfc.hasPrefix("MEDICAL")
+            || pfc.hasPrefix("HEALTHCARE") { return .health }
+        if pfc.hasPrefix("RENT_AND_UTILITIES") || pfc.hasPrefix("HOME_IMPROVEMENT") { return .home }
+        if pfc.hasPrefix("GENERAL_SERVICES") { return .other }
+        if pfc.hasPrefix("BANK_FEES") || pfc.hasPrefix("LOAN_PAYMENTS") { return .transfer }
+        if pfc.hasPrefix("GOVERNMENT") { return .other }
+
+        // Legacy Plaid `category` strings + merchant keywords.
         let hay = "\(merchant) \(tellerCategory ?? "")".lowercased()
-        if hay.contains("salary") || hay.contains("payroll") || hay.contains("deposit") { return .income }
-        if hay.contains("transfer") || hay.contains("venmo") || hay.contains("zelle") { return .transfer }
-        if hay.contains("uber") || hay.contains("lyft") || hay.contains("gas") || hay.contains("shell") { return .transport }
-        if hay.contains("netflix") || hay.contains("spotify") || hay.contains("apple.com/bill") { return .subscriptions }
-        if hay.contains("whole foods") || hay.contains("trader joe") || hay.contains("kroger") || hay.contains("grocery") { return .groceries }
-        if hay.contains("restaurant") || hay.contains("cafe") || hay.contains("coffee") || hay.contains("starbucks") { return .dining }
-        if hay.contains("amazon") || hay.contains("target") || hay.contains("walmart") || hay.contains("ikea") { return .shopping }
-        if hay.contains("pharmacy") || hay.contains("cvs") || hay.contains("gym") { return .health }
-        if hay.contains("rent") || hay.contains("utility") || hay.contains("electric") || hay.contains("home depot") { return .home }
-        if hay.contains("movie") || hay.contains("ticket") || hay.contains("amc") { return .entertainment }
+        if hay.contains("salary") || hay.contains("payroll") || hay.contains("direct dep") { return .income }
+        if hay.contains("transfer") || hay.contains("venmo") || hay.contains("zelle")
+            || hay.contains("cash app") { return .transfer }
+        if hay.contains("grocery") || hay.contains("whole foods") || hay.contains("trader joe")
+            || hay.contains("kroger") || hay.contains("safeway") || hay.contains("costco") { return .groceries }
+        if hay.contains("restaurant") || hay.contains("cafe") || hay.contains("coffee")
+            || hay.contains("starbucks") || hay.contains("doordash") || hay.contains("ubereats") { return .dining }
+        if hay.contains("uber") || hay.contains("lyft") || hay.contains("shell")
+            || hay.contains("chevron") || hay.contains("exxon") || hay.contains("parking") { return .transport }
+        if hay.contains("netflix") || hay.contains("spotify") || hay.contains("hulu")
+            || hay.contains("disney+") || hay.contains("apple.com/bill")
+            || hay.contains("subscription") { return .subscriptions }
+        if hay.contains("amazon") || hay.contains("target") || hay.contains("walmart")
+            || hay.contains("ikea") || hay.contains("best buy") { return .shopping }
+        if hay.contains("pharmacy") || hay.contains("cvs") || hay.contains("walgreens")
+            || hay.contains("gym") || hay.contains("doctor") { return .health }
+        if hay.contains("rent") || hay.contains("utility") || hay.contains("electric")
+            || hay.contains("pg&e") || hay.contains("home depot") || hay.contains("lowe") { return .home }
+        if hay.contains("movie") || hay.contains("ticket") || hay.contains("amc")
+            || hay.contains("steam") || hay.contains("concert") { return .entertainment }
         return .other
     }
 }
@@ -330,7 +381,7 @@ final class SpendUserCategoryEntity {
     }
 }
 
-/// Monthly budget for a parent category or a subcategory.
+/// Monthly budget for a parent category, subcategory, or custom user category.
 @Model
 final class SpendBudgetEntity {
     var id: UUID = UUID()
@@ -338,6 +389,8 @@ final class SpendBudgetEntity {
     var categoryRaw: String = SpendCategory.other.rawValue
     /// When set, this budget applies to the subcategory instead of the whole category.
     var subcategoryID: UUID?
+    /// When set, this budget applies to a custom user category (pie slice).
+    var userCategoryID: UUID?
     var monthlyAmount: Double = 0
     var updatedAt: Date = Date()
 
@@ -346,9 +399,15 @@ final class SpendBudgetEntity {
         set { categoryRaw = newValue.rawValue }
     }
 
-    init(category: SpendCategory, subcategoryID: UUID? = nil, monthlyAmount: Double) {
+    init(
+        category: SpendCategory,
+        subcategoryID: UUID? = nil,
+        userCategoryID: UUID? = nil,
+        monthlyAmount: Double
+    ) {
         categoryRaw = category.rawValue
         self.subcategoryID = subcategoryID
+        self.userCategoryID = userCategoryID
         self.monthlyAmount = monthlyAmount
         updatedAt = Date()
     }
@@ -457,5 +516,36 @@ final class SpendUseLogEntity {
         self.itemID = itemID
         self.usedAt = usedAt
         self.note = note
+    }
+}
+
+/// User rule: always map this merchant/store to a category (built-in or custom).
+@Model
+final class SpendMerchantRuleEntity {
+    var id: UUID = UUID()
+    /// Lowercased / collapsed merchant key for matching.
+    var merchantKey: String = ""
+    /// Display name shown in UI (original merchant spelling).
+    var merchantDisplay: String = ""
+    var categoryRaw: String = SpendCategory.other.rawValue
+    var userCategoryID: UUID?
+    var updatedAt: Date = Date()
+
+    var category: SpendCategory {
+        get { SpendCategory(rawValue: categoryRaw) ?? .other }
+        set { categoryRaw = newValue.rawValue }
+    }
+
+    init(
+        merchantKey: String,
+        merchantDisplay: String,
+        category: SpendCategory = .other,
+        userCategoryID: UUID? = nil
+    ) {
+        self.merchantKey = merchantKey
+        self.merchantDisplay = merchantDisplay
+        categoryRaw = category.rawValue
+        self.userCategoryID = userCategoryID
+        updatedAt = Date()
     }
 }

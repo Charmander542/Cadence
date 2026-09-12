@@ -239,11 +239,22 @@ struct FocusStatsView: View {
             }
 
             if recent.isEmpty {
-                Text("No focus sessions yet. Start a Pomo or Stopwatch.")
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(Theme.Space.md)
+                VStack(spacing: Theme.Space.sm) {
+                    Theme.IconWell(systemImage: "timer", tint: Theme.cta, size: 44)
+                    Text("No sessions yet")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text("Start a Pomo or Stopwatch, or add one manually.")
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
+                        .multilineTextAlignment(.center)
+                    Button("Add session") { showManualAdd = true }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.cta)
+                        .accessibilityHint("Opens manual focus session form")
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Theme.Space.md)
             } else {
                 VStack(spacing: 0) {
                     ForEach(recent, id: \.id) { session in
@@ -295,6 +306,17 @@ struct FocusStatsView: View {
             Text(FocusStore.formatDuration(session.durationSeconds))
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.muted)
+            Button {
+                FocusStore.delete(session, in: modelContext)
+            } label: {
+                Image(systemName: "trash")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.danger)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Delete session")
         }
         .padding(.vertical, Theme.Space.sm + 2)
         .accessibilityElement(children: .combine)

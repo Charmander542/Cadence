@@ -50,16 +50,29 @@ struct NewsHomeView: View {
                         .zIndex(1)
 
                     if visible.isEmpty {
-                        Theme.EmptyState(
-                            systemImage: "newspaper",
-                            title: "No stories yet",
-                            message: "Refresh to pull today’s top mix from public feeds, then AI can tighten the digests.",
-                            cta: "REFRESH DIGEST",
-                            ctaHint: "Fetches RSS and optional AI summaries"
-                        ) {
-                            Task { await refresh() }
+                        if topicFilter != nil, !todayArticles.isEmpty {
+                            Theme.EmptyState(
+                                systemImage: "line.3.horizontal.decrease.circle",
+                                title: "No stories in this topic",
+                                message: "Today’s digest has other stories. Clear the filter or pick another topic.",
+                                cta: "CLEAR FILTER",
+                                ctaHint: "Shows all stories in today’s digest"
+                            ) {
+                                topicFilter = nil
+                            }
+                            .padding(.horizontal, Theme.Space.lg)
+                        } else {
+                            Theme.EmptyState(
+                                systemImage: "newspaper",
+                                title: "No stories yet",
+                                message: "Refresh to pull today’s top mix from public feeds, then AI can tighten the digests.",
+                                cta: "REFRESH DIGEST",
+                                ctaHint: "Fetches RSS and optional AI summaries"
+                            ) {
+                                Task { await refresh() }
+                            }
+                            .padding(.horizontal, Theme.Space.lg)
                         }
-                        .padding(.horizontal, Theme.Space.lg)
                     } else {
                         LazyVStack(alignment: .leading, spacing: Theme.Space.lg) {
                             ForEach(Array(visible.enumerated()), id: \.element.id) { index, article in
