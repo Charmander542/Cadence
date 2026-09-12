@@ -13,7 +13,9 @@ enum HealthStore {
             timeInBedHours: max(raw.timeInBedHours, raw.sleepHours),
             deepHours: raw.deepHours,
             remHours: raw.remHours,
+            coreHours: raw.coreHours,
             awakeInterruptions: raw.awakeInterruptions,
+            sleepLatencyMinutes: raw.sleepLatencyMinutes,
             overnightRHR: raw.overnightRHR > 0 ? raw.overnightRHR : raw.appleRestingHR,
             daytimeAvgHR: raw.daytimeAvgHR,
             hrvMs: raw.hrvMs,
@@ -30,9 +32,44 @@ enum HealthStore {
             baselineRHR: HealthBaselines.rhr,
             baselineRR: HealthBaselines.respiratoryRate,
             recentAvgStrain: recent.strain,
-            recentAvgRecovery: recent.recovery
+            recentAvgRecovery: recent.recovery,
+            sleepBankHours: HealthBaselines.sleepBankHours(goal: HealthPreferences.sleepGoalHours)
         )
         return BevelScoring.score(input)
+    }
+
+    /// Rebuild approximate raw metrics from a persisted snapshot (for detail explainers).
+    static func rawApproximate(from snapshot: HealthDaySnapshotEntity) -> HealthKitClient.RawDayMetrics {
+        let series = heartSeries(from: snapshot).map { ($0.hour, $0.bpm) }
+        let zones = decodeZoneMinutes(snapshot.zoneMinutesJSON)
+        return HealthKitClient.RawDayMetrics(
+            sleepHours: snapshot.sleepHours,
+            timeInBedHours: max(snapshot.timeInBedHours, snapshot.sleepHours),
+            deepHours: snapshot.deepSleepHours,
+            remHours: snapshot.remSleepHours,
+            coreHours: snapshot.coreSleepHours > 0
+                ? snapshot.coreSleepHours
+                : max(0, snapshot.sleepHours - snapshot.deepSleepHours - snapshot.remSleepHours),
+            awakeInterruptions: snapshot.awakeInterruptions,
+            sleepLatencyMinutes: snapshot.sleepLatencyMinutes >= 0 ? snapshot.sleepLatencyMinutes : nil,
+            overnightRHR: snapshot.restingHR,
+            appleRestingHR: snapshot.restingHR,
+            daytimeAvgHR: series.map(\.1).averageOr(snapshot.restingHR + 18),
+            hrvMs: snapshot.hrvMs,
+            respiratoryRate: snapshot.respiratoryRate,
+            spo2Percent: snapshot.spo2Percent,
+            wristTempDeltaC: snapshot.hasWristTemp ? snapshot.wristTempDeltaC : nil,
+            activeEnergyKcal: snapshot.activeEnergyKcal,
+            steps: snapshot.steps,
+            exerciseMinutes: snapshot.exerciseMinutes,
+            workoutActiveEnergyKcal: snapshot.workoutActiveEnergyKcal > 0
+                ? snapshot.workoutActiveEnergyKcal
+                : snapshot.activeEnergyKcal * 0.45,
+            workoutCount: snapshot.workoutCount,
+            zoneMinutes: zones,
+            heartSamples: series,
+            sleepStages: decodeSleepStages(snapshot.sleepStagesJSON)
+        )
     }
 
     static func demoRaw(for day: Date = Date()) -> HealthKitClient.RawDayMetrics {
@@ -45,6 +82,19 @@ enum HealthStore {
             samples.append((hour, base + wobble))
         }
         let sleep = 6.4 + Double(seed % 5) * 0.35
+        let nightStart = Calendar.current.date(bySettingHour: 23, minute: 10, second: 0, of: day.addingTimeInterval(-86400))
+            ?? day.addingTimeInterval(-2 * 3600)
+        var cursor = nightStart.timeIntervalSince1970
+        let pattern: [(Int, Double)] = [
+            (2, sleep * 0.18), (3, sleep * 0.12), (2, sleep * 0.2), (1, sleep * 0.1),
+            (0, 0.08), (2, sleep * 0.15), (3, sleep * 0.08), (1, sleep * 0.12), (2, sleep * 0.12),
+        ]
+        var stages: [HealthKitClient.SleepStageSegment] = []
+        for (stage, hours) in pattern {
+            let end = cursor + hours * 3600
+            stages.append(.init(stage: stage, startEpoch: cursor, endEpoch: end))
+            cursor = end
+        }
         return HealthKitClient.RawDayMetrics(
             sleepHours: sleep,
             timeInBedHours: sleep + 0.7,
@@ -52,6 +102,7 @@ enum HealthStore {
             remHours: sleep * 0.21,
             coreHours: sleep * 0.55,
             awakeInterruptions: seed % 4,
+            sleepLatencyMinutes: Double(8 + seed % 25),
             overnightRHR: 52 + Double(seed % 6),
             appleRestingHR: 56 + Double(seed % 7),
             daytimeAvgHR: 74 + Double(seed % 8),
@@ -65,7 +116,8 @@ enum HealthStore {
             workoutActiveEnergyKcal: Double(120 + seed % 8 * 30),
             workoutCount: seed % 3 == 0 ? 0 : 1,
             zoneMinutes: [12, 18, 10, 4, Double(seed % 5)],
-            heartSamples: samples
+            heartSamples: samples,
+            sleepStages: stages
         )
     }
 
@@ -99,14 +151,26 @@ enum HealthStore {
         row.timeInBedHours = raw.timeInBedHours
         row.deepSleepHours = raw.deepHours
         row.remSleepHours = raw.remHours
+        row.coreSleepHours = raw.coreHours
+        row.awakeInterruptions = raw.awakeInterruptions
+        row.sleepLatencyMinutes = raw.sleepLatencyMinutes ?? -1
         row.restingHR = raw.overnightRHR > 0 ? raw.overnightRHR : raw.appleRestingHR
         row.hrvMs = raw.hrvMs
         row.respiratoryRate = raw.respiratoryRate
         row.spo2Percent = raw.spo2Percent
+        if let temp = raw.wristTempDeltaC {
+            row.wristTempDeltaC = temp
+            row.hasWristTemp = true
+        } else {
+            row.hasWristTemp = false
+        }
         row.activeEnergyKcal = raw.activeEnergyKcal
         row.steps = raw.steps
         row.exerciseMinutes = raw.exerciseMinutes
         row.workoutCount = raw.workoutCount
+        row.workoutActiveEnergyKcal = raw.workoutActiveEnergyKcal
+        row.zoneMinutesJSON = encodeZoneMinutes(raw.zoneMinutes)
+        row.scoreConfidence = scored.confidence
         row.stressHigh = scored.stressHigh
         row.stressLow = scored.stressLow
         row.stressAvg = scored.stressAvg
@@ -116,13 +180,15 @@ enum HealthStore {
         row.source = source
         row.updatedAt = Date()
         row.heartRateSeriesJSON = encodeSeries(raw.heartSamples)
+        row.sleepStagesJSON = encodeSleepStages(raw.sleepStages)
         try context.save()
 
-        if source == .healthKit {
+        if source == .healthKit || source == .demo {
             HealthBaselines.record(
                 hrv: raw.hrvMs,
                 rhr: row.restingHR,
                 rr: raw.respiratoryRate,
+                sleepHours: raw.sleepHours,
                 day: start
             )
         }
@@ -139,14 +205,38 @@ enum HealthStore {
     }
 
     static func vitals(from snapshot: HealthDaySnapshotEntity) -> [HealthVital] {
-        [
+        let sleepHours = snapshot.sleepHours
+        let goal = HealthPreferences.sleepGoalHours
+        func status(for value: Double?, low: Double, high: Double, invertLowerIsBetter: Bool = false) -> HealthVital.Status {
+            guard let value, value > 0 else { return .noData }
+            if invertLowerIsBetter {
+                if value < low { return .lower }
+                if value > high { return .higher }
+                return .normal
+            }
+            if value < low { return .lower }
+            if value > high { return .higher }
+            return .normal
+        }
+
+        let rhrDisplay: HealthVital.Status = {
+            guard snapshot.restingHR > 0 else { return .noData }
+            if snapshot.restingHR < 55 { return .lower }
+            if snapshot.restingHR > 75 { return .higher }
+            return .normal
+        }()
+
+        return [
             HealthVital(
                 id: "resp",
-                title: "Resp",
+                title: "RR",
                 systemImage: "lungs.fill",
                 value: snapshot.respiratoryRate > 0 ? snapshot.respiratoryRate : nil,
                 unit: "rpm",
-                normalized: clamp((snapshot.respiratoryRate - 10) / 10)
+                normalized: clamp((snapshot.respiratoryRate - 10) / 12),
+                status: status(for: snapshot.respiratoryRate, low: 12, high: 20),
+                bandLow: 0.25,
+                bandHigh: 0.7
             ),
             HealthVital(
                 id: "rhr",
@@ -154,7 +244,10 @@ enum HealthStore {
                 systemImage: "heart.fill",
                 value: snapshot.restingHR > 0 ? snapshot.restingHR : nil,
                 unit: "bpm",
-                normalized: clamp(1 - (snapshot.restingHR - 45) / 50)
+                normalized: clamp((snapshot.restingHR - 40) / 50),
+                status: rhrDisplay,
+                bandLow: 0.2,
+                bandHigh: 0.55
             ),
             HealthVital(
                 id: "hrv",
@@ -162,7 +255,10 @@ enum HealthStore {
                 systemImage: "waveform.path.ecg",
                 value: snapshot.hrvMs > 0 ? snapshot.hrvMs : nil,
                 unit: "ms",
-                normalized: clamp((snapshot.hrvMs - 20) / 80)
+                normalized: clamp((snapshot.hrvMs - 20) / 80),
+                status: status(for: snapshot.hrvMs, low: 30, high: 120),
+                bandLow: 0.3,
+                bandHigh: 0.75
             ),
             HealthVital(
                 id: "spo2",
@@ -170,23 +266,34 @@ enum HealthStore {
                 systemImage: "drop.fill",
                 value: snapshot.spo2Percent > 0 ? snapshot.spo2Percent : nil,
                 unit: "%",
-                normalized: clamp((snapshot.spo2Percent - 90) / 10)
+                normalized: clamp((snapshot.spo2Percent - 90) / 10),
+                status: status(for: snapshot.spo2Percent, low: 95, high: 100),
+                bandLow: 0.55,
+                bandHigh: 0.95
             ),
             HealthVital(
-                id: "steps",
-                title: "Steps",
-                systemImage: "figure.walk",
-                value: snapshot.steps > 0 ? snapshot.steps : nil,
-                unit: "",
-                normalized: clamp(snapshot.steps / 10_000)
+                id: "temp",
+                title: "Temp",
+                systemImage: "thermometer.medium",
+                value: snapshot.hasWristTemp ? snapshot.wristTempDeltaC : nil,
+                unit: "°C Δ",
+                normalized: snapshot.hasWristTemp ? clamp(0.5 + snapshot.wristTempDeltaC / 2) : 0.5,
+                status: snapshot.hasWristTemp
+                    ? (abs(snapshot.wristTempDeltaC) < 0.6 ? .normal : (snapshot.wristTempDeltaC > 0 ? .higher : .lower))
+                    : .noData,
+                bandLow: 0.35,
+                bandHigh: 0.65
             ),
             HealthVital(
-                id: "kcal",
-                title: "Active",
-                systemImage: "flame.fill",
-                value: snapshot.activeEnergyKcal > 0 ? snapshot.activeEnergyKcal : nil,
-                unit: "kcal",
-                normalized: clamp(snapshot.activeEnergyKcal / 700)
+                id: "sleep",
+                title: "Sleep",
+                systemImage: "moon.fill",
+                value: sleepHours > 0 ? sleepHours : nil,
+                unit: "h",
+                normalized: clamp(sleepHours / max(goal, 1)),
+                status: sleepHours <= 0 ? .noData : (abs(sleepHours - goal) < 1.0 ? .normal : (sleepHours < goal ? .lower : .higher)),
+                bandLow: 0.45,
+                bandHigh: 0.8
             ),
         ]
     }
@@ -202,11 +309,51 @@ enum HealthStore {
         }
     }
 
+    static func sleepStages(from snapshot: HealthDaySnapshotEntity) -> [HealthKitClient.SleepStageSegment] {
+        decodeSleepStages(snapshot.sleepStagesJSON)
+    }
+
     private static func encodeSeries(_ samples: [(hour: Double, bpm: Double)]) -> String {
         let payload = samples.map { ["t": $0.hour, "v": $0.bpm] }
         guard let data = try? JSONSerialization.data(withJSONObject: payload),
               let str = String(data: data, encoding: .utf8) else { return "[]" }
         return str
+    }
+
+    private static func encodeSleepStages(_ stages: [HealthKitClient.SleepStageSegment]) -> String {
+        let payload = stages.map { ["s": Double($0.stage), "a": $0.startEpoch, "b": $0.endEpoch] }
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              let str = String(data: data, encoding: .utf8) else { return "[]" }
+        return str
+    }
+
+    private static func decodeSleepStages(_ json: String) -> [HealthKitClient.SleepStageSegment] {
+        guard let data = json.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Double]] else {
+            return []
+        }
+        return arr.compactMap { dict in
+            guard let s = dict["s"], let a = dict["a"], let b = dict["b"] else { return nil }
+            return HealthKitClient.SleepStageSegment(stage: Int(s), startEpoch: a, endEpoch: b)
+        }
+    }
+
+    private static func encodeZoneMinutes(_ zones: [Double]) -> String {
+        let padded = (0..<5).map { i in i < zones.count ? zones[i] : 0 }
+        guard let data = try? JSONSerialization.data(withJSONObject: padded),
+              let str = String(data: data, encoding: .utf8) else { return "[0,0,0,0,0]" }
+        return str
+    }
+
+    private static func decodeZoneMinutes(_ json: String) -> [Double] {
+        guard let data = json.data(using: .utf8),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [Double],
+              !arr.isEmpty else {
+            return [0, 0, 0, 0, 0]
+        }
+        var zones = arr
+        while zones.count < 5 { zones.append(0) }
+        return Array(zones.prefix(5))
     }
 
     private static func clamp(_ value: Double) -> Double {

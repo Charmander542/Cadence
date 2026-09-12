@@ -76,6 +76,7 @@
 		A20000000000000000000065 /* HealthMetricDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000065 /* HealthMetricDetailView.swift */; };
 		A20000000000000000000066 /* HealthSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000066 /* HealthSettingsView.swift */; };
 		A20000000000000000000067 /* HealthChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000067 /* HealthChrome.swift */; };
+		A2000000000000000000006C /* WorkoutDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000006C /* WorkoutDetailSheet.swift */; };
 		A20000000000000000000068 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000068 /* HealthKit.framework */; };
 		A20000000000000000000070 /* NewsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000070 /* NewsModels.swift */; };
 		A20000000000000000000071 /* NewsPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000071 /* NewsPreferences.swift */; };
@@ -236,6 +237,7 @@
 		A10000000000000000000065 /* HealthMetricDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthMetricDetailView.swift; sourceTree = "<group>"; };
 		A10000000000000000000066 /* HealthSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSettingsView.swift; sourceTree = "<group>"; };
 		A10000000000000000000067 /* HealthChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthChrome.swift; sourceTree = "<group>"; };
+		A1000000000000000000006C /* WorkoutDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutDetailSheet.swift; sourceTree = "<group>"; };
 		A10000000000000000000068 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
 		A10000000000000000000070 /* NewsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsModels.swift; sourceTree = "<group>"; };
 		A10000000000000000000071 /* NewsPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsPreferences.swift; sourceTree = "<group>"; };
@@ -589,6 +591,7 @@
 				A10000000000000000000065 /* HealthMetricDetailView.swift */,
 				A10000000000000000000066 /* HealthSettingsView.swift */,
 				A10000000000000000000067 /* HealthChrome.swift */,
+				A1000000000000000000006C /* WorkoutDetailSheet.swift */,
 			);
 			path = Health;
 			sourceTree = "<group>";
@@ -857,6 +860,7 @@
 				A20000000000000000000065 /* HealthMetricDetailView.swift in Sources */,
 				A20000000000000000000066 /* HealthSettingsView.swift in Sources */,
 				A20000000000000000000067 /* HealthChrome.swift in Sources */,
+				A2000000000000000000006C /* WorkoutDetailSheet.swift in Sources */,
 				A20000000000000000000070 /* NewsModels.swift in Sources */,
 				A20000000000000000000071 /* NewsPreferences.swift in Sources */,
 				A20000000000000000000072 /* NewsClient.swift in Sources */,

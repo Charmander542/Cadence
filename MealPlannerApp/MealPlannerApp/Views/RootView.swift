@@ -292,7 +292,9 @@ struct MainTabView: View {
                 )
                 .transition(.asymmetric(
                     insertion: .move(edge: .leading).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
+                    // Interactive close already slid the panel off-screen; fading avoids a
+                    // second slide that ghosted a duplicate sidebar.
+                    removal: .opacity
                 ))
             }
         }

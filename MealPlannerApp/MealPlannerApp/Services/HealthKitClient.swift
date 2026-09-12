@@ -18,6 +18,16 @@ actor HealthKitClient {
         }
     }
 
+    /// Ordered overnight stage chunks for Bevel-style hypnogram (epoch seconds + stage code).
+    struct SleepStageSegment: Sendable, Hashable {
+        /// 0 awake · 1 REM · 2 core · 3 deep · 4 unspecified asleep
+        var stage: Int
+        var startEpoch: TimeInterval
+        var endEpoch: TimeInterval
+
+        var durationHours: Double { max(0, (endEpoch - startEpoch) / 3600) }
+    }
+
     struct RawDayMetrics: Sendable {
         var sleepHours: Double = 0
         var timeInBedHours: Double = 0
@@ -25,6 +35,8 @@ actor HealthKitClient {
         var remHours: Double = 0
         var coreHours: Double = 0
         var awakeInterruptions: Int = 0
+        /// Minutes from first in-bed to first asleep sample (nil if unknown).
+        var sleepLatencyMinutes: Double? = nil
         var overnightRHR: Double = 0
         var appleRestingHR: Double = 0
         var daytimeAvgHR: Double = 0
@@ -39,6 +51,7 @@ actor HealthKitClient {
         var workoutCount: Int = 0
         var zoneMinutes: [Double] = [0, 0, 0, 0, 0]
         var heartSamples: [(hour: Double, bpm: Double)] = []
+        var sleepStages: [SleepStageSegment] = []
     }
 
     private let store = HKHealthStore()
@@ -115,6 +128,7 @@ actor HealthKitClient {
             remHours: sleepData.remHours,
             coreHours: sleepData.coreHours,
             awakeInterruptions: sleepData.awakeInterruptions,
+            sleepLatencyMinutes: sleepData.latencyMinutes,
             overnightRHR: overnight > 0 ? overnight : (try await appleRHR),
             appleRestingHR: try await appleRHR,
             daytimeAvgHR: daytime,
@@ -128,7 +142,8 @@ actor HealthKitClient {
             workoutActiveEnergyKcal: workout.energy,
             workoutCount: workout.count,
             zoneMinutes: zones,
-            heartSamples: samples
+            heartSamples: samples,
+            sleepStages: sleepData.stages
         )
     }
 
@@ -142,11 +157,13 @@ actor HealthKitClient {
         var coreHours: Double
         var awakeInterruptions: Int
         var asleepIntervals: [(Date, Date)]
+        var latencyMinutes: Double?
+        var stages: [SleepStageSegment]
     }
 
     private func sleepBreakdown(start: Date, end: Date) async throws -> SleepBreakdown {
         guard let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else {
-            return SleepBreakdown(asleepHours: 0, inBedHours: 0, deepHours: 0, remHours: 0, coreHours: 0, awakeInterruptions: 0, asleepIntervals: [])
+            return SleepBreakdown(asleepHours: 0, inBedHours: 0, deepHours: 0, remHours: 0, coreHours: 0, awakeInterruptions: 0, asleepIntervals: [], latencyMinutes: nil, stages: [])
         }
         let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
         let samples: [HKCategorySample] = try await withCheckedThrowingContinuation { cont in
@@ -175,27 +192,58 @@ actor HealthKitClient {
         var inBed = 0.0
         var awakeCount = 0
         var intervals: [(Date, Date)] = []
+        var stages: [SleepStageSegment] = []
+        var firstInBed: Date?
+        var firstAsleep: Date?
 
         for sample in samples {
             let dur = sample.endDate.timeIntervalSince(sample.startDate)
             if sample.value == HKCategoryValueSleepAnalysis.inBed.rawValue {
                 inBed += dur
+                if firstInBed == nil { firstInBed = sample.startDate }
             }
             if sample.value == HKCategoryValueSleepAnalysis.awake.rawValue {
                 awakeCount += 1
+                stages.append(SleepStageSegment(
+                    stage: 0,
+                    startEpoch: sample.startDate.timeIntervalSince1970,
+                    endEpoch: sample.endDate.timeIntervalSince1970
+                ))
             }
             if asleepValues.contains(sample.value) {
                 asleep += dur
                 intervals.append((sample.startDate, sample.endDate))
+                if firstAsleep == nil { firstAsleep = sample.startDate }
+                let stageCode: Int
                 switch sample.value {
-                case HKCategoryValueSleepAnalysis.asleepDeep.rawValue: deep += dur
-                case HKCategoryValueSleepAnalysis.asleepREM.rawValue: rem += dur
-                case HKCategoryValueSleepAnalysis.asleepCore.rawValue: core += dur
-                default: break
+                case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
+                    deep += dur
+                    stageCode = 3
+                case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
+                    rem += dur
+                    stageCode = 1
+                case HKCategoryValueSleepAnalysis.asleepCore.rawValue:
+                    core += dur
+                    stageCode = 2
+                default:
+                    stageCode = 4
                 }
+                stages.append(SleepStageSegment(
+                    stage: stageCode,
+                    startEpoch: sample.startDate.timeIntervalSince1970,
+                    endEpoch: sample.endDate.timeIntervalSince1970
+                ))
             }
         }
         if inBed < asleep { inBed = asleep }
+        stages.sort { $0.startEpoch < $1.startEpoch }
+
+        let latency: Double? = {
+            guard let bed = firstInBed, let asleepAt = firstAsleep, asleepAt >= bed else { return nil }
+            let mins = asleepAt.timeIntervalSince(bed) / 60
+            guard mins >= 0, mins < 240 else { return nil }
+            return mins
+        }()
 
         return SleepBreakdown(
             asleepHours: asleep / 3600,
@@ -204,16 +252,45 @@ actor HealthKitClient {
             remHours: rem / 3600,
             coreHours: core / 3600,
             awakeInterruptions: awakeCount,
-            asleepIntervals: intervals
+            asleepIntervals: intervals,
+            latencyMinutes: latency,
+            stages: stages
         )
     }
 
     // MARK: - Workouts & HR
 
-    private func workoutStats(start: Date, end: Date) async throws -> (count: Int, energy: Double) {
+    /// Workouts for Fitness logger (Watch + third-party written to Health).
+    struct WorkoutSummary: Sendable, Identifiable {
+        var id: UUID
+        var name: String
+        var start: Date
+        var durationMinutes: Double
+        var activeEnergyKcal: Double
+        var averageHR: Double?
+        var source: String
+    }
+
+    private func workoutStats(start: Date, end: Date) async throws -> (energy: Double, count: Int) {
+        let summaries = try await fetchWorkouts(for: start)
+        let inRange = summaries.filter { $0.start >= start && $0.start < end }
+        let energy = inRange.reduce(0.0) { $0 + $1.activeEnergyKcal }
+        return (energy, inRange.count)
+    }
+
+    func fetchWorkouts(for day: Date = Date()) async throws -> [WorkoutSummary] {
+        guard isAvailable else { throw HealthKitError.unavailable }
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: day)
+        guard let end = cal.date(byAdding: .day, value: 1, to: start) else { return [] }
         let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
         let samples: [HKWorkout] = try await withCheckedThrowingContinuation { cont in
-            let query = HKSampleQuery(sampleType: .workoutType(), predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, results, error in
+            let query = HKSampleQuery(
+                sampleType: .workoutType(),
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)]
+            ) { _, results, error in
                 if let error {
                     cont.resume(throwing: error)
                     return
@@ -222,10 +299,27 @@ actor HealthKitClient {
             }
             store.execute(query)
         }
-        let energy = samples.reduce(0.0) { sum, workout in
-            sum + (workout.totalEnergyBurned?.doubleValue(for: .kilocalorie()) ?? 0)
+        return samples.map { workout in
+            let name = workout.workoutActivityType.cadenceDisplayName
+            let kcal = workout.totalEnergyBurned?.doubleValue(for: .kilocalorie()) ?? 0
+            let mins = workout.duration / 60
+            let avgHR: Double? = {
+                guard let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return nil }
+                return workout.statistics(for: hrType)?
+                    .averageQuantity()?
+                    .doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+            }()
+            let source = workout.sourceRevision.source.name
+            return WorkoutSummary(
+                id: workout.uuid,
+                name: name,
+                start: workout.startDate,
+                durationMinutes: mins,
+                activeEnergyKcal: kcal,
+                averageHR: avgHR,
+                source: source
+            )
         }
-        return (samples.count, energy)
     }
 
     private func heartRateSeries(start: Date, end: Date) async throws -> [(hour: Double, bpm: Double)] {
@@ -287,9 +381,10 @@ actor HealthKitClient {
     }
 
     private func estimatedMaxHR(resting: Double) -> Double {
-        // Fallback Tanaka-ish estimate; resting unused but kept for future HRR zones.
-        _ = resting
-        return 190
+        // Without profile age, infer a Tanaka-ish max from resting HR instead of a flat 190.
+        let estimatedAge = max(18, min(75, 200 - resting * 1.6))
+        let tanaka = 208 - 0.7 * estimatedAge
+        return max(150, min(210, tanaka))
     }
 
     private func zoneMinutes(from samples: [(hour: Double, bpm: Double)], maxHR: Double) -> [Double] {
@@ -366,6 +461,31 @@ actor HealthKitClient {
                 cont.resume(returning: value)
             }
             store.execute(query)
+        }
+    }
+}
+
+private extension HKWorkoutActivityType {
+    var cadenceDisplayName: String {
+        switch self {
+        case .running: return "Running"
+        case .cycling: return "Cycling"
+        case .walking: return "Walking"
+        case .hiking: return "Hiking"
+        case .traditionalStrengthTraining, .functionalStrengthTraining: return "Strength training"
+        case .highIntensityIntervalTraining: return "HIIT"
+        case .yoga: return "Yoga"
+        case .swimBikeRun, .swimming: return "Swimming"
+        case .elliptical: return "Elliptical"
+        case .rowing: return "Rowing"
+        case .cooldown: return "Cooldown"
+        case .coreTraining: return "Core"
+        case .flexibility: return "Flexibility"
+        case .dance: return "Dance"
+        case .martialArts: return "Martial arts"
+        case .soccer, .basketball, .tennis: return "Sport"
+        default:
+            return "Workout"
         }
     }
 }

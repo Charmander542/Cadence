@@ -179,6 +179,7 @@ struct PlannerDrawer: View {
     @State private var editingList: TaskListEntity?
     /// Interactive swipe-to-close offset (0 = open, negative = dragging shut).
     @State private var closeDragX: CGFloat = 0
+    @State private var isClosing = false
 
     private let panelWidth: CGFloat = 300
     private let closeThreshold: CGFloat = 90
@@ -198,7 +199,7 @@ struct PlannerDrawer: View {
         ZStack(alignment: .leading) {
             Color.black.opacity(scrimOpacity)
                 .ignoresSafeArea()
-                .onTapGesture(perform: onClose)
+                .onTapGesture { closeInteractively() }
                 .accessibilityLabel("Dismiss sidebar")
                 .accessibilityAddTraits(.isButton)
 
@@ -231,7 +232,9 @@ struct PlannerDrawer: View {
                     Text("Sidebar")
                         .font(Theme.title(.title3))
                     Spacer()
-                    Button(action: onClose) {
+                    Button {
+                        closeInteractively()
+                    } label: {
                         Image(systemName: "xmark")
                             .foregroundStyle(Theme.muted)
                     }
@@ -376,20 +379,41 @@ struct PlannerDrawer: View {
             .onChanged { value in
                 // Prefer horizontal dismiss; ignore mostly-vertical scrolls in the list.
                 guard abs(value.translation.width) > abs(value.translation.height) * 0.65 else { return }
+                // Only left (close). Don’t rubber-band past the open position.
                 closeDragX = min(0, value.translation.width)
             }
             .onEnded { value in
                 let shouldClose = value.translation.width < -closeThreshold
                     || value.predictedEndTranslation.width < -closeThreshold * 1.35
                 if shouldClose {
-                    onClose()
-                    closeDragX = 0
+                    closeInteractively(fromDrag: true)
                 } else {
                     withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) {
                         closeDragX = 0
                     }
                 }
             }
+    }
+
+    /// Slide the panel fully off-screen, then remove it without a second `.move` transition
+    /// (resetting `closeDragX` under RootView’s removal animation caused ghost panels).
+    private func closeInteractively(fromDrag: Bool = false) {
+        guard !isClosing else { return }
+        isClosing = true
+        let offscreen = -panelWidth - 24
+        let duration: TimeInterval = fromDrag ? 0.18 : 0.22
+        withAnimation(.easeOut(duration: duration)) {
+            closeDragX = offscreen
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
+            var t = Transaction()
+            t.disablesAnimations = true
+            withTransaction(t) {
+                closeDragX = 0
+                isClosing = false
+                onClose()
+            }
+        }
     }
 
     private func drawerSectionHeader(_ title: String) -> some View {

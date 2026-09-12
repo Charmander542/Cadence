@@ -2390,8 +2390,65 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 | Field | Value |
 |-------|-------|
 | **Phase** | `RUNNING` |
-| **Next batch** | **LD** |
-| **Summary** | LC: tap subcategory → rename/budget/delete; removed CUSTOMIZE. Next: LD. |
+| **Next batch** | **LK** |
+| **Summary** | LJ: Mobbin Bevel redesign — stepped hypnogram + scrub tooltip; Sleep tab on-page; fewer pointless sheets. Next: LK Overview polish / cardio. |
+
+### Batch LJ — Mobbin Bevel redesign (user: not loving it / graph bad)
+
+- [x] **Sleep night graph feels bad** — replaced capsule bars with Bevel/Eight Sleep stepped hypnogram (Awake→REM→Core→Deep bands) + drag scrub tooltip. — 2026-09-12
+  → Refs: [Bevel Primary sleep](https://mobbin.com/flows/a3fb194c-c64d-4ac1-b424-317a26c013af), [stages screen](https://mobbin.com/screens/c4c2dd72-1d95-431b-898f-ad415b4f5c39).
+- [x] **Sleep page layout** — Primary sleep event card, stages hero + rings, latency, trend sparklines; sheet only for score/contributors deep dive. — 2026-09-12
+- [x] **Popups only when useful** — vitals no longer open Recovery/HR sheets on every tap; Sleep vital / Primary card / rings / workouts still drill in. — 2026-09-12
+- [x] **Append**.
+
+### Batch LI — Real sleep hypnogram intervals
+
+- [x] **Hypnogram used totals only** — persist HK sleep stage samples; chart uses real timeline when present. — 2026-09-12
+  → Fix: `SleepStageSegment` + `sleepStagesJSON`; `HealthChrome.SleepHypnogram(segments:)`.
+- [x] **Append**.
+
+### Batch LH — History + workout detail
+
+- [x] **Multi-day history** — day chevrons + 30-day History sheet; Fitness heatmap taps a day. — 2026-09-12
+  → Fix: `HealthHomeView` historyDays / shiftDay / activityHeatmapCard.
+- [x] **Per-workout detail** — tap Workout Log row → duration, kcal, avg HR, source. — 2026-09-12
+  → Fix: `WorkoutDetailSheet`.
+- [x] **Append**.
+
+### Batch LG — Body build + Bevel visual match (user)
+
+- [x] **Build failed** — missing `workoutStats`, invalid `HKWorkoutActivityType.rower`, drawer `Button(action:)` arity. — 2026-09-12
+  → Fix: `HealthKitClient.workoutStats` + `.rowing`; `PlannerDrawer` close button closure.
+- [x] **Sleep UI ≠ Bevel Primary sleep** — score pill, in-bed/asleep, 2×3 contributor grid (REM/Deep split), hypnogram, latency Fast/Normal/Late, Watch attribution. — 2026-09-12
+  → Fix: `HealthMetricDetailView` + Sleep tab; `BevelScoring` contributors; `HealthChrome` hypnogram/latency/cells.
+- [x] **Overview ≠ Bevel Home monitor** — Health Monitor 2×2 cards (RR/RHR/HRV/SpO₂/Temp/Sleep) + stress half-gauge. — 2026-09-12
+  → Fix: `HealthChrome.MonitorCard` / `StressGauge`; `HealthStore.vitals`.
+- [x] **Append**.
+
+### Batch LF — Body audit follow-up
+
+- [x] **Vitals only focused, never opened detail** — tap opens HR / HRV / Recovery / Strain sheets. — 2026-09-12
+- [x] **Score inputs dropped on save** — snapshot now stores core/awake/latency/zones/temp/confidence/workout kcal. — 2026-09-12
+- [x] **Max HR flat 190** — resting-informed Tanaka estimate for zones. — 2026-09-12
+- [x] **Append**.
+
+### Batch LE — Body Health redesign (user: Bevel + Mobbin + algorithms)
+
+- [x] **Design doc** — IA, sub-pages, algorithms, sync plan. — 2026-09-12
+  → `docs/HEALTH_REDESIGN.md`; Mobbin Bevel/WHOOP/Oura refs.
+- [x] **Stronger scoring** — contributor ratings, recovery breakdown, sleep bank, confidence blend, latency. — 2026-09-12
+  → `BevelScoring`, `HealthBaselines.sleepBankHours`, HK sleep latency.
+- [x] **Explainable details** — Sleep/Recovery/Strain contributors + stages + bank. — 2026-09-12
+  → `HealthMetricDetailView`.
+- [x] **Fitness logger + Sleep tab** — Body segments Overview/Sleep/Fitness/Lift; HK workout list. — 2026-09-12
+  → `HealthHomeView`, `HealthKitClient.fetchWorkouts`.
+- [x] **Append**.
+
+### Batch LD — Sidebar left-swipe ghosting (user)
+
+- [x] **Left swipe close ghosts / snaps** — drag reset + `.move` removal fought each other. — 2026-09-12
+  → Fix: `PlannerDrawer.closeInteractively` finishes off-screen then dismisses with animations disabled; RootView removal → opacity only.
+- [x] **Append**.
 
 ### Batch LC — Tap subcategory to edit (user)
 

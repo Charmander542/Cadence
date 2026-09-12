@@ -15,14 +15,22 @@ final class HealthDaySnapshotEntity {
     var timeInBedHours: Double = 0
     var deepSleepHours: Double = 0
     var remSleepHours: Double = 0
+    var coreSleepHours: Double = 0
+    var awakeInterruptions: Int = 0
+    var sleepLatencyMinutes: Double = -1
     var restingHR: Double = 0
     var hrvMs: Double = 0
     var respiratoryRate: Double = 0
     var spo2Percent: Double = 0
+    var wristTempDeltaC: Double = 0
+    var hasWristTemp: Bool = false
     var activeEnergyKcal: Double = 0
     var steps: Double = 0
     var exerciseMinutes: Double = 0
     var workoutCount: Int = 0
+    var workoutActiveEnergyKcal: Double = 0
+    var zoneMinutesJSON: String = "[0,0,0,0,0]"
+    var scoreConfidence: Double = 0
     var stressHigh: Double = 0
     var stressLow: Double = 0
     var stressAvg: Double = 0
@@ -31,6 +39,9 @@ final class HealthDaySnapshotEntity {
     var insightBody: String = ""
     var sourceRaw: String = HealthDataSource.demo.rawValue
     var updatedAt: Date = Date()
+
+    /// Optional JSON array of `{s,a,b}` sleep stage segments (stage, startEpoch, endEpoch).
+    var sleepStagesJSON: String = "[]"
 
     /// Optional JSON array of `{t,v}` for HR sparkline (hours from midnight, bpm).
     var heartRateSeriesJSON: String = "[]"
@@ -51,12 +62,28 @@ enum HealthDataSource: String, Codable {
 }
 
 struct HealthVital: Identifiable, Hashable {
+    enum Status: String, Hashable {
+        case normal, lower, higher, noData
+        var title: String {
+            switch self {
+            case .normal: return "Normal"
+            case .lower: return "Lower"
+            case .higher: return "Higher"
+            case .noData: return "No data"
+            }
+        }
+    }
+
     let id: String
     let title: String
     let systemImage: String
     let value: Double?
     let unit: String
-    let normalized: Double // 0…1 for pillar fill
+    let normalized: Double // 0…1 for pillar / gauge position
+    var status: Status = .normal
+    /// Highlight band on the vertical gauge (baseline “normal” range), 0…1.
+    var bandLow: Double = 0.35
+    var bandHigh: Double = 0.65
 }
 
 struct HealthScoreSet: Hashable {
