@@ -123,6 +123,34 @@ enum SpendStore {
     }
 
     @discardableResult
+    static func addUserCategory(
+        name: String,
+        systemImage: String = "tag",
+        colorHex: String = "",
+        in context: ModelContext
+    ) -> SpendUserCategoryEntity {
+        let existing = (try? context.fetch(FetchDescriptor<SpendUserCategoryEntity>())) ?? []
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let row = SpendUserCategoryEntity(
+            name: trimmed.isEmpty ? "Untitled" : trimmed,
+            systemImage: systemImage,
+            colorHex: colorHex,
+            sortOrder: (existing.map(\.sortOrder).max() ?? -1) + 1
+        )
+        context.insert(row)
+        try? context.save()
+        return row
+    }
+
+    static func deleteUserCategory(_ category: SpendUserCategoryEntity, in context: ModelContext) {
+        let txs = (try? context.fetch(FetchDescriptor<SpendTransactionEntity>())) ?? []
+        for tx in txs where tx.userCategoryID == category.id {
+            tx.userCategoryID = nil
+        }
+        context.delete(category)
+        try? context.save()
+    }
+
     static func addSubcategory(
         name: String,
         parent: SpendCategory,
@@ -199,7 +227,8 @@ enum SpendStore {
         _ transactions: [SpendTransactionEntity],
         in range: (start: Date, end: Date),
         category: SpendCategory? = nil,
-        subcategoryID: UUID? = nil
+        subcategoryID: UUID? = nil,
+        userCategoryID: UUID? = nil
     ) -> [SpendTransactionEntity] {
         transactions.filter { tx in
             !tx.isHidden
@@ -208,7 +237,8 @@ enum SpendStore {
                 && tx.postedAt < range.end
                 && tx.category != .income
                 && tx.category != .transfer
-                && (category == nil || tx.category == category)
+                && (userCategoryID == nil || tx.userCategoryID == userCategoryID)
+                && (userCategoryID != nil || category == nil || (tx.userCategoryID == nil && tx.category == category))
                 && (subcategoryID == nil || tx.subcategoryID == subcategoryID)
         }
     }
@@ -216,15 +246,22 @@ enum SpendStore {
     static func categorySlices(
         transactions: [SpendTransactionEntity],
         budgets: [SpendBudgetEntity],
+        userCategories: [SpendUserCategoryEntity] = [],
         in range: (start: Date, end: Date)
     ) -> [SpendCategorySlice] {
         let txs = spendingTransactions(transactions, in: range)
         var totals: [SpendCategory: (amount: Double, count: Int)] = [:]
+        var userTotals: [UUID: (amount: Double, count: Int)] = [:]
         for tx in txs {
-            let entry = totals[tx.category] ?? (0, 0)
-            totals[tx.category] = (entry.amount + abs(tx.amount), entry.count + 1)
+            if let uid = tx.userCategoryID {
+                let entry = userTotals[uid] ?? (0, 0)
+                userTotals[uid] = (entry.amount + abs(tx.amount), entry.count + 1)
+            } else {
+                let entry = totals[tx.category] ?? (0, 0)
+                totals[tx.category] = (entry.amount + abs(tx.amount), entry.count + 1)
+            }
         }
-        return SpendCategory.spendingCases.compactMap { cat in
+        let builtIn = SpendCategory.spendingCases.compactMap { cat -> SpendCategorySlice? in
             guard let entry = totals[cat], entry.amount > 0 else { return nil }
             return SpendCategorySlice(
                 category: cat,
@@ -237,7 +274,21 @@ enum SpendStore {
                 transactionCount: entry.count
             )
         }
-        .sorted { $0.amount > $1.amount }
+        let custom = userCategories.compactMap { cat -> SpendCategorySlice? in
+            guard let entry = userTotals[cat.id], entry.amount > 0 else { return nil }
+            return SpendCategorySlice(
+                category: .other,
+                subcategoryID: nil,
+                userCategoryID: cat.id,
+                title: cat.name,
+                systemImage: cat.systemImage,
+                color: cat.tint,
+                amount: entry.amount,
+                budget: nil,
+                transactionCount: entry.count
+            )
+        }
+        return (builtIn + custom).sorted { $0.amount > $1.amount }
     }
 
     static func subcategorySlices(
@@ -598,7 +649,7 @@ enum SpendStore {
     ) -> SpendTrackedItemEntity {
         transaction.isTracked = true
         let item = SpendTrackedItemEntity(
-            title: transaction.merchant,
+            title: transaction.costUseTitle,
             purchasePrice: abs(transaction.amount),
             purchasedAt: transaction.postedAt,
             useMode: useMode,
@@ -608,6 +659,18 @@ enum SpendStore {
         context.insert(item)
         try? context.save()
         return item
+    }
+
+    /// Keep a linked cost/use title in sync when the purchase description changes.
+    static func syncTrackedTitle(from transaction: SpendTransactionEntity, in context: ModelContext) {
+        guard transaction.isTracked, !transaction.remoteID.isEmpty else { return }
+        let remoteID = transaction.remoteID
+        let title = transaction.costUseTitle
+        guard let items = try? context.fetch(FetchDescriptor<SpendTrackedItemEntity>()) else { return }
+        for item in items where item.linkedTransactionRemoteID == remoteID {
+            item.title = title
+        }
+        try? context.save()
     }
 
     static func logUse(
@@ -626,6 +689,7 @@ enum SpendStore {
     static func addManualTrackedItem(
         title: String,
         price: Double,
+        purchasedAt: Date = Date(),
         mode: SpendUseMode,
         category: SpendCategory,
         in context: ModelContext
@@ -633,6 +697,7 @@ enum SpendStore {
         let item = SpendTrackedItemEntity(
             title: title,
             purchasePrice: price,
+            purchasedAt: purchasedAt,
             useMode: mode,
             category: category
         )

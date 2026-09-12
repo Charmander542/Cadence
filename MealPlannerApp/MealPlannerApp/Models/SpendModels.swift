@@ -91,9 +91,13 @@ enum SpendCategory: String, CaseIterable, Identifiable, Codable {
 
 /// Snapshot used by pie chart + budget rows.
 struct SpendCategorySlice: Identifiable {
-    var id: String { category.rawValue + (subcategoryID?.uuidString ?? "") + title }
+    var id: String {
+        if let userCategoryID { return "user-\(userCategoryID.uuidString)" }
+        return category.rawValue + (subcategoryID?.uuidString ?? "") + title
+    }
     let category: SpendCategory
     let subcategoryID: UUID?
+    let userCategoryID: UUID?
     let title: String
     let systemImage: String
     let color: Color
@@ -119,6 +123,28 @@ struct SpendCategorySlice: Identifiable {
         guard let budget, budget > 0 else { return false }
         return amount > budget
     }
+
+    init(
+        category: SpendCategory,
+        subcategoryID: UUID?,
+        userCategoryID: UUID? = nil,
+        title: String,
+        systemImage: String,
+        color: Color,
+        amount: Double,
+        budget: Double?,
+        transactionCount: Int
+    ) {
+        self.category = category
+        self.subcategoryID = subcategoryID
+        self.userCategoryID = userCategoryID
+        self.title = title
+        self.systemImage = systemImage
+        self.color = color
+        self.amount = amount
+        self.budget = budget
+        self.transactionCount = transactionCount
+    }
 }
 
 /// How cost-per-use is computed for a tracked item.
@@ -140,7 +166,7 @@ enum SpendUseMode: String, CaseIterable, Identifiable, Codable {
     var detail: String {
         switch self {
         case .tapToLog: return "Each tap counts one use. Cost per use drops as you log."
-        case .dailyAmortize: return "Assumes one use per day from the purchase date."
+        case .dailyAmortize: return "Spreads the price across each day since purchase. Shows average cost per day."
         }
     }
 }
@@ -192,10 +218,34 @@ final class SpendTransactionEntity {
     var notes: String = ""
     var isTracked: Bool = false
     var isHidden: Bool = false
+    /// User-created top-level category. When set, this overrides `category` for grouping.
+    var userCategoryID: UUID?
 
     var category: SpendCategory {
         get { SpendCategory(rawValue: categoryRaw) ?? .other }
         set { categoryRaw = newValue.rawValue }
+    }
+
+    /// Manual note shown as Description on the purchase. Used as the cost/use title when set.
+    var trimmedDescription: String {
+        notes.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Cost/use tracker name: description if the user wrote one, otherwise merchant.
+    var costUseTitle: String {
+        trimmedDescription.isEmpty ? merchant : trimmedDescription
+    }
+
+    func assign(builtIn category: SpendCategory) {
+        userCategoryID = nil
+        if self.category != category { subcategoryID = nil }
+        self.category = category
+    }
+
+    func assign(userCategoryID: UUID) {
+        self.userCategoryID = userCategoryID
+        subcategoryID = nil
+        category = .other
     }
 
     init(
@@ -250,6 +300,29 @@ final class SpendSubcategoryEntity {
     ) {
         self.name = name
         parentCategoryRaw = parent.rawValue
+        self.systemImage = systemImage
+        self.colorHex = colorHex
+        self.sortOrder = sortOrder
+        createdAt = Date()
+    }
+}
+
+/// User-created top-level spending category (Pets, Kids, etc.).
+@Model
+final class SpendUserCategoryEntity {
+    var id: UUID = UUID()
+    var name: String = ""
+    var systemImage: String = "tag"
+    var colorHex: String = ""
+    var sortOrder: Int = 0
+    var createdAt: Date = Date()
+
+    var tint: Color {
+        SpendColor.color(hex: colorHex) ?? Color(red: 0.62, green: 0.64, blue: 0.70)
+    }
+
+    init(name: String, systemImage: String = "tag", colorHex: String = "", sortOrder: Int = 0) {
+        self.name = name
         self.systemImage = systemImage
         self.colorHex = colorHex
         self.sortOrder = sortOrder

@@ -29,6 +29,12 @@ final class AppModel: ObservableObject {
     @Published var requestedCloseDrawer = false
     /// When set, the active page opens its FAB action (quick add / event / habit) then clears.
     @Published var requestedFABAction: FABAction?
+    /// Opens Spend → Categories manage sheet (Overview blue CATEGORIES).
+    @Published var requestedOpenSpendCategories = false
+    /// Opens the New category composer inside that sheet.
+    @Published var requestedOpenSpendNewCategory = false
+    /// Opens the first Overview category, then its first purchase editor.
+    @Published var requestedOpenSpendCategoryPurchase = false
     @Published var generatingStatus = "Planning your week"
     @Published var isBuildingShopList = false
     @Published var isRefreshingGrocery = false

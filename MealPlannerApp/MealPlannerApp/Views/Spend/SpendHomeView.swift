@@ -17,6 +17,8 @@ struct SpendHomeView: View {
     @Query(sort: \SpendSubcategoryEntity.sortOrder)
     private var subcategories: [SpendSubcategoryEntity]
     @Query private var budgets: [SpendBudgetEntity]
+    @Query(sort: \SpendUserCategoryEntity.sortOrder)
+    private var userCategories: [SpendUserCategoryEntity]
 
     @State private var segment: Segment = .overview
     @State private var categoryFilter: SpendCategory?
@@ -24,7 +26,9 @@ struct SpendHomeView: View {
     @State private var selectedTransaction: SpendTransactionEntity?
     @State private var selectedItem: SpendTrackedItemEntity?
     @State private var selectedCategory: SpendCategory?
+    @State private var selectedUserCategory: UserCategorySheetItem?
     @State private var pieFocus: SpendCategory?
+    @State private var pieFocusUserID: UUID?
     @State private var pieHighlightID: String?
     /// Bumps whenever the expanded slice is interacted with; stale timers ignore themselves.
     @State private var pieCollapseGeneration = 0
@@ -70,14 +74,44 @@ struct SpendHomeView: View {
     }
 
     private var categorySlices: [SpendCategorySlice] {
-        SpendStore.categorySlices(transactions: transactions, budgets: budgets, in: monthRange)
+        SpendStore.categorySlices(
+            transactions: transactions,
+            budgets: budgets,
+            userCategories: userCategories,
+            in: monthRange
+        )
+    }
+
+    /// Pie stays spend-only; breakdown also lists unused custom categories so new ones are visible.
+    private var breakdownSlices: [SpendCategorySlice] {
+        var rows = categorySlices
+        let seen = Set(rows.compactMap(\.userCategoryID))
+        for cat in userCategories where !seen.contains(cat.id) {
+            rows.append(
+                SpendCategorySlice(
+                    category: .other,
+                    subcategoryID: nil,
+                    userCategoryID: cat.id,
+                    title: cat.name,
+                    systemImage: cat.systemImage,
+                    color: cat.tint,
+                    amount: 0,
+                    budget: nil,
+                    transactionCount: 0
+                )
+            )
+        }
+        return rows
     }
 
     /// Full-ring sectors: other categories stay put; the focused category’s wedge expands
     /// and splits into subcategory pieces (same total angle — not a new full donut).
     private var pieSectors: [PieSector] {
         categorySlices.flatMap { cat -> [PieSector] in
-            guard cat.category == pieFocus else {
+            if let userID = cat.userCategoryID {
+                return [PieSector(from: cat, expanded: pieFocusUserID == userID, splitChild: false)]
+            }
+            guard cat.category == pieFocus, pieFocusUserID == nil else {
                 return [PieSector(from: cat, expanded: false, splitChild: false)]
             }
             let subs = SpendStore.subcategorySlices(
@@ -96,8 +130,18 @@ struct SpendHomeView: View {
     }
 
     private var focusedCategoryAmount: Double {
+        if let pieFocusUserID {
+            return categorySlices.first(where: { $0.userCategoryID == pieFocusUserID })?.amount ?? 0
+        }
         guard let pieFocus else { return 0 }
-        return categorySlices.first(where: { $0.category == pieFocus })?.amount ?? 0
+        return categorySlices.first(where: { $0.userCategoryID == nil && $0.category == pieFocus })?.amount ?? 0
+    }
+
+    private var focusedPieTitle: String? {
+        if let pieFocusUserID {
+            return userCategories.first(where: { $0.id == pieFocusUserID })?.name
+        }
+        return pieFocus?.title
     }
 
     private var monthSpend: Double {
@@ -168,14 +212,37 @@ struct SpendHomeView: View {
             showAddTracked = true
             appModel.requestedFABAction = nil
         }
+        .onChange(of: appModel.requestedOpenSpendCategories) { _, open in
+            guard open else { return }
+            showCategories = true
+            appModel.requestedOpenSpendCategories = false
+        }
+        .onChange(of: appModel.requestedOpenSpendCategoryPurchase) { _, open in
+            guard open else { return }
+            openFirstCategoryPurchase()
+        }
+        .onAppear {
+            if appModel.requestedOpenSpendCategories {
+                showCategories = true
+                appModel.requestedOpenSpendCategories = false
+            }
+            if appModel.requestedOpenSpendCategoryPurchase {
+                openFirstCategoryPurchase()
+            }
+        }
         .sheet(item: $selectedTransaction) { tx in
-            SpendTransactionSheet(transaction: tx, subcategories: subcategories)
+            SpendTransactionSheet(transaction: tx, subcategories: subcategories, userCategories: userCategories)
         }
         .sheet(item: $selectedItem) { item in
             SpendItemDetailView(item: item)
         }
         .sheet(item: $selectedCategory) { cat in
             SpendCategoryDetailView(category: cat, month: focusMonth)
+        }
+        .sheet(item: $selectedUserCategory) { item in
+            if let user = userCategories.first(where: { $0.id == item.id }) {
+                SpendCategoryDetailView(category: .other, userCategory: user, month: focusMonth)
+            }
         }
         .sheet(isPresented: $showAddTracked) {
             AddTrackedItemSheet()
@@ -378,7 +445,7 @@ struct SpendHomeView: View {
                         }
                         .accessibilityElement(children: .contain)
                         .accessibilityLabel(pieAccessibilityLabel)
-                        .accessibilityHint(pieFocus == nil
+                        .accessibilityHint(pieFocus == nil && pieFocusUserID == nil
                                            ? "Double tap a slice to expand and split it"
                                            : "Tap outside the wheel to show the full pie again, or wait 7 seconds")
                     }
@@ -433,11 +500,11 @@ struct SpendHomeView: View {
     }
 
     private var pieCenterLabel: some View {
-        let focused = pieFocus
-        let title = focused?.title.uppercased() ?? "TOTAL SPEND"
-        let amount = focused == nil ? monthSpend : focusedCategoryAmount
+        let focusedTitle = focusedPieTitle
+        let title = focusedTitle?.uppercased() ?? "TOTAL SPEND"
+        let amount = focusedTitle == nil ? monthSpend : focusedCategoryAmount
         let subtitle: String = {
-            if focused != nil {
+            if focusedTitle != nil {
                 let pct = monthSpend > 0 ? Int((focusedCategoryAmount / monthSpend * 100).rounded()) : 0
                 return "\(pct)% of \(shortMonthLabel)"
             }
@@ -464,39 +531,41 @@ struct SpendHomeView: View {
         .frame(width: 118)
         .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(focused == nil
+        .accessibilityLabel(focusedTitle == nil
                             ? "Total spend \(SpendFormat.money(monthSpend)) in \(monthLabel)"
-                            : "\(focused!.title), \(SpendFormat.money(focusedCategoryAmount)). Tap outside the wheel to collapse")
+                            : "\(focusedTitle ?? ""), \(SpendFormat.money(focusedCategoryAmount)). Tap outside the wheel to collapse")
     }
 
     private var pieAccessibilityLabel: String {
-        if let pieFocus {
+        if let title = focusedPieTitle {
             let parts = pieSectors.filter(\.expanded).map { "\($0.title) \(SpendFormat.money($0.amount))" }.joined(separator: ", ")
-            return "\(pieFocus.title) expanded: \(parts)"
+            return "\(title) expanded: \(parts)"
         }
         return "Spending pie by category"
     }
 
     private func pieDimOpacity(for sector: PieSector) -> Double {
-        guard pieFocus != nil else { return 1 }
+        guard pieFocus != nil || pieFocusUserID != nil else { return 1 }
         return sector.expanded ? 1 : 0.34
     }
 
     private func collapsePieFocus() {
-        guard pieFocus != nil else { return }
+        guard pieFocus != nil || pieFocusUserID != nil else { return }
         pieFocus = nil
+        pieFocusUserID = nil
         pieHighlightID = nil
         pieCollapseGeneration += 1
     }
 
     private func schedulePieAutoCollapse() {
-        guard pieFocus != nil else { return }
+        guard pieFocus != nil || pieFocusUserID != nil else { return }
         pieCollapseGeneration += 1
         let generation = pieCollapseGeneration
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(7))
-            guard generation == pieCollapseGeneration, pieFocus != nil else { return }
+            guard generation == pieCollapseGeneration, pieFocus != nil || pieFocusUserID != nil else { return }
             pieFocus = nil
+            pieFocusUserID = nil
             pieHighlightID = nil
         }
     }
@@ -537,10 +606,15 @@ struct SpendHomeView: View {
         }
 
         pieTapConsumed = true
-        if pieFocus == hit.category {
+        if let userID = hit.userCategoryID {
+            pieFocus = nil
+            pieFocusUserID = userID
+            pieHighlightID = hit.id
+        } else if pieFocus == hit.category, pieFocusUserID == nil {
             pieHighlightID = hit.id
         } else {
             pieFocus = hit.category
+            pieFocusUserID = nil
             pieHighlightID = hit.id
         }
         schedulePieAutoCollapse()
@@ -564,11 +638,11 @@ struct SpendHomeView: View {
                         .foregroundStyle(Theme.cta)
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("Manage custom subcategories")
+                .accessibilityHint("Create and manage spending categories")
             }
             .padding(.horizontal, Theme.Space.lg)
 
-            if categorySlices.isEmpty {
+            if breakdownSlices.isEmpty {
                 Theme.EmptyState(
                     systemImage: "chart.pie",
                     title: "Nothing to break down",
@@ -582,14 +656,18 @@ struct SpendHomeView: View {
             } else {
                 Theme.Card {
                     VStack(spacing: 0) {
-                        ForEach(categorySlices) { slice in
+                        ForEach(breakdownSlices) { slice in
                             Button {
-                                selectedCategory = slice.category
+                                if let userID = slice.userCategoryID {
+                                    selectedUserCategory = UserCategorySheetItem(id: userID)
+                                } else {
+                                    selectedCategory = slice.category
+                                }
                             } label: {
                                 categoryRow(slice)
                             }
                             .buttonStyle(.plain)
-                            if slice.id != categorySlices.last?.id {
+                            if slice.id != breakdownSlices.last?.id {
                                 Divider().overlay(Theme.gridDivider)
                             }
                         }
@@ -726,6 +804,11 @@ struct SpendHomeView: View {
                         categoryFilter = cat
                     }
                 }
+                ForEach(userCategories, id: \.id) { cat in
+                    chip(title: cat.name, color: cat.tint, selected: false) {
+                        selectedUserCategory = UserCategorySheetItem(id: cat.id)
+                    }
+                }
             }
         }
     }
@@ -803,10 +886,18 @@ struct SpendHomeView: View {
                 .frame(width: 28, height: 28)
                 .background(Circle().fill(tint.opacity(0.22)))
             VStack(alignment: .leading, spacing: 1) {
-                Text(tx.merchant)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Theme.ink)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    Text(tx.merchant)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Theme.ink)
+                        .lineLimit(1)
+                    if !tx.trimmedDescription.isEmpty {
+                        Text(tx.trimmedDescription)
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.muted)
+                            .lineLimit(1)
+                    }
+                }
                 Text("\(shortDate(tx.postedAt)) · \(subName ?? tx.category.title)")
                     .font(.caption2)
                     .foregroundStyle(Theme.muted)
@@ -820,7 +911,11 @@ struct SpendHomeView: View {
         .padding(.horizontal, Theme.Space.md)
         .padding(.vertical, Theme.Space.sm)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(tx.merchant), \(SpendFormat.money(tx.amount)), \(subName ?? tx.category.title)")
+        .accessibilityLabel({
+            var parts = [tx.merchant, SpendFormat.money(tx.amount), subName ?? tx.category.title]
+            if !tx.trimmedDescription.isEmpty { parts.insert(tx.trimmedDescription, at: 1) }
+            return parts.joined(separator: ", ")
+        }())
         .accessibilityHint("Opens purchase details")
     }
 
@@ -887,7 +982,7 @@ struct SpendHomeView: View {
                 }
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("COST / USE")
+                        Text(item.useMode == .dailyAmortize ? "COST / DAY" : "COST / USE")
                             .font(.caption2.weight(.bold))
                             .tracking(0.7)
                             .foregroundStyle(Theme.muted)
@@ -899,9 +994,15 @@ struct SpendHomeView: View {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(SpendFormat.money(item.purchasePrice))
                             .font(.subheadline.weight(.semibold))
-                        Text("\(item.effectiveUseCount) uses")
-                            .font(.caption)
-                            .foregroundStyle(Theme.muted)
+                        if item.useMode == .dailyAmortize {
+                            Text(item.costPerUse.map { "\(SpendFormat.money($0)) / day" } ?? "—")
+                                .font(.caption)
+                                .foregroundStyle(Theme.muted)
+                        } else {
+                            Text("\(item.effectiveUseCount) uses")
+                                .font(.caption)
+                                .foregroundStyle(Theme.muted)
+                        }
                     }
                 }
                 if item.useMode == .tapToLog {
@@ -913,7 +1014,24 @@ struct SpendHomeView: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(item.title), cost per use \(item.costPerUse.map(SpendFormat.money) ?? "none yet")")
+        .accessibilityLabel({
+            if item.useMode == .dailyAmortize {
+                return "\(item.title), average \(item.costPerUse.map(SpendFormat.money) ?? "none") per day"
+            }
+            return "\(item.title), cost per use \(item.costPerUse.map(SpendFormat.money) ?? "none yet")"
+        }())
+    }
+
+    private func openFirstCategoryPurchase() {
+        guard let slice = categorySlices.first else {
+            appModel.requestedOpenSpendCategoryPurchase = false
+            return
+        }
+        if let userID = slice.userCategoryID {
+            selectedUserCategory = UserCategorySheetItem(id: userID)
+        } else {
+            selectedCategory = slice.category
+        }
     }
 
     private func shortDate(_ date: Date) -> String {
@@ -942,6 +1060,7 @@ private struct SpendTransactionSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var transaction: SpendTransactionEntity
     let subcategories: [SpendSubcategoryEntity]
+    var userCategories: [SpendUserCategoryEntity] = []
     @State private var trackMode: SpendUseMode = .tapToLog
 
     private var categorySubs: [SpendSubcategoryEntity] {
@@ -962,36 +1081,34 @@ private struct SpendTransactionSheet: View {
                 }
 
                 Section {
-                    Picker("Category", selection: Binding(
-                        get: { transaction.category },
+                    TextField("What was this for?", text: Binding(
+                        get: { transaction.notes },
                         set: { newValue in
-                            if let sid = transaction.subcategoryID,
-                               let sub = subcategories.first(where: { $0.id == sid }),
-                               sub.parentCategory != newValue {
-                                transaction.subcategoryID = nil
-                            }
-                            transaction.category = newValue
+                            transaction.notes = newValue
+                            SpendStore.syncTrackedTitle(from: transaction, in: modelContext)
                             try? modelContext.save()
                         }
-                    )) {
-                        ForEach(SpendCategory.allCases) { cat in
-                            Label(cat.title, systemImage: cat.systemImage).tag(cat)
-                        }
-                    }
+                    ), axis: .vertical)
+                    .lineLimit(3...8)
+                    .accessibilityLabel("Description")
+                    .accessibilityHint("Optional note used as the cost per use name")
+                } header: {
+                    spendSheetSectionHeader("DESCRIPTION")
+                } footer: {
+                    Text("This name is used in Cost / Use instead of the merchant.")
+                        .font(.caption)
+                }
 
-                    Picker("Subcategory", selection: Binding(
-                        get: { transaction.subcategoryID },
-                        set: { transaction.subcategoryID = $0; try? modelContext.save() }
-                    )) {
-                        Text("None").tag(Optional<UUID>.none)
-                        ForEach(categorySubs, id: \.id) { sub in
-                            Text(sub.name).tag(Optional(sub.id))
-                        }
-                    }
+                Section {
+                    SpendCategoryAssignmentFields(
+                        transaction: transaction,
+                        userCategories: userCategories,
+                        subcategories: categorySubs
+                    )
                 } header: {
                     spendSheetSectionHeader("CATEGORY")
                 } footer: {
-                    Text("Subcategories like Kitchen live under a parent (Home). Manage them from Overview → Categories.")
+                    Text("Create your own categories from Overview → Categories. Subcategories like Kitchen live under a parent.")
                         .font(.caption)
                 }
 
@@ -1041,6 +1158,7 @@ private struct AddTrackedItemSheet: View {
     @Environment(\.modelContext) private var modelContext
     @State private var title = ""
     @State private var priceText = ""
+    @State private var purchasedAt = Date()
     @State private var mode: SpendUseMode = .tapToLog
     @State private var category: SpendCategory = .shopping
 
@@ -1054,6 +1172,13 @@ private struct AddTrackedItemSheet: View {
                     TextField("Purchase price", text: $priceText)
                         .keyboardType(.decimalPad)
                         .accessibilityLabel("Purchase price")
+                    DatePicker(
+                        "Purchase date",
+                        selection: $purchasedAt,
+                        in: ...Date(),
+                        displayedComponents: .date
+                    )
+                    .accessibilityHint("Date used for daily cost and history")
                     Picker("Category", selection: $category) {
                         ForEach(SpendCategory.spendingCases) { cat in
                             Text(cat.title).tag(cat)
@@ -1107,6 +1232,7 @@ private struct AddTrackedItemSheet: View {
         _ = SpendStore.addManualTrackedItem(
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             price: price,
+            purchasedAt: purchasedAt,
             mode: mode,
             category: category,
             in: modelContext
@@ -1115,11 +1241,16 @@ private struct AddTrackedItemSheet: View {
     }
 }
 
+private struct UserCategorySheetItem: Identifiable {
+    let id: UUID
+}
+
 /// One wedge in the Spend overview donut (category or expanded subcategory piece).
 private struct PieSector: Identifiable {
     let id: String
     let category: SpendCategory
     let subcategoryID: UUID?
+    let userCategoryID: UUID?
     let title: String
     let color: Color
     let amount: Double
@@ -1128,9 +1259,10 @@ private struct PieSector: Identifiable {
 
     init(from slice: SpendCategorySlice, expanded: Bool, splitChild: Bool) {
         // Stable identity (no expand flag) so Charts doesn't thrash/crash on split.
-        id = slice.category.rawValue + "|" + (slice.subcategoryID?.uuidString ?? "parent") + "|" + slice.title
+        id = slice.id
         category = slice.category
         subcategoryID = slice.subcategoryID
+        userCategoryID = slice.userCategoryID
         title = slice.title
         color = slice.color
         amount = slice.amount

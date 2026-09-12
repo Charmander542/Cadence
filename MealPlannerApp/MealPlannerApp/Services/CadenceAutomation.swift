@@ -64,6 +64,15 @@ enum CadenceAutomation {
             case "drawer":
                 appModel.requestedOpenDrawer = true
                 log("open", "drawer")
+            case "spend-categories":
+                appModel.requestedWheelId = WheelDestination.spend.rawValue
+                appModel.requestedOpenSpendCategories = true
+                log("open", "spend-categories")
+            case "spend-new-category":
+                appModel.requestedWheelId = WheelDestination.spend.rawValue
+                appModel.requestedOpenSpendCategories = true
+                appModel.requestedOpenSpendNewCategory = true
+                log("open", "spend-new-category")
             default:
                 break
             }

@@ -6,8 +6,10 @@ import Charts
 struct SpendCategoryDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var appModel: AppModel
 
     let category: SpendCategory
+    var userCategory: SpendUserCategoryEntity? = nil
     let month: Date
 
     @Query(sort: \SpendTransactionEntity.postedAt, order: .reverse)
@@ -15,6 +17,8 @@ struct SpendCategoryDetailView: View {
     @Query(sort: \SpendSubcategoryEntity.sortOrder)
     private var subcategories: [SpendSubcategoryEntity]
     @Query private var budgets: [SpendBudgetEntity]
+    @Query(sort: \SpendUserCategoryEntity.sortOrder)
+    private var userCategories: [SpendUserCategoryEntity]
 
     @State private var budgetText = ""
     @State private var showAddSub = false
@@ -35,7 +39,10 @@ struct SpendCategoryDetailView: View {
     }
 
     private var total: Double {
-        slices.map(\.amount).reduce(0, +)
+        if userCategory != nil {
+            return purchases.map { abs($0.amount) }.reduce(0, +)
+        }
+        return slices.map(\.amount).reduce(0, +)
     }
 
     private var categoryBudget: Double? {
@@ -48,8 +55,25 @@ struct SpendCategoryDetailView: View {
     }
 
     private var purchases: [SpendTransactionEntity] {
-        SpendStore.spendingTransactions(transactions, in: range, category: category)
-            .sorted { $0.postedAt > $1.postedAt }
+        SpendStore.spendingTransactions(
+            transactions,
+            in: range,
+            category: userCategory == nil ? category : nil,
+            userCategoryID: userCategory?.id
+        )
+        .sorted { $0.postedAt > $1.postedAt }
+    }
+
+    private var displayTitle: String {
+        userCategory?.name ?? category.title
+    }
+
+    private var displayTint: Color {
+        userCategory?.tint ?? category.tint
+    }
+
+    private var displayImage: String {
+        userCategory?.systemImage ?? category.systemImage
     }
 
     var body: some View {
@@ -59,23 +83,24 @@ struct SpendCategoryDetailView: View {
                     headerCard
                         .padding(.horizontal, Theme.Space.lg)
 
-                    if !slices.isEmpty {
+                    if userCategory == nil, !slices.isEmpty {
                         subDonut
                             .padding(.horizontal, Theme.Space.lg)
                         subList
                     }
 
-                    budgetEditor
-                        .padding(.horizontal, Theme.Space.lg)
-
-                    subManage
+                    if userCategory == nil {
+                        budgetEditor
+                            .padding(.horizontal, Theme.Space.lg)
+                        subManage
+                    }
                     purchasesSection
                 }
                 .padding(.vertical, Theme.Space.md)
                 .padding(.bottom, 40)
             }
             .background(Theme.canvas.ignoresSafeArea())
-            .navigationTitle(category.title)
+            .navigationTitle(displayTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -89,12 +114,22 @@ struct SpendCategoryDetailView: View {
                 if let budget = categoryBudget {
                     budgetText = String(format: "%.0f", budget)
                 }
+                if appModel.requestedOpenSpendCategoryPurchase {
+                    appModel.requestedOpenSpendCategoryPurchase = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                        selectedTransaction = purchases.first
+                    }
+                }
             }
             .sheet(isPresented: $showAddSub) {
                 NewSubcategorySheet(parent: category)
             }
             .sheet(item: $selectedTransaction) { tx in
-                SpendCategoryTransactionEditor(transaction: tx, subcategories: kids)
+                SpendCategoryTransactionEditor(
+                    transaction: tx,
+                    subcategories: subcategories,
+                    userCategories: userCategories
+                )
             }
         }
     }
@@ -102,11 +137,11 @@ struct SpendCategoryDetailView: View {
     private var headerCard: some View {
         Theme.Card {
             HStack(spacing: Theme.Space.md) {
-                Image(systemName: category.systemImage)
+                Image(systemName: displayImage)
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(category.tint)
+                    .foregroundStyle(displayTint)
                     .frame(width: 48, height: 48)
-                    .background(Circle().fill(category.tint.opacity(0.22)))
+                    .background(Circle().fill(displayTint.opacity(0.22)))
                 VStack(alignment: .leading, spacing: 4) {
                     Text("THIS MONTH")
                         .font(.caption2.weight(.bold))
@@ -115,7 +150,7 @@ struct SpendCategoryDetailView: View {
                     Text(SpendFormat.money(total))
                         .font(Theme.display(.title))
                         .foregroundStyle(Theme.ink)
-                    if let budget = categoryBudget {
+                    if userCategory == nil, let budget = categoryBudget {
                         let left = budget - total
                         Text(left >= 0
                              ? "\(SpendFormat.money(left)) left of \(SpendFormat.money(budget))"
@@ -302,9 +337,18 @@ struct SpendCategoryDetailView: View {
                             } label: {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(tx.merchant)
-                                            .font(.subheadline.weight(.medium))
-                                            .foregroundStyle(Theme.ink)
+                                        HStack(spacing: 6) {
+                                            Text(tx.merchant)
+                                                .font(.subheadline.weight(.medium))
+                                                .foregroundStyle(Theme.ink)
+                                                .lineLimit(1)
+                                            if !tx.trimmedDescription.isEmpty {
+                                                Text(tx.trimmedDescription)
+                                                    .font(.subheadline)
+                                                    .foregroundStyle(Theme.muted)
+                                                    .lineLimit(1)
+                                            }
+                                        }
                                         Text(subLabel(for: tx))
                                             .font(.caption2)
                                             .foregroundStyle(Theme.muted)
@@ -492,6 +536,12 @@ private struct SpendCategoryTransactionEditor: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var transaction: SpendTransactionEntity
     let subcategories: [SpendSubcategoryEntity]
+    var userCategories: [SpendUserCategoryEntity] = []
+
+    private var categorySubs: [SpendSubcategoryEntity] {
+        subcategories.filter { $0.parentCategory == transaction.category }
+            .sorted { $0.sortOrder < $1.sortOrder }
+    }
 
     var body: some View {
         NavigationStack {
@@ -500,16 +550,25 @@ private struct SpendCategoryTransactionEditor: View {
                     LabeledContent("Merchant", value: transaction.merchant)
                     LabeledContent("Amount", value: SpendFormat.money(transaction.amount))
                 }
-                Section("Subcategory") {
-                    Picker("Subcategory", selection: Binding(
-                        get: { transaction.subcategoryID },
-                        set: { transaction.subcategoryID = $0; try? modelContext.save() }
-                    )) {
-                        Text("General").tag(Optional<UUID>.none)
-                        ForEach(subcategories, id: \.id) { sub in
-                            Text(sub.name).tag(Optional(sub.id))
+                Section("Description") {
+                    TextField("What was this for?", text: Binding(
+                        get: { transaction.notes },
+                        set: { newValue in
+                            transaction.notes = newValue
+                            SpendStore.syncTrackedTitle(from: transaction, in: modelContext)
+                            try? modelContext.save()
                         }
-                    }
+                    ), axis: .vertical)
+                    .lineLimit(3...8)
+                    .accessibilityLabel("Description")
+                    .accessibilityHint("Optional note used as the cost per use name")
+                }
+                Section("Category") {
+                    SpendCategoryAssignmentFields(
+                        transaction: transaction,
+                        userCategories: userCategories,
+                        subcategories: categorySubs
+                    )
                 }
             }
             .navigationTitle("Purchase")

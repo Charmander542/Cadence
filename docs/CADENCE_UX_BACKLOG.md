@@ -2390,13 +2390,33 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 | Field | Value |
 |-------|-------|
 | **Phase** | `RUNNING` |
-| **Next batch** | **KP** |
-| **Summary** | CreateFAB plus-only circle again (no text); News/Health still off. KO PASS. Next: KP audit. |
+| **Next batch** | **KS** |
+| **Summary** | Reverted KR breakdown trailing inset (broke card alignment). Next: KS. |
+
+### Batch KS — Fresh UX audit (post-KR)
+
+- [ ] **Spend pie hint wraps tightly** — “Tap a slice to expand · tap elsewhere or wait 7s…” is cramped under the donut.
+- [ ] **Append**.
+
+### Batch KR — Fresh UX audit (post-KQ)
+
+- [x] **Spend FAB covers breakdown leftover** — Reverted 2026-09-12; extra trailing inset misaligned the card with budget/donut.
+- [x] **Append**.
+
+### Batch KQ — Custom spend categories (user)
+
+- [x] **Overview CATEGORIES → create category** — New category sheet (name, icon, color). — 2026-09-12
+  → Fix: `SpendUserCategoryEntity` + `SpendCategoriesManageView` New category.
+- [x] **Overview → category → item can change category** — picker includes built-in + custom. — 2026-09-12
+  → Fix: `SpendCategoryAssignmentFields` on category purchase editor.
+- [x] **Sim verify** — Categories list, New category composer, Shopping item Category picker. — 2026-09-12
+  → `/tmp/cadence-spot-check/spend-categories.png`, `spend-new-category.png`, `spend-category-item.png`
 
 ### Batch KP — Fresh UX audit (post-KO)
 
-- [ ] **Habits / Spend plus circle** — still present; a11y labels page-specific.
-- [ ] **Append**.
+- [x] **Habits / Spend plus circle** — still present; a11y labels page-specific. — 2026-09-12
+  → `/tmp/cadence-spot-check/tab-habits.png`, `wheel-spend.png`
+- [x] **Append**.
 
 ### Batch KO — Plus-only FAB (user)
 

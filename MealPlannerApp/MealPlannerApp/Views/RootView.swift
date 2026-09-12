@@ -611,6 +611,23 @@ struct MainTabView: View {
             }
         }
 
+        if args.contains("-openSpendCategories")
+            || args.contains("-openSpendNewCategory")
+            || args.contains("-openSpendCategoryPurchase") {
+            selectWheel(.spend)
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(1100))
+                if args.contains("-openSpendCategoryPurchase") {
+                    appModel.requestedOpenSpendCategoryPurchase = true
+                } else {
+                    appModel.requestedOpenSpendCategories = true
+                    if args.contains("-openSpendNewCategory") {
+                        appModel.requestedOpenSpendNewCategory = true
+                    }
+                }
+            }
+        }
+
         if args.contains("-cadenceSpotCheck") {
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(800))

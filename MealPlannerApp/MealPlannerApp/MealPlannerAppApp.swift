@@ -33,6 +33,7 @@ struct MealPlannerApp: App {
             FocusSessionEntity.self,
             SpendSubcategoryEntity.self,
             SpendBudgetEntity.self,
+            SpendUserCategoryEntity.self,
         ])
         // v10: Import Apple/Google calendar events into Cadence.
         let config = ModelConfiguration("musclemeal-v10", isStoredInMemoryOnly: false)

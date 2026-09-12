@@ -56,11 +56,11 @@ struct SpendItemDetailView: View {
     private var hero: some View {
         Theme.Card {
             VStack(alignment: .leading, spacing: Theme.Space.sm) {
-                Text("COST TO USE IT")
+                Text(item.useMode == .dailyAmortize ? "AVERAGE PER DAY" : "COST TO USE IT")
                     .font(.caption2.weight(.bold))
                     .tracking(0.7)
                     .foregroundStyle(Theme.muted)
-                Text(item.costPerUse.map(SpendFormat.money) ?? "Log a use to begin")
+                Text(item.costPerUse.map { item.useMode == .dailyAmortize ? "\(SpendFormat.money($0)) / day" : SpendFormat.money($0) } ?? "Log a use to begin")
                     .font(Theme.display(.largeTitle))
                     .foregroundStyle(Theme.cta)
                     .minimumScaleFactor(0.7)
@@ -84,7 +84,21 @@ struct SpendItemDetailView: View {
                 Divider().overlay(Theme.gridDivider)
                 row("Category", item.category.title)
                 Divider().overlay(Theme.gridDivider)
-                row("Purchased", item.purchasedAt.formatted(date: .abbreviated, time: .omitted))
+                DatePicker(
+                    "Purchased",
+                    selection: Binding(
+                        get: { item.purchasedAt },
+                        set: { newDate in
+                            item.purchasedAt = newDate
+                            try? modelContext.save()
+                        }
+                    ),
+                    in: ...Date(),
+                    displayedComponents: .date
+                )
+                .font(.subheadline)
+                .padding(.vertical, Theme.Space.sm)
+                .accessibilityHint("Changes the purchase date used for daily cost")
                 if let last = item.lastUsedAt {
                     Divider().overlay(Theme.gridDivider)
                     row("Last use", last.formatted(date: .abbreviated, time: .shortened))
