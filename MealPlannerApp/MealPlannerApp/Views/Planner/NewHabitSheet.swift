@@ -181,7 +181,7 @@ struct NewHabitSheet: View {
     private func habitSectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
             .font(.caption2.weight(.bold))
-            .tracking(0.6)
+            .tracking(0.7)
             .foregroundStyle(Theme.muted)
             .accessibilityAddTraits(.isHeader)
     }

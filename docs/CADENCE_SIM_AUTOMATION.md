@@ -21,11 +21,12 @@ Screenshots are written to `/tmp/cadence-spot-check/` by default (`CADENCE_SHOT_
 3. **Launch** — `./scripts/cadence_sim launch` (passes `-cadenceSkipOnboarding` automatically)
 4. **Navigate** — relaunch with launch args (default) or in-session taps:
    - `./scripts/cadence_sim navigate tab today`
+   - `./scripts/cadence_sim navigate wheel spend` (also `focus` / `news` / `health` / …)
    - `./scripts/cadence_sim navigate open settings`
    - `./scripts/cadence_sim navigate tab calendar --in-session` (tap tab bar, keeps state)
 5. **Screenshot** — `./scripts/cadence_sim screenshot --name my-screen`
 6. **Inspect UI** — `./scripts/cadence_sim describe --json` (accessibility tree)
-7. **Interact** — `./scripts/cadence_sim tap-label "Open menu"`
+7. **Interact** — `./scripts/cadence_sim tap-label "Open sidebar"`
 8. **Run scripted flows** — `./scripts/cadence_sim run spot_check`
 
 Use `--json` on any command for structured output agents can parse.
@@ -40,8 +41,9 @@ Use `--json` on any command for structured output agents can parse.
 | `install` | Install `.app` bundle |
 | `launch [args…]` | Launch Cadence |
 | `terminate` | Kill the app |
-| `navigate tab <name\|0-4> [--in-session]` | Switch tab (relaunch or tap tab bar) |
-| `navigate open settings\|search\|shop\|drawer` | Open sheet/drawer |
+| `navigate tab <name\|0-4> [--in-session]` | Switch legacy tab (relaunch or tap) |
+| `navigate wheel <dest> [--in-session]` | Open dial destination via `-openWheel` (spend/focus/news/…) |
+| `navigate open settings\|search\|shop\|drawer\|spend\|focus\|news\|…` | Open sheet/drawer/wheel page |
 | `navigate close settings\|search\|drawer\|all` | Dismiss chrome |
 | `open-url <url>` | Raw `simctl openurl` |
 | `screenshot [--name X] [--out path]` | PNG capture |
@@ -78,14 +80,14 @@ Add JSON flows under `scripts/cadence_sim_flows/`. Each step is an object with `
 
 Built-in flows:
 
-- `spot_check` — all five tabs, shop, settings, global search
+- `spot_check` — legacy tabs + Spend/Focus/News, shop, settings, global search
 - `drawer_and_settings` — drawer chrome + settings entry
 
 ## App integration
 
 The app accepts:
 
-- **Launch args**: `-cadenceSkipOnboarding`, `-openMainTab N`, `-openShop`, `-openSettings`, `-openGlobalSearch`
+- **Launch args**: `-cadenceSkipOnboarding`, `-openMainTab N`, `-openWheel <dest>`, `-openShop`, `-openSettings`, `-openGlobalSearch`
 - **URL scheme `cadence://`**: optional; iOS may show an “Open in Cadence?” confirmation dialog, so prefer launch args + idb taps for automation.
 
 Automation logs print as `CADENCE_AUTOMATION action=… detail=…` in the Xcode/simulator console when URLs are handled.

@@ -77,6 +77,8 @@ final class CalendarSyncService {
     // MARK: - Task sync
 
     func upsertTask(_ task: PlannerTaskEntity) throws {
+        // Imported external events stay read-mirrored — don't push them back out.
+        guard !task.isImportedExternalEvent else { return }
         guard PlannerPreferences.syncTasksToAppleCalendar,
               let dueAt = task.dueAt,
               !task.isCompleted
@@ -310,6 +312,88 @@ final class CalendarSyncService {
     private func hasTimeComponent(_ date: Date) -> Bool {
         let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
         return (comps.hour ?? 0) != 0 || (comps.minute ?? 0) != 0
+    }
+
+    // MARK: - Import into Cadence
+
+    /// Pulls events from selected Apple calendars into Cadence as calendar events.
+    @discardableResult
+    func importEvents(into context: ModelContext, lookbackDays: Int = 14, lookaheadDays: Int = 60) throws -> Int {
+        guard PlannerPreferences.importFromAppleCalendar else {
+            try pruneImportedEvents(source: "apple", keeping: [], in: context)
+            return 0
+        }
+        let calendars = selectedAppleCalendars()
+        guard !calendars.isEmpty else {
+            try pruneImportedEvents(source: "apple", keeping: [], in: context)
+            return 0
+        }
+
+        let cal = Calendar.current
+        let start = cal.date(byAdding: .day, value: -lookbackDays, to: cal.startOfDay(for: .now)) ?? .now
+        let end = cal.date(byAdding: .day, value: lookaheadDays, to: cal.startOfDay(for: .now)) ?? .now
+        let predicate = store.predicateForEvents(withStart: start, end: end, calendars: calendars)
+        let events = store.events(matching: predicate)
+
+        var seenIDs = Set<String>()
+        var upserted = 0
+        for event in events {
+            guard let eventID = event.eventIdentifier, !eventID.isEmpty else { continue }
+            if Self.isCadenceOwnedNotes(event.notes) { continue }
+            if event.title.hasPrefix("Lift ·") || event.title.hasPrefix("Lunch ·") || event.title.hasPrefix("Dinner ·") {
+                continue
+            }
+
+            let externalID = "apple:\(eventID)"
+            seenIDs.insert(externalID)
+            let task = existingImported(externalID: externalID, in: context) ?? {
+                let created = PlannerTaskEntity(title: event.title)
+                created.isEvent = true
+                created.importedExternalID = externalID
+                created.importedSourceRaw = "apple"
+                context.insert(created)
+                return created
+            }()
+
+            task.title = event.title.isEmpty ? "Event" : event.title
+            task.notes = event.notes ?? ""
+            task.location = event.location ?? ""
+            task.dueAt = event.startDate
+            let duration = max(Int(event.endDate.timeIntervalSince(event.startDate) / 60), event.isAllDay ? 24 * 60 : 30)
+            task.durationMinutes = duration
+            task.isEvent = true
+            if task.colorHex.isEmpty, let hex = event.calendar.cgColor?.hexString {
+                task.colorHex = hex.replacingOccurrences(of: "#", with: "")
+            }
+            upserted += 1
+        }
+
+        try pruneImportedEvents(source: "apple", keeping: seenIDs, in: context)
+        try context.save()
+        return upserted
+    }
+
+    private func existingImported(externalID: String, in context: ModelContext) -> PlannerTaskEntity? {
+        let all = (try? context.fetch(FetchDescriptor<PlannerTaskEntity>())) ?? []
+        return all.first { $0.importedExternalID == externalID }
+    }
+
+    private func pruneImportedEvents(source: String, keeping: Set<String>, in context: ModelContext) throws {
+        let all = (try? context.fetch(FetchDescriptor<PlannerTaskEntity>())) ?? []
+        for task in all where task.importedSourceRaw == source {
+            if keeping.isEmpty || !keeping.contains(task.importedExternalID) {
+                context.delete(task)
+            }
+        }
+    }
+
+    static func isCadenceOwnedNotes(_ notes: String?) -> Bool {
+        guard let notes else { return false }
+        let lower = notes.lowercased()
+        return lower.contains("cadence task")
+            || lower.contains("cadence meal")
+            || lower.contains("cadence workout")
+            || lower == "cadence meal plan"
     }
 }
 

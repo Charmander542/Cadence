@@ -30,9 +30,12 @@ struct MealPlannerApp: App {
             HealthDaySnapshotEntity.self,
             NewsArticleEntity.self,
             NewsBriefingEntity.self,
+            FocusSessionEntity.self,
+            SpendSubcategoryEntity.self,
+            SpendBudgetEntity.self,
         ])
-        // v7: Spend Plaid enrollments (sync cursor).
-        let config = ModelConfiguration("musclemeal-v7", isStoredInMemoryOnly: false)
+        // v10: Import Apple/Google calendar events into Cadence.
+        let config = ModelConfiguration("musclemeal-v10", isStoredInMemoryOnly: false)
         do {
             return try ModelContainer(for: schema, configurations: [config])
         } catch {
@@ -76,6 +79,9 @@ struct MealPlannerApp: App {
                     WidgetSnapshotWriter.publishImmediately(in: context)
                     Task.detached(priority: .utility) {
                         RecipeDatabase.shared.warmCache()
+                    }
+                    Task { @MainActor in
+                        _ = await SpendStore.restorePlaidEnrollmentsIfNeeded(in: context)
                     }
                     Task {
                         try? await Task.sleep(for: .seconds(2))

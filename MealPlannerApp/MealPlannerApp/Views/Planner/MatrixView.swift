@@ -32,7 +32,8 @@ struct MatrixView: View {
     /// Locked after first layout so keyboard / Quick Add never shrinks the quadrants.
     @State private var lockedGridHeight: CGFloat = 0
 
-    private let matrixFABClearance: CGFloat = 110
+    /// Grid fills to the dial; FAB overlays on top (no reserved clearance).
+    private let matrixEdgeInset: CGFloat = 4
 
     private var openTasks: [PlannerTaskEntity] { tasks }
 
@@ -43,13 +44,13 @@ struct MatrixView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             PlannerTitleHeader(title: "Matrix", onMenu: onOpenDrawer)
-                .padding(.bottom, Theme.Space.md + 2)
+                .padding(.bottom, Theme.Space.xs)
 
             GeometryReader { geo in
-                let gap: CGFloat = Theme.Space.sm + 2
+                let gap: CGFloat = Theme.Space.xs
                 let contentHeight = lockedGridHeight > 0 ? lockedGridHeight : geo.size.height
-                let w = (geo.size.width - Theme.Space.lg * 2 - gap) / 2
-                let h = max(160, (contentHeight - gap - matrixFABClearance) / 2)
+                let w = (geo.size.width - matrixEdgeInset * 2 - gap) / 2
+                let h = max(160, (contentHeight - gap) / 2)
                 VStack(spacing: gap) {
                     HStack(spacing: gap) {
                         quadrant(.urgentImportant, width: w, height: h)
@@ -60,10 +61,10 @@ struct MatrixView: View {
                         quadrant(.notUrgentUnimportant, width: w, height: h)
                     }
                 }
-                .padding(.horizontal, Theme.Space.lg)
-                .padding(.bottom, matrixFABClearance)
+                .padding(.horizontal, matrixEdgeInset)
+                .frame(maxHeight: .infinity, alignment: .top)
             }
-            .frame(height: lockedGridHeight > 0 ? lockedGridHeight : nil)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background {
                 GeometryReader { proxy in
                     Color.clear.preference(key: MatrixGridHeightKey.self, value: proxy.size.height)
@@ -127,24 +128,6 @@ struct MatrixView: View {
             .accessibilityLabel(matrixQuadrantHeaderLabel(q, count: items.count))
             .accessibilityAddTraits(.isHeader)
             if items.isEmpty {
-                // Todoist-style empty priority slot: muted caps cue, dashed drop target.
-                Spacer(minLength: 0)
-                Text("DROP HERE")
-                    .font(.caption2.weight(.bold))
-                    .tracking(0.8)
-                    .foregroundStyle(Theme.muted)
-                    .padding(.horizontal, Theme.Space.sm + 2)
-                    .padding(.vertical, Theme.Space.sm)
-                    .frame(maxWidth: .infinity)
-                    .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
-                            .strokeBorder(
-                                Theme.muted.opacity(0.45),
-                                style: StrokeStyle(lineWidth: 1, dash: [5, 4])
-                            )
-                    )
-                    .accessibilityLabel("Drop tasks here")
                 Spacer(minLength: 0)
             } else {
                 ScrollView {

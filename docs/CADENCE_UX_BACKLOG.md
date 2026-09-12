@@ -2363,6 +2363,7 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 
 ## Recently verified
 
+- **Batch JL PASS 2026-09-11** — Calendar month-only + Day/3-day/Week menu; Focus Pomo/Stopwatch + stats; Matrix/Shop fuller bleed.
 - **Batch IZ PASS 2026-09-10** — News/workout hit boxes; workout toolbar roles; keyboard dismiss.
 - **Batch IY PASS 2026-09-10** — Calendar month stays open; year grid jump; hold-empty + drag reorder on app grid.
 - **Batch IX PASS 2026-09-10** — Configurable apps/wheel (edit grid + Settings Apps).
@@ -2389,14 +2390,253 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 | Field | Value |
 |-------|-------|
 | **Phase** | `RUNNING` |
-| **Next batch** | **JJ** |
-| **Summary** | Settings sub-pages Mobbin-cleaned (no heroes; intro footers; inline titles). Hub + details cohesive. Continuing JJ. |
+| **Next batch** | **KP** |
+| **Summary** | CreateFAB plus-only circle again (no text); News/Health still off. KO PASS. Next: KP audit. |
 
-### Batch JJ — Continue UX loop
+### Batch KP — Fresh UX audit (post-KO)
 
-- [ ] **Next Mobbin friction**.
-- [ ] **Implement + screenshot**.
+- [ ] **Habits / Spend plus circle** — still present; a11y labels page-specific.
 - [ ] **Append**.
+
+### Batch KO — Plus-only FAB (user)
+
+- [x] **Plus-only CreateFAB** — drop capsule labels; keep a11y Add task/event/habit; News/Health still off. — 2026-09-11
+  → Fix: `CreateFAB` 58pt circle + plus; remove `shortTitle`.
+- [x] **Sim verify** — Today 58×58 plus; News Add count 0. — 2026-09-11
+  → `/tmp/cadence-spot-check-ko-plus/plus-today.png`, `plus-news.png`
+- [x] **Append**.
+
+### Batch KN — Fresh UX audit (post-KM)
+
+- [x] **CreateFAB vs UndoFAB spacing** — leading undo / trailing create pattern unchanged. — 2026-09-11
+- [x] **App grid hide CreateFAB** — verified earlier (grid hides dial FAB). — 2026-09-11
+- [x] **Append**.
+
+### Batch KM — Fresh UX audit (post-KL)
+
+- [x] **Calendar EVENT → event sheet** — opens. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/km-event.png`
+- [x] **Habits HABIT → NewHabitSheet** — opens. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/km-habit.png`
+- [x] **Append**.
+
+### Batch KL — Fresh UX audit (post-KK)
+
+- [x] **Drawer open** — drawer screenshot captured; close soft-fails cleanly. — 2026-09-11
+- [x] **QuickAdd from Today FAB** — sheet opens. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/kl-quickadd.png`
+- [x] **Append**.
+
+### Batch KK — Fresh UX audit (post-KJ)
+
+- [x] **RootView showWheelDock + CreateFAB** — FAB gated on `showWheelDock` + `fabAction`. — 2026-09-11
+- [x] **Spend ITEM a11y label** — “Add tracked purchase”. — 2026-09-11
+- [x] **Append**.
+
+### Batch KJ — Fresh UX audit (post-KI)
+
+- [x] **Health sync header** — sync controls present; no dial Add. — 2026-09-11
+- [x] **Focus Start vs former FAB space** — Start session full-width (~272×56). — 2026-09-11
+- [x] **Append**.
+
+### Batch KI — Fresh UX audit (post-KH)
+
+- [x] **CreateFAB press scale** — light press only (no fan-out) by design. — 2026-09-11
+- [x] **News refresh header** — Refresh digest present; Add count 0. — 2026-09-11
+- [x] **Append**.
+
+### Batch KH — Fresh UX audit (post-KG)
+
+- [x] **Habits ADD HABIT header + dial HABIT** — dial Add habit present. — 2026-09-11
+- [x] **Matrix quadrant empty Add vs dial TASK** — dial Add task present. — 2026-09-11
+- [x] **Append**.
+
+### Batch KG — Fresh UX audit (post-KF)
+
+- [x] **Dial create capsule hit target** — FAB frame height 52. — 2026-09-11
+- [x] **Inbox vs Today TASK label** — Inbox opens QuickAdd. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/kg-inbox.png`
+- [x] **Append**.
+
+### Batch KF — Fresh UX audit (post-KE)
+
+- [x] **Build + spot-check after KE tracking** — build OK; Today/Spend/News smoke shots. — 2026-09-11
+  → `/tmp/cadence-spot-check-kf/`
+- [x] **Append new P2 from skim** — onboarding tracking left at 0.8 intentionally. — 2026-09-11
+- [x] **Append**.
+
+### Batch KE — Residual muted tracking (post-KD)
+
+- [x] **Workout / Browse / Grocery muted headers** — tracking 0.6/0.8 → 0.7. — 2026-09-11
+  → Fix: WorkoutHome/Active/Preview, Browse, Grocery.
+- [x] **Spend / MealPlan residual 0.5–0.8** — 0.6/0.8 → 0.7; 0.5 meta chips kept. — 2026-09-11
+  → Fix: SpendHome/CategoryDetail/ItemDetail, MealPlanView.
+- [x] **Append**.
+
+### Batch KD — Fresh UX audit (post-KC)
+
+- [x] **Residual planner muted caps drift** — planner sheets mostly 0.7; 0.5 remains on small meta (OK). Broader drift in Workout/Browse/Grocery/Spend/Meals → KE. — 2026-09-11
+- [x] **Widget / extension chrome** — no dial FAB / CreateFAB usage outside RootView. — 2026-09-11
+- [x] **Append**.
+
+### Batch KC — Fresh UX audit (post-KB)
+
+- [x] **Spend Overview pie vs ITEM capsule** — ITEM clears center total; sits over breakdown foot. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/kc-spend.png`
+- [x] **Calendar day/3-day EVENT capsule** — visible above dial in 3 Day. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/kc-calendar.png`
+- [x] **Append**.
+
+### Batch KB — Fresh UX audit (post-KA)
+
+- [x] **CreateFAB shadow in light mode** — readable on white Today. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/kb-today-light.png`
+- [x] **VoiceOver order** — dial FAB at y≈740; empty-state Add separate. — 2026-09-11
+- [x] **Append**.
+
+### Batch KA — Fresh UX audit (post-JZ)
+
+- [x] **cadence_sim close all** — search/drawer soft-fail + relaunch fallback; no invalid escape. — 2026-09-11
+  → Fix: `scripts/cadence_sim.py` close handlers.
+- [x] **simctl boot “Unable to boot… Booted”** — skip boot when already booted. — 2026-09-11
+  → Fix: `ensure_booted` checks booted list first.
+- [x] **Append**.
+
+### Batch JZ — Fresh UX audit (post-JY)
+
+- [x] **Meals New week CTA** — no dial Add. — 2026-09-11
+- [x] **Shop sheet** — no dial Add task while shop open. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/jz-meals.png`, `jz-shop.png`
+- [x] **Append**.
+
+### Batch JY — Fresh UX audit (post-JX)
+
+- [x] **Health Lift segment** — no dial Add. — 2026-09-11
+- [x] **Focus Start CTA** — Start session on-page; no dial FAB. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/jy-focus.png`
+- [x] **Append**.
+
+### Batch JX — Fresh UX audit (post-JW)
+
+- [x] **OrangeFAB naming** — renamed to `CreateFAB` (+ `OrangeFAB` typealias). — 2026-09-11
+  → Fix: `PlannerChrome.swift` / `RootView.swift`
+- [x] **cadence_sim spot_check flow** — wheel Spend/Focus/News shots after argparse fix. — 2026-09-11
+  → `/tmp/cadence-spot-check-jx/wheel-spend.png`, `wheel-focus.png`, `wheel-news.png`
+- [x] **Append**.
+
+### Batch JW — Fresh UX audit (post-JV)
+
+- [x] **Inbox empty CTA + dial TASK** — FAB opens QuickAdd. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/jw-inbox-add.png`
+- [x] **Undo chip + labeled FAB coexistence** — TASK capsule baseline on Today (undo appears after complete). — 2026-09-11
+- [x] **Append**.
+
+### Batch JV — Fresh UX audit (post-JU)
+
+- [x] **Spend COST/USE tab with FAB** — ITEM capsule present. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/jv-spend-cost.png`
+- [x] **Calendar month scope + EVENT capsule** — Add event still at dial clearance. — 2026-09-11
+- [x] **Append**.
+
+### Batch JU — Fresh UX audit (post-JT)
+
+- [x] **Global search / Settings** — no dial Add task when sheets open. — 2026-09-11
+- [x] **App grid expanded** — dial FAB hidden (only page empty-state Add remains). — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/ju-app-grid.png`
+- [x] **Append**.
+
+### Batch JT — Fresh UX audit (post-JS)
+
+- [x] **Dial neighbor tap with labeled FAB** — Habits→Calendar; Add event present. — 2026-09-11
+- [x] **Matrix FAB opens QuickAdd** — one tap. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/jt-matrix-add.png`
+- [x] **Append**.
+
+### Batch JS — Fresh UX audit (post-JR)
+
+- [x] **Habits HABIT FAB → NewHabitSheet** — opens New Habit. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/js-habit-add.png`
+- [x] **Light-mode FAB contrast** — `+ TASK` readable; restored dark. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/js-today-light.png`
+- [x] **Append**.
+
+### Batch JR — Fresh UX audit (post-JQ)
+
+- [x] **Browse / Workout dial pages** — Browse: no dial Add. — 2026-09-11
+- [x] **Spend ITEM sheet from FAB** — opens Track item (CANCEL/SAVE). — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/jr-spend-add.png`
+- [x] **Append**.
+
+### Batch JQ — Fresh UX audit (post-JP)
+
+- [x] **Matrix / Inbox FAB labels** — both show Add task dial capsule. — 2026-09-11
+  → `/tmp/cadence-spot-check-jo-fab/jq-matrix.png`, `jq-inbox.png`
+- [x] **Empty-state vs FAB redundancy** — keep both (Todoist-style); dial stays when scrolled. — 2026-09-11
+- [x] **Append**.
+
+### Batch JP — Fresh UX audit (post-JO FAB)
+
+- [x] **Audit create vs consume chrome** — Meals/Focus: no dial `Add` a11y; in-page CTAs remain. — 2026-09-11
+  → Verified: `/tmp/cadence-spot-check-jo-fab/jp-focus.png`, `jp-meals.png`
+- [x] **FAB capsule vs dial clearance** — `navigate wheel` OK; Calendar still shows Add event after dial switch. — 2026-09-11
+- [x] **Append**.
+
+### Batch JN — Fresh UX audit (post-JM)
+
+- [x] **ListSettings / NewHabit / Habits caps** — NewHabit/Habits already 0.7; weekday chips keep 0.3 for fit. — 2026-09-11
+- [x] **PlannerChrome / WorkoutIntegration residual** — already 0.7; calendar weekday symbols 0.8 → 0.7. — 2026-09-11
+  → Fix: `CalendarPlannerView` month weekday tracking.
+- [x] **cadence_sim wheel tabs** — argparse now accepts `wheel`; destinations already mapped. — 2026-09-11
+  → Fix: `scripts/cadence_sim.py` navigate choices include `wheel`.
+- [x] **Reconnect Mobbin MCP tools** — available this session (JO used search_screens). — 2026-09-11
+- [x] **Append**.
+
+### Batch JO — Dial FAB redesign (user + Mobbin)
+
+- [x] **Labeled create capsule** — replace mystery circle with compact `+ TASK|EVENT|HABIT|ITEM` pill; light press only (no fan-out). Refs: [Todoist](https://mobbin.com/screens/1ae63b10-6840-42ec-838a-0117cb219e99), [Structured](https://mobbin.com/screens/2945ca91-3537-4a3c-82c5-0901c16a3af1); avoid [Pangea](https://mobbin.com/screens/ad29ee8d-4b30-430b-9842-53d9e345bacd) expand. — 2026-09-11
+  → Fix: `OrangeFAB` capsule + `FABAction.shortTitle`; `FABPressButtonStyle`. `/tmp/cadence-spot-check-jo-fab/fab-today.png`, `fab-calendar.png`, `fab-habits.png`, `fab-spend.png`
+- [x] **Hide on consume pages** — remove FAB from News + Health/Body (refresh/sync stay in headers). — 2026-09-11
+  → Fix: `WheelDestination.fabAction`; drop `healthCheckIn` / `refreshNews`; News/Health handlers removed. a11y: News/Health `Add` count 0. `/tmp/cadence-spot-check-jo-fab/fab-news.png`, `fab-health.png`
+- [x] **Create pages only** — Today, Inbox, Matrix, Calendar, Habits, Spend keep FAB. — 2026-09-11
+  → Fix: inbox → `.todayQuickAdd`. QuickAdd opens from FAB (`fab-today-opened.png`).
+- [x] **Append**.
+
+### Batch JM — Fresh UX audit (post-JK sheets)
+
+- [x] **QuickAdd / DayDetail sheets** — align remaining planner sheets to Task/Event muted section chrome if any still plain. — 2026-09-11
+  → Fix: `QuickAddSheet` LIST/TASK/WHEN + `.tint(Theme.cta)`; `DayDetailSheet` TASKS/EVENTS/WORKOUT + CLOSE; `TagEditorSheet` NAME/COLOR. `/tmp/cadence-spot-check-jm/quickadd-jm.png`
+- [x] **Spend home list rows** — Monzo-style tighter purchase rows if still loose after JK sheets. — 2026-09-11
+  → Fix: `SpendHomeView.transactionRow` 28pt icon, sm padding, caption2 meta, no chevron; PURCHASES tracking 0.7. `/tmp/cadence-spot-check-jm/spend-home-jm.png`
+- [x] **Reconnect Mobbin MCP tools** — skipped 2026-09-11 (tools not available in session; note only).
+- [x] **Append**.
+
+### Batch JL — User redesign (calendar + Focus + full-bleed)
+
+- [x] **Calendar** — month name only in header (no date range / top date strip); view menu for Day / 3 Day / Week (+ Month/Year); grid takes more screen; FAB stays overlay. — 2026-09-11
+  → Fix: `CalendarPlannerView` view-switcher Menu + month-only `headerTitle`; removed day column strip; slim month-picker handle. `/tmp/cadence-spot-check/calendar-jl.png`
+- [x] **Focus sub-app** — Pomo + Stopwatch dial app with stats page (Structured/TickTick-style refs). — 2026-09-11
+  → Fix: `FocusHomeView` / `FocusStatsView` / `FocusSettingsView` + `FocusSessionEntity`; dial `target` icon; top-right **STATS** (no FAB). `/tmp/cadence-spot-check/focus-home.png`, `focus-stats.png`
+- [x] **Full-bleed pages** — Matrix / Shop / similar reduce inset chrome so content fills width; + stays on top via RootView FAB. — 2026-09-11
+  → Fix: Matrix edge-to-dial behind +; no DROP HERE; Shop `.plain` list + tighter margins.
+- [x] **Append**.
+
+### Batch JK — Continue underdone sheets
+
+- [x] **Event sheet** — elevate Form to match Task editor section chrome. — 2026-09-11
+  → Fix: `PlannerEventSheet` WHEN (times + reminder) / REPEAT / WIDGET / ORGANIZE muted caps; `.tint(Theme.cta)`; tracking 0.7. `/tmp/cadence-spot-check-jk/event-sheet-jk.png`
+- [x] **Spend transaction / add item / item detail** — Monzo/Orbit density. — 2026-09-11
+  → Fix: muted PURCHASE/CATEGORY/COST·USE + ITEM/HOW YOU USE; toolbar DONE/CANCEL/SAVE caps; detail DETAILS header + tighter spacing. `/tmp/cadence-spot-check-jk/spend-add-item-jk.png`
+- [ ] **Reconnect Mobbin MCP tools** in a fresh chat if still missing.
+- [x] **Append**.
+
+### Batch JJ — Underdone pages (user: full Mobbin pass)
+
+- [x] **Dial Inbox / Browse** — real `TodayView(.inbox)` + `BrowseHomeView` (no Coming Soon stubs). — 2026-09-11
+- [x] **Task editor** — muted TASK/WHEN/REPEAT/ORGANIZE sections (Todoist/Things form density). — 2026-09-11
+- [x] **Workout summary** — celebration IconWell + next-time cards + primary Done (Hevy finish). — 2026-09-11
+- [x] **Pantry + Tags rows** — IconWell / hairline chips. — 2026-09-11
+- [x] **Health metric footer** — drop “placeholder” copy. — 2026-09-11
+  → Note: Mobbin plugin installed + OAuth reported OK, but `plugin-mobbin-mobbin` tools not exposed to agent; used backlog Mobbin patterns.
 
 ### Batch JH — Settings sub-pages Mobbin cleanup (user)
 

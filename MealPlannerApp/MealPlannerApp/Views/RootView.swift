@@ -15,6 +15,7 @@ struct RootView: View {
             }
         }
         .cadenceDismissKeyboardOnTap()
+        .cadenceKeyboardDoneButton()
         .onAppear { _ = ensureProfile() }
         .onAppear {
             CadenceAutomation.skipOnboardingIfRequested(modelContext: modelContext, profiles: profiles)
@@ -50,7 +51,12 @@ struct MainTabView: View {
     @Query(sort: \TaskListEntity.sortOrder) private var lists: [TaskListEntity]
 
     @State private var showDrawer = false
+    /// Interactive edge-swipe reveal while opening (0…sidebarWidth).
+    @State private var sidebarOpenDragX: CGFloat = 0
     @State private var showSettings = false
+    private let sidebarWidth: CGFloat = 300
+    private let sidebarEdgeWidth: CGFloat = 22
+    private let sidebarOpenThreshold: CGFloat = 72
     @State private var openShopOnMeals = false
     @State private var plannerDestination: PlannerDestination = .today
     @State private var showTagManager = false
@@ -60,6 +66,8 @@ struct MainTabView: View {
     @State private var isAppGridExpanded = false
     /// Live pull-up distance from the dial — drawn in this ZStack so it never resizes the page inset.
     @State private var wheelExpandPull: CGFloat = 0
+    /// Hide dial while the app menu is up / dismissing so icons don’t flash through (“ghost apps”).
+    @State private var showWheelDock = true
     @StateObject private var appsModel = CadenceAppsModel()
 
     private var wheelItems: [WheelNavItem] { appsModel.dialItems }
@@ -81,23 +89,24 @@ struct MainTabView: View {
                 .animation(nil, value: wheelExpandPull)
 
             // Larger dial overlays the reserved band (may extend slightly into content).
-            if !isAppGridExpanded {
+            if showWheelDock {
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
                     wheelDock
                 }
                 .ignoresSafeArea(edges: .bottom)
+                .transition(.opacity)
             }
 
             // FAB above the dial as a trailing-only control — must not cover the wheel hit target.
-            if !isAppGridExpanded, let fab = contentDestination.fabAction {
+            if showWheelDock, let fab = contentDestination.fabAction {
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
                         .allowsHitTesting(false)
                     HStack(spacing: 0) {
                         Spacer(minLength: 0)
                             .allowsHitTesting(false)
-                        OrangeFAB(
+                        CreateFAB(
                             accessibilityLabel: fab.accessibilityLabel,
                             accessibilityHint: fab.accessibilityHint
                         ) {
@@ -113,7 +122,8 @@ struct MainTabView: View {
             }
 
             // Interactive pull-up peek — sibling overlay, not part of the bottom inset.
-            if wheelExpandPull > 12, !isAppGridExpanded {
+            // Only while the dial reports an active upward pull (cleared on gesture cancel).
+            if wheelExpandPull > 12, showWheelDock {
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
                     RoundedRectangle(cornerRadius: Theme.Radius.xl + 4, style: .continuous)
@@ -128,14 +138,18 @@ struct MainTabView: View {
                 }
                 .ignoresSafeArea(edges: .bottom)
                 .allowsHitTesting(false)
+                .accessibilityHidden(true)
             }
 
             // Full-screen overlay (sibling of inset content) so expand never pushes the page.
+            // Avoid .move(edge:) removal — a cancelled spring can leave grabber chrome stuck on-screen.
             ZStack {
                 if isAppGridExpanded {
                     Color.black.opacity(0.55)
                         .ignoresSafeArea()
                         .onTapGesture {
+                            // Match swipe-dismiss: hide dial first, then collapse overlay.
+                            showWheelDock = false
                             withAnimation(appMenuSpring) {
                                 isAppGridExpanded = false
                             }
@@ -151,7 +165,12 @@ struct MainTabView: View {
                             selectedId: $selectedWheelId,
                             onSelect: handleWheelSelect,
                             onDismiss: {
-                                isAppGridExpanded = false
+                                // Menu already slid off — drop overlay without bringing the dial back early.
+                                var t = Transaction()
+                                t.disablesAnimations = true
+                                withTransaction(t) {
+                                    isAppGridExpanded = false
+                                }
                             },
                             onWorkoutVisibilityChange: { on in
                                 profile.workoutsEnabled = on
@@ -160,12 +179,19 @@ struct MainTabView: View {
                         )
                     }
                     .ignoresSafeArea(edges: .bottom)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    // Slide in; fade out on dismiss so a cancelled spring can't leave grabber chrome stuck.
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .opacity
+                    ))
                 }
             }
             .animation(appMenuSpring, value: isAppGridExpanded)
             .allowsHitTesting(isAppGridExpanded)
         }
+        // Prefer dial / app-menu swipes over Home Indicator + app-switcher edge gestures.
+        // Users still reach Home by swiping up a second time (or from outside the dial).
+        .defersSystemGestures(on: .bottom)
         .environment(\.isAppGridExpanded, isAppGridExpanded)
         .tint(Theme.accent)
         .liveWorkoutHost()
@@ -215,6 +241,15 @@ struct MainTabView: View {
                 }
             }
         }
+        .onChange(of: isAppGridExpanded) { _, expanded in
+            if expanded {
+                // Cover dial immediately so icons never sit under a translucent menu.
+                showWheelDock = false
+                wheelExpandPull = 0
+            } else if !showWheelDock {
+                revealWheelDockAfterMenu()
+            }
+        }
         .overlay {
             if appModel.isGeneratingPlan && !appModel.planGeneratingMinimized {
                 PlanGeneratingOverlay()
@@ -259,7 +294,38 @@ struct MainTabView: View {
                         appModel.showGlobalSearchSheet = true
                     }
                 )
-                .transition(.opacity)
+                .transition(.asymmetric(
+                    insertion: .move(edge: .leading).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
+            }
+        }
+        // Left-edge swipe opens the sidebar (grab the left of the screen).
+        .overlay(alignment: .leading) {
+            if !showDrawer {
+                Color.clear
+                    .frame(width: sidebarEdgeWidth)
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .gesture(sidebarOpenEdgeGesture)
+                    .accessibilityHidden(true)
+            }
+        }
+        // Live preview while dragging the edge open.
+        .overlay(alignment: .leading) {
+            if !showDrawer, sidebarOpenDragX > 8 {
+                Color.black.opacity(0.4 * Double(min(1, sidebarOpenDragX / sidebarWidth)))
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .overlay(alignment: .leading) {
+                        Theme.surface
+                            .frame(width: sidebarWidth)
+                            .overlay(alignment: .trailing) {
+                                Rectangle().fill(Theme.hairline).frame(width: 1)
+                            }
+                            .offset(x: -sidebarWidth + min(sidebarOpenDragX, sidebarWidth))
+                    }
+                    .allowsHitTesting(false)
             }
         }
         .sheet(isPresented: Binding(
@@ -307,6 +373,10 @@ struct MainTabView: View {
             }
         }
         .onAppear {
+            // Cold launch / return: never leave pull-peek or app-menu chrome on screen.
+            isAppGridExpanded = false
+            showWheelDock = true
+            wheelExpandPull = 0
             migrateLegacySelectionIfNeeded()
             loadedPages.insert(selectedWheelId)
             if let dest = WheelDestination(rawValue: selectedWheelId), dest.showsContentPage {
@@ -334,10 +404,40 @@ struct MainTabView: View {
         .zIndex(2)
     }
 
-    @ViewBuilder
+    private func revealWheelDockAfterMenu() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
+            guard !isAppGridExpanded else { return }
+            withAnimation(.easeOut(duration: 0.16)) {
+                showWheelDock = true
+            }
+        }
+    }
+
+    private var sidebarOpenEdgeGesture: some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .global)
+            .onChanged { value in
+                guard abs(value.translation.width) >= abs(value.translation.height) * 0.55 else { return }
+                sidebarOpenDragX = min(sidebarWidth, max(0, value.translation.width))
+            }
+            .onEnded { value in
+                let shouldOpen = value.translation.width > sidebarOpenThreshold
+                    || value.predictedEndTranslation.width > sidebarOpenThreshold * 1.25
+                if shouldOpen {
+                    sidebarOpenDragX = 0
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        showDrawer = true
+                    }
+                } else {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) {
+                        sidebarOpenDragX = 0
+                    }
+                }
+            }
+    }
+
     private var pageContent: some View {
         let page = contentDestination
-        ZStack {
+        return ZStack {
             lazyPage(WheelDestination.today.rawValue, active: page == .today) {
                 TodayView(destination: plannerDestination, onOpenDrawer: { showDrawer = true })
             }
@@ -361,22 +461,10 @@ struct MainTabView: View {
                 HabitsHomeView(onOpenDrawer: { showDrawer = true })
             }
             lazyPage(WheelDestination.inbox.rawValue, active: page == .inbox) {
-                PlaceholderPageView(
-                    title: "Inbox",
-                    systemImage: "tray",
-                    subtitle: "Tasks without a due date will live here. Placeholder for the wheel demo.",
-                    onOpenDrawer: { showDrawer = true },
-                    onGoToday: { selectWheel(.today) }
-                )
+                TodayView(destination: .inbox, onOpenDrawer: { showDrawer = true })
             }
             lazyPage(WheelDestination.browse.rawValue, active: page == .browse) {
-                PlaceholderPageView(
-                    title: "Browse",
-                    systemImage: "book",
-                    subtitle: "Cookbook browsing will land here. Placeholder for the wheel demo.",
-                    onOpenDrawer: { showDrawer = true },
-                    onGoToday: { selectWheel(.today) }
-                )
+                BrowseHomeView(onOpenDrawer: { showDrawer = true })
             }
             lazyPage(WheelDestination.spend.rawValue, active: page == .spend) {
                 SpendHomeView(onOpenDrawer: { showDrawer = true })
@@ -386,6 +474,9 @@ struct MainTabView: View {
             }
             lazyPage(WheelDestination.news.rawValue, active: page == .news) {
                 NewsHomeView(onOpenDrawer: { showDrawer = true })
+            }
+            lazyPage(WheelDestination.focus.rawValue, active: page == .focus) {
+                FocusHomeView(onOpenDrawer: { showDrawer = true })
             }
         }
     }
@@ -556,6 +647,7 @@ enum WheelDestination: String, CaseIterable, Identifiable {
     case spend
     case health
     case news
+    case focus
     case settings
 
     var id: String { rawValue }
@@ -574,16 +666,15 @@ enum WheelDestination: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Pages that show the shared dial + button (hosted above the wheel in RootView).
+    /// Pages that show the shared dial create control (hosted above the wheel in RootView).
+    /// Create surfaces only — News / Health / Focus / Meals / Browse use in-page CTAs instead.
     var fabAction: FABAction? {
         switch self {
-        case .today: return .todayQuickAdd
+        case .today, .inbox: return .todayQuickAdd
         case .matrix: return .matrixQuickAdd
         case .calendar: return .addEvent
         case .habits: return .addHabit
         case .spend: return .addSpendItem
-        case .health: return .healthCheckIn
-        case .news: return .refreshNews
         default: return nil
         }
     }
@@ -636,6 +727,8 @@ enum WheelDestination: String, CaseIterable, Identifiable {
             return .init(id: rawValue, label: "Body", systemImage: "heart.text.square")
         case .news:
             return .init(id: rawValue, label: "News", systemImage: "newspaper")
+        case .focus:
+            return .init(id: rawValue, label: "Focus", systemImage: "target")
         case .settings:
             return .init(id: rawValue, label: "Settings", systemImage: "gearshape")
         }

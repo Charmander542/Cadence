@@ -470,7 +470,7 @@ struct TagManagerSheet: View {
                         Theme.IconWell(systemImage: "number", tint: Theme.muted, size: 48)
                         Text("NO TAGS")
                             .font(.caption2.weight(.bold))
-                            .tracking(0.6)
+                            .tracking(0.7)
                             .foregroundStyle(Theme.muted)
                         Text("Create your first tag")
                             .font(Theme.display(.headline))
@@ -495,13 +495,24 @@ struct TagManagerSheet: View {
                             Circle()
                                 .fill(PlannerColor.from(hex: tag.colorHex))
                                 .frame(width: 28, height: 28)
-                            Text("#\(tag.name)")
-                                .foregroundStyle(Theme.ink)
+                                .overlay {
+                                    Circle().strokeBorder(Theme.hairline, lineWidth: 1)
+                                }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("#\(tag.name)")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(Theme.ink)
+                                Text("TAP TO EDIT")
+                                    .font(.caption2.weight(.bold))
+                                    .tracking(0.5)
+                                    .foregroundStyle(Theme.muted)
+                            }
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .font(.caption)
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(Theme.muted)
                         }
+                        .padding(.vertical, 4)
                     }
                     .listRowBackground(Theme.surface)
                     .accessibilityElement(children: .combine)
@@ -565,11 +576,7 @@ struct TagEditorSheet: View {
                         .accessibilityValue(name.isEmpty ? "Empty" : name)
                         .accessibilityHint("Tag name used when typing #tag in tasks")
                 } header: {
-                    Text("NAME")
-                        .font(.caption2.weight(.bold))
-                        .tracking(0.6)
-                        .foregroundStyle(Theme.muted)
-                        .accessibilityAddTraits(.isHeader)
+                    tagEditorSectionHeader("NAME")
                 }
                 Section {
                     ColorSwatchGrid(
@@ -578,35 +585,46 @@ struct TagEditorSheet: View {
                         swatchNamePrefix: "Tag color"
                     )
                 } header: {
-                    Text("COLOR")
-                        .font(.caption2.weight(.bold))
-                        .tracking(0.6)
-                        .foregroundStyle(Theme.muted)
-                        .accessibilityAddTraits(.isHeader)
+                    tagEditorSectionHeader("COLOR")
                 }
             }
             .scrollContentBackground(.hidden)
             .background(Theme.canvas)
+            .tint(Theme.cta)
             .navigationTitle("Edit Tag")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("CANCEL") { dismiss() }
+                        .font(.caption.weight(.bold))
+                        .tracking(0.5)
                         .accessibilityHint("Discards tag edits")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button("SAVE") {
                         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                         if !trimmed.isEmpty { tag.name = trimmed }
                         try? modelContext.save()
                         dismiss()
                     }
+                    .font(.caption.weight(.bold))
+                    .tracking(0.5)
+                    .foregroundStyle(Theme.cta)
                     .accessibilityHint("Saves tag name and color")
                 }
             }
             .onAppear { name = tag.name }
         }
         .presentationDetents([.medium])
+    }
+
+    private func tagEditorSectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2.weight(.bold))
+            .tracking(0.7)
+            .foregroundStyle(Theme.muted)
+            .textCase(nil)
+            .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -625,7 +643,7 @@ struct ListSettingsSheet: View {
                 } header: {
                     Text("LIST")
                         .font(.caption2.weight(.bold))
-                        .tracking(0.8)
+                        .tracking(0.7)
                         .foregroundStyle(Theme.muted)
                         .textCase(nil)
                         .accessibilityAddTraits(.isHeader)
@@ -642,7 +660,7 @@ struct ListSettingsSheet: View {
                 } header: {
                     Text("VISIBILITY")
                         .font(.caption2.weight(.bold))
-                        .tracking(0.8)
+                        .tracking(0.7)
                         .foregroundStyle(Theme.muted)
                         .textCase(nil)
                         .accessibilityAddTraits(.isHeader)

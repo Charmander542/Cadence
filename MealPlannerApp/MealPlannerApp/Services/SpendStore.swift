@@ -4,6 +4,10 @@ import SwiftData
 @MainActor
 enum SpendStore {
     static func seedDemoIfNeeded(in context: ModelContext) {
+        seedDefaultSubcategoriesIfNeeded(in: context)
+        seedDefaultBudgetsIfNeeded(in: context)
+        removeDemoTrackedItemsIfNeeded(in: context)
+
         guard !SpendPreferences.hasDemoSeed else { return }
         var descriptor = FetchDescriptor<SpendTransactionEntity>()
         descriptor.fetchLimit = 1
@@ -13,16 +17,29 @@ enum SpendStore {
         }
 
         let cal = Calendar.current
-        let samples: [(String, Double, Int, SpendCategory)] = [
-            ("Whole Foods Market", -86.42, 0, .groceries),
-            ("Blue Bottle Coffee", -6.75, 1, .dining),
-            ("Shell Gas", -54.10, 2, .transport),
-            ("Apple Services", -16.99, 3, .subscriptions),
-            ("Patagonia Nano Puff", -229.00, 5, .shopping),
-            ("Payroll Deposit", 2400.00, 4, .income),
+        let kitchen = ensureSubcategory(named: "Kitchen", parent: .home, systemImage: "fork.knife.circle", in: context)
+        let utilities = ensureSubcategory(named: "Utilities", parent: .home, systemImage: "bolt.fill", in: context)
+        _ = ensureSubcategory(named: "Coffee", parent: .dining, systemImage: "cup.and.saucer.fill", in: context)
+
+        let samples: [(String, Double, Int, SpendCategory, UUID?)] = [
+            ("Whole Foods Market", -86.42, 0, .groceries, nil),
+            ("Trader Joe's", -54.18, 6, .groceries, nil),
+            ("Blue Bottle Coffee", -6.75, 1, .dining, nil),
+            ("Mokafe", -28.40, 8, .dining, nil),
+            ("Shell Gas", -54.10, 2, .transport, nil),
+            ("Uber", -18.25, 9, .transport, nil),
+            ("Apple Services", -16.99, 3, .subscriptions, nil),
+            ("Spotify", -11.99, 10, .subscriptions, nil),
+            ("Patagonia Nano Puff", -229.00, 5, .shopping, nil),
+            ("Target", -67.52, 7, .shopping, nil),
+            ("AMC Theatres", -32.00, 4, .entertainment, nil),
+            ("IKEA kitchen gear", -124.00, 3, .home, kitchen.id),
+            ("PG&E", -98.40, 8, .home, utilities.id),
+            ("CVS Pharmacy", -22.15, 9, .health, nil),
+            ("Payroll Deposit", 2400.00, 4, .income, nil),
         ]
 
-        for (merchant, amount, daysAgo, category) in samples {
+        for (merchant, amount, daysAgo, category, subID) in samples {
             let day = cal.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
             let tx = SpendTransactionEntity(
                 remoteID: "demo-\(merchant)-\(daysAgo)",
@@ -31,34 +48,249 @@ enum SpendStore {
                 amount: amount,
                 postedAt: day,
                 category: category,
+                subcategoryID: subID,
                 tellerCategory: category.title
             )
             context.insert(tx)
         }
 
-        let jacket = SpendTrackedItemEntity(
-            title: "Patagonia Nano Puff",
-            purchasePrice: 229,
-            purchasedAt: cal.date(byAdding: .day, value: -5, to: Date()) ?? Date(),
-            useMode: .tapToLog,
-            category: .shopping,
-            linkedTransactionRemoteID: "demo-Patagonia Nano Puff-5"
-        )
-        jacket.useCount = 3
-        jacket.lastUsedAt = cal.date(byAdding: .day, value: -1, to: Date())
-        context.insert(jacket)
-
-        let coffee = SpendTrackedItemEntity(
-            title: "AeroPress",
-            purchasePrice: 39.95,
-            purchasedAt: cal.date(byAdding: .day, value: -40, to: Date()) ?? Date(),
-            useMode: .dailyAmortize,
-            category: .home
-        )
-        context.insert(coffee)
+        setBudget(450, for: .groceries, subcategoryID: nil, in: context)
+        setBudget(200, for: .dining, subcategoryID: nil, in: context)
+        setBudget(180, for: .transport, subcategoryID: nil, in: context)
+        setBudget(300, for: .shopping, subcategoryID: nil, in: context)
+        setBudget(250, for: .home, subcategoryID: nil, in: context)
+        setBudget(150, for: .home, subcategoryID: kitchen.id, in: context)
+        setBudget(120, for: .entertainment, subcategoryID: nil, in: context)
+        setBudget(80, for: .subscriptions, subcategoryID: nil, in: context)
 
         try? context.save()
         SpendPreferences.hasDemoSeed = true
+    }
+
+    /// Strip shipped sample cost-per-use trackers (Patagonia / AeroPress) if still present.
+    static func removeDemoTrackedItemsIfNeeded(in context: ModelContext) {
+        let flag = "spend_demo_trackers_cleared_v1"
+        guard !UserDefaults.standard.bool(forKey: flag) else { return }
+        let demoTitles: Set<String> = ["Patagonia Nano Puff", "AeroPress"]
+        let existing = (try? context.fetch(FetchDescriptor<SpendTrackedItemEntity>())) ?? []
+        for item in existing where demoTitles.contains(item.title) {
+            context.delete(item)
+        }
+        try? context.save()
+        UserDefaults.standard.set(true, forKey: flag)
+    }
+
+    static func seedDefaultSubcategoriesIfNeeded(in context: ModelContext) {
+        var descriptor = FetchDescriptor<SpendSubcategoryEntity>()
+        descriptor.fetchLimit = 1
+        if (try? context.fetch(descriptor))?.isEmpty == false { return }
+        _ = ensureSubcategory(named: "Kitchen", parent: .home, systemImage: "fork.knife.circle", in: context)
+        _ = ensureSubcategory(named: "Utilities", parent: .home, systemImage: "bolt.fill", in: context)
+        _ = ensureSubcategory(named: "Coffee", parent: .dining, systemImage: "cup.and.saucer.fill", in: context)
+        try? context.save()
+    }
+
+    static func seedDefaultBudgetsIfNeeded(in context: ModelContext) {
+        var descriptor = FetchDescriptor<SpendBudgetEntity>()
+        descriptor.fetchLimit = 1
+        if (try? context.fetch(descriptor))?.isEmpty == false { return }
+        // Leave empty so first-run users set their own; demo seed fills budgets when seeding txs.
+    }
+
+    @discardableResult
+    static func ensureSubcategory(
+        named name: String,
+        parent: SpendCategory,
+        systemImage: String,
+        colorHex: String = "",
+        in context: ModelContext
+    ) -> SpendSubcategoryEntity {
+        let existing = (try? context.fetch(FetchDescriptor<SpendSubcategoryEntity>())) ?? []
+        if let found = existing.first(where: {
+            $0.name.caseInsensitiveCompare(name) == .orderedSame && $0.parentCategory == parent
+        }) {
+            return found
+        }
+        let row = SpendSubcategoryEntity(
+            name: name,
+            parent: parent,
+            systemImage: systemImage,
+            colorHex: colorHex,
+            sortOrder: existing.count
+        )
+        context.insert(row)
+        return row
+    }
+
+    @discardableResult
+    static func addSubcategory(
+        name: String,
+        parent: SpendCategory,
+        systemImage: String = "tag",
+        colorHex: String = "",
+        in context: ModelContext
+    ) -> SpendSubcategoryEntity {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let row = ensureSubcategory(
+            named: trimmed.isEmpty ? "Untitled" : trimmed,
+            parent: parent,
+            systemImage: systemImage,
+            colorHex: colorHex,
+            in: context
+        )
+        try? context.save()
+        return row
+    }
+
+    static func deleteSubcategory(_ sub: SpendSubcategoryEntity, in context: ModelContext) {
+        let txs = (try? context.fetch(FetchDescriptor<SpendTransactionEntity>())) ?? []
+        for tx in txs where tx.subcategoryID == sub.id {
+            tx.subcategoryID = nil
+        }
+        let budgets = (try? context.fetch(FetchDescriptor<SpendBudgetEntity>())) ?? []
+        for budget in budgets where budget.subcategoryID == sub.id {
+            context.delete(budget)
+        }
+        context.delete(sub)
+        try? context.save()
+    }
+
+    static func setBudget(
+        _ amount: Double,
+        for category: SpendCategory,
+        subcategoryID: UUID?,
+        in context: ModelContext
+    ) {
+        let budgets = (try? context.fetch(FetchDescriptor<SpendBudgetEntity>())) ?? []
+        let match = budgets.first { budget in
+            budget.category == category && budget.subcategoryID == subcategoryID
+        }
+        if amount <= 0 {
+            if let match { context.delete(match) }
+            try? context.save()
+            return
+        }
+        if let match {
+            match.monthlyAmount = amount
+            match.updatedAt = Date()
+        } else {
+            context.insert(SpendBudgetEntity(category: category, subcategoryID: subcategoryID, monthlyAmount: amount))
+        }
+        try? context.save()
+    }
+
+    static func budgetAmount(
+        for category: SpendCategory,
+        subcategoryID: UUID?,
+        budgets: [SpendBudgetEntity]
+    ) -> Double? {
+        budgets.first { $0.category == category && $0.subcategoryID == subcategoryID }?.monthlyAmount
+    }
+
+    /// Outflows in `[start, end)`.
+    static func monthBounds(containing date: Date = Date(), calendar: Calendar = .current) -> (start: Date, end: Date) {
+        let comps = calendar.dateComponents([.year, .month], from: date)
+        let start = calendar.date(from: comps) ?? date
+        let end = calendar.date(byAdding: .month, value: 1, to: start) ?? date
+        return (start, end)
+    }
+
+    static func spendingTransactions(
+        _ transactions: [SpendTransactionEntity],
+        in range: (start: Date, end: Date),
+        category: SpendCategory? = nil,
+        subcategoryID: UUID? = nil
+    ) -> [SpendTransactionEntity] {
+        transactions.filter { tx in
+            !tx.isHidden
+                && tx.amount < 0
+                && tx.postedAt >= range.start
+                && tx.postedAt < range.end
+                && tx.category != .income
+                && tx.category != .transfer
+                && (category == nil || tx.category == category)
+                && (subcategoryID == nil || tx.subcategoryID == subcategoryID)
+        }
+    }
+
+    static func categorySlices(
+        transactions: [SpendTransactionEntity],
+        budgets: [SpendBudgetEntity],
+        in range: (start: Date, end: Date)
+    ) -> [SpendCategorySlice] {
+        let txs = spendingTransactions(transactions, in: range)
+        var totals: [SpendCategory: (amount: Double, count: Int)] = [:]
+        for tx in txs {
+            let entry = totals[tx.category] ?? (0, 0)
+            totals[tx.category] = (entry.amount + abs(tx.amount), entry.count + 1)
+        }
+        return SpendCategory.spendingCases.compactMap { cat in
+            guard let entry = totals[cat], entry.amount > 0 else { return nil }
+            return SpendCategorySlice(
+                category: cat,
+                subcategoryID: nil,
+                title: cat.title,
+                systemImage: cat.systemImage,
+                color: cat.tint,
+                amount: entry.amount,
+                budget: budgetAmount(for: cat, subcategoryID: nil, budgets: budgets),
+                transactionCount: entry.count
+            )
+        }
+        .sorted { $0.amount > $1.amount }
+    }
+
+    static func subcategorySlices(
+        for category: SpendCategory,
+        transactions: [SpendTransactionEntity],
+        subcategories: [SpendSubcategoryEntity],
+        budgets: [SpendBudgetEntity],
+        in range: (start: Date, end: Date)
+    ) -> [SpendCategorySlice] {
+        let txs = spendingTransactions(transactions, in: range, category: category)
+        let kids = subcategories.filter { $0.parentCategory == category }.sorted { $0.sortOrder < $1.sortOrder }
+        var bySub: [UUID?: (amount: Double, count: Int)] = [:]
+        for tx in txs {
+            let key = tx.subcategoryID
+            let entry = bySub[key] ?? (0, 0)
+            bySub[key] = (entry.amount + abs(tx.amount), entry.count + 1)
+        }
+        var slices: [SpendCategorySlice] = []
+        for sub in kids {
+            let entry = bySub[sub.id] ?? (0, 0)
+            guard entry.amount > 0 || budgetAmount(for: category, subcategoryID: sub.id, budgets: budgets) != nil else { continue }
+            slices.append(
+                SpendCategorySlice(
+                    category: category,
+                    subcategoryID: sub.id,
+                    title: sub.name,
+                    systemImage: sub.systemImage,
+                    color: sub.tint,
+                    amount: entry.amount,
+                    budget: budgetAmount(for: category, subcategoryID: sub.id, budgets: budgets),
+                    transactionCount: entry.count
+                )
+            )
+        }
+        if let uncategorized = bySub[nil], uncategorized.amount > 0 {
+            slices.append(
+                SpendCategorySlice(
+                    category: category,
+                    subcategoryID: nil,
+                    title: "General",
+                    systemImage: category.systemImage,
+                    color: category.tint.opacity(0.75),
+                    amount: uncategorized.amount,
+                    budget: nil,
+                    transactionCount: uncategorized.count
+                )
+            )
+        }
+        return slices.sorted { $0.amount > $1.amount }
+    }
+
+    static func totalBudgeted(budgets: [SpendBudgetEntity]) -> Double {
+        budgets.filter { $0.subcategoryID == nil }.map(\.monthlyAmount).reduce(0, +)
     }
 
     /// Persist a newly linked Plaid Item, then sync transactions.
@@ -85,9 +317,113 @@ enum SpendStore {
             )
             context.insert(enrollment)
         }
+        KeychainStore.upsertPlaidItemRecord(
+            itemID: itemID,
+            institutionName: institutionName,
+            isSandbox: isSandbox
+        )
         try context.save()
         _ = try await syncEnrollment(enrollment, in: context)
         return enrollment
+    }
+
+    /// Rebuild SwiftData enrollments from Keychain after a store wipe / reinstall that left tokens behind.
+    /// Returns how many enrollments were restored.
+    @MainActor
+    @discardableResult
+    static func restorePlaidEnrollmentsIfNeeded(in context: ModelContext) async -> Int {
+        KeychainStore.migratePlaidKeychainAccessibilityIfNeeded()
+
+        let existing: [SpendEnrollmentEntity]
+        do {
+            existing = try context.fetch(FetchDescriptor<SpendEnrollmentEntity>())
+        } catch {
+            return 0
+        }
+        let known = Set(existing.map(\.enrollmentID))
+        let registry = Dictionary(
+            uniqueKeysWithValues: KeychainStore.loadPlaidItemRegistry().map { ($0.itemID, $0) }
+        )
+        let orphanIDs = KeychainStore.listPlaidAccessTokenItemIDs().filter { !known.contains($0) }
+        guard !orphanIDs.isEmpty else {
+            // Keep registry in sync for already-linked Items (first run after this feature).
+            for enrollment in existing {
+                KeychainStore.upsertPlaidItemRecord(
+                    itemID: enrollment.enrollmentID,
+                    institutionName: enrollment.institutionName,
+                    isSandbox: enrollment.isSandbox
+                )
+            }
+            return 0
+        }
+
+        var restored = 0
+        for itemID in orphanIDs {
+            let meta = registry[itemID]
+            let name = meta?.institutionName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let institution = (name?.isEmpty == false) ? name! : "Linked bank"
+            let isSandbox = meta?.isSandbox ?? (SpendPreferences.environment == .sandbox)
+            let enrollment = SpendEnrollmentEntity(
+                accessTokenKeychainAccount: "plaid_access_\(itemID)",
+                institutionName: institution,
+                enrollmentID: itemID,
+                isSandbox: isSandbox
+            )
+            enrollment.syncCursor = KeychainStore.plaidSyncCursor(itemID: itemID)
+            context.insert(enrollment)
+            KeychainStore.upsertPlaidItemRecord(
+                itemID: itemID,
+                institutionName: institution,
+                isSandbox: isSandbox
+            )
+            restored += 1
+        }
+        try? context.save()
+
+        // Refresh names + transactions in the background when credentials exist.
+        if SpendPreferences.isConfigured {
+            for itemID in orphanIDs {
+                guard let enrollment = (try? context.fetch(FetchDescriptor<SpendEnrollmentEntity>()))?
+                    .first(where: { $0.enrollmentID == itemID })
+                else { continue }
+                if let refreshed = try? await refreshInstitutionName(for: enrollment) {
+                    enrollment.institutionName = refreshed
+                    KeychainStore.upsertPlaidItemRecord(
+                        itemID: itemID,
+                        institutionName: refreshed,
+                        isSandbox: enrollment.isSandbox
+                    )
+                }
+                _ = try? await syncEnrollment(enrollment, in: context)
+            }
+            try? context.save()
+        }
+        return restored
+    }
+
+    private static func refreshInstitutionName(for enrollment: SpendEnrollmentEntity) async throws -> String? {
+        guard let secret = KeychainStore.loadPlaidSecret(), !secret.isEmpty,
+              let accessToken = KeychainStore.plaidAccessToken(itemID: enrollment.enrollmentID),
+              !accessToken.isEmpty
+        else { return nil }
+        let client = PlaidClient()
+        let env: SpendPreferences.PlaidEnvironment = enrollment.isSandbox ? .sandbox : .production
+        let accounts = try await client.fetchAccounts(
+            clientID: SpendPreferences.clientID,
+            secret: secret,
+            environment: env,
+            accessToken: accessToken
+        )
+        if let institutionID = accounts.item?.institution_id {
+            let name = try? await client.fetchInstitutionName(
+                clientID: SpendPreferences.clientID,
+                secret: secret,
+                environment: env,
+                institutionID: institutionID
+            )
+            if let name, !name.isEmpty { return name }
+        }
+        return accounts.accounts.first?.displayName
     }
 
     /// Exchange a public token (Link or sandbox helper) and sync.

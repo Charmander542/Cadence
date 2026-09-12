@@ -34,8 +34,9 @@ MealPlannerApp/MealPlannerApp/
 
 | Module | Status | Docs |
 |--------|--------|------|
-| **Spend** | Purchases + cost-per-use; Plaid Link | `docs/PLAID_SETUP.md` |
+| **Spend** | Overview pie + budgets + subcategories; Plaid Link; cost-per-use | `docs/PLAID_SETUP.md` |
 | **Health** | Bevel-like rings; HealthKit + demo | `docs/APPLE_HEALTH_SETUP.md` |
 | **News** | Daily top-10 RSS + optional AI briefs + images | `docs/NEWS_SETUP.md` |
+| **Focus** | Pomodoro + stopwatch + stats | (in-app Settings → Focus) |
 
-Mobbin — Spend: Starling/Monzo. Health: Bevel. News: Perplexity Discover, Apple News, Particle.
+Mobbin — Spend: Rocket Money (category donut, budgets, custom categories). Health: Bevel. News: Perplexity Discover, Apple News, Particle. Focus: Toggl Track / Me+ / Focus To-Do-style stats.

@@ -86,6 +86,15 @@
 		A20000000000000000000075 /* NewsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000075 /* NewsHomeView.swift */; };
 		A20000000000000000000076 /* NewsArticleDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000076 /* NewsArticleDetailView.swift */; };
 		A20000000000000000000077 /* NewsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000077 /* NewsSettingsView.swift */; };
+		A200000000000000000000A0 /* FocusModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A0 /* FocusModels.swift */; };
+		A200000000000000000000A1 /* FocusPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* FocusPreferences.swift */; };
+		A200000000000000000000A2 /* FocusStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A2 /* FocusStore.swift */; };
+		A200000000000000000000A3 /* FocusHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A3 /* FocusHomeView.swift */; };
+		A200000000000000000000A4 /* FocusStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A4 /* FocusStatsView.swift */; };
+		A200000000000000000000A5 /* FocusSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A5 /* FocusSettingsView.swift */; };
+		A200000000000000000000B0 /* SpendCategoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000B0 /* SpendCategoryDetailView.swift */; };
+		A200000000000000000000B1 /* SpendBudgetsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000B1 /* SpendBudgetsView.swift */; };
+		A200000000000000000000B2 /* SpendCategoriesManageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000B2 /* SpendCategoriesManageView.swift */; };
 		A20000000000000000000078 /* NewsChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000078 /* NewsChrome.swift */; };
 		A20000000000000000000080 /* CadenceAppsPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000080 /* CadenceAppsPreferences.swift */; };
 		A20000000000000000000081 /* AppsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000081 /* AppsSettingsView.swift */; };
@@ -237,6 +246,15 @@
 		A10000000000000000000075 /* NewsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsHomeView.swift; sourceTree = "<group>"; };
 		A10000000000000000000076 /* NewsArticleDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsArticleDetailView.swift; sourceTree = "<group>"; };
 		A10000000000000000000077 /* NewsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsSettingsView.swift; sourceTree = "<group>"; };
+		A100000000000000000000A0 /* FocusModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusModels.swift; sourceTree = "<group>"; };
+		A100000000000000000000A1 /* FocusPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusPreferences.swift; sourceTree = "<group>"; };
+		A100000000000000000000A2 /* FocusStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusStore.swift; sourceTree = "<group>"; };
+		A100000000000000000000A3 /* FocusHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusHomeView.swift; sourceTree = "<group>"; };
+		A100000000000000000000A4 /* FocusStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusStatsView.swift; sourceTree = "<group>"; };
+		A100000000000000000000A5 /* FocusSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusSettingsView.swift; sourceTree = "<group>"; };
+		A100000000000000000000B0 /* SpendCategoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendCategoryDetailView.swift; sourceTree = "<group>"; };
+		A100000000000000000000B1 /* SpendBudgetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendBudgetsView.swift; sourceTree = "<group>"; };
+		A100000000000000000000B2 /* SpendCategoriesManageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendCategoriesManageView.swift; sourceTree = "<group>"; };
 		A10000000000000000000078 /* NewsChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsChrome.swift; sourceTree = "<group>"; };
 		A10000000000000000000080 /* CadenceAppsPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CadenceAppsPreferences.swift; sourceTree = "<group>"; };
 		A10000000000000000000081 /* AppsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppsSettingsView.swift; sourceTree = "<group>"; };
@@ -360,6 +378,7 @@
 				A10000000000000000000051 /* SpendModels.swift */,
 				A10000000000000000000060 /* HealthModels.swift */,
 				A10000000000000000000070 /* NewsModels.swift */,
+				A100000000000000000000A0 /* FocusModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -405,6 +424,8 @@
 				A10000000000000000000072 /* NewsClient.swift */,
 				A10000000000000000000073 /* NewsStore.swift */,
 				A10000000000000000000074 /* NewsAIService.swift */,
+				A100000000000000000000A1 /* FocusPreferences.swift */,
+				A100000000000000000000A2 /* FocusStore.swift */,
 				A10000000000000000000080 /* CadenceAppsPreferences.swift */,
 			);
 			path = Services;
@@ -435,6 +456,7 @@
 				C10000000000000000000013 /* Spend */,
 				C10000000000000000000014 /* Health */,
 				C10000000000000000000015 /* News */,
+				C10000000000000000000016 /* Focus */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -552,6 +574,9 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000055 /* SpendHomeView.swift */,
+				A100000000000000000000B0 /* SpendCategoryDetailView.swift */,
+				A100000000000000000000B1 /* SpendBudgetsView.swift */,
+				A100000000000000000000B2 /* SpendCategoriesManageView.swift */,
 				A10000000000000000000056 /* SpendItemDetailView.swift */,
 				A10000000000000000000057 /* SpendSettingsView.swift */,
 			);
@@ -578,6 +603,16 @@
 				A10000000000000000000078 /* NewsChrome.swift */,
 			);
 			path = News;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000016 /* Focus */ = {
+			isa = PBXGroup;
+			children = (
+				A100000000000000000000A3 /* FocusHomeView.swift */,
+				A100000000000000000000A4 /* FocusStatsView.swift */,
+				A100000000000000000000A5 /* FocusSettingsView.swift */,
+			);
+			path = Focus;
 			sourceTree = "<group>";
 		};
 		W10000000000000000000012 /* Shared */ = {
@@ -809,6 +844,15 @@
 				A20000000000000000000075 /* NewsHomeView.swift in Sources */,
 				A20000000000000000000076 /* NewsArticleDetailView.swift in Sources */,
 				A20000000000000000000077 /* NewsSettingsView.swift in Sources */,
+				A200000000000000000000A0 /* FocusModels.swift in Sources */,
+				A200000000000000000000A1 /* FocusPreferences.swift in Sources */,
+				A200000000000000000000A2 /* FocusStore.swift in Sources */,
+				A200000000000000000000A3 /* FocusHomeView.swift in Sources */,
+				A200000000000000000000A4 /* FocusStatsView.swift in Sources */,
+				A200000000000000000000A5 /* FocusSettingsView.swift in Sources */,
+				A200000000000000000000B0 /* SpendCategoryDetailView.swift in Sources */,
+				A200000000000000000000B1 /* SpendBudgetsView.swift in Sources */,
+				A200000000000000000000B2 /* SpendCategoriesManageView.swift in Sources */,
 				A20000000000000000000078 /* NewsChrome.swift in Sources */,
 				A20000000000000000000080 /* CadenceAppsPreferences.swift in Sources */,
 				A20000000000000000000081 /* AppsSettingsView.swift in Sources */,

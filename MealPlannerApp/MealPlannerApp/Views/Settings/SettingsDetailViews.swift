@@ -165,6 +165,8 @@ extension View {
             .tint(Theme.cta)
             // Do NOT attach a SwiftUI tap gesture here — it steals NavigationLink taps.
             .scrollDismissesKeyboard(.interactively)
+            .cadenceDismissKeyboardOnTap()
+            .cadenceKeyboardDoneButton()
     }
 
     /// Dismiss keyboard on background taps without blocking buttons / NavigationLinks.
@@ -173,17 +175,41 @@ extension View {
     func cadenceDismissKeyboardOnTap() -> some View {
         background(CadenceKeyboardDismissInstaller())
     }
+
+    /// Toolbar "Done" above the keyboard (especially for number pads that have no return key).
+    func cadenceKeyboardDoneButton() -> some View {
+        toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    CadenceKeyboard.dismiss()
+                }
+                .fontWeight(.semibold)
+            }
+        }
+    }
 }
 
-/// Installs a non-cancelling tap recognizer on the nearest hosting view.
+enum CadenceKeyboard {
+    static func dismiss() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
+}
+
+/// Installs a single non-cancelling tap recognizer on the **key window** so sheets /
+/// number pads dismiss when tapping outside (RootView-only install missed modal sheets).
 private struct CadenceKeyboardDismissInstaller: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView(frame: .zero)
-        view.isUserInteractionEnabled = true
+        view.isUserInteractionEnabled = false
         view.backgroundColor = .clear
-        // Defer install until we're in the hierarchy so we can attach to a superview.
         DispatchQueue.main.async {
             context.coordinator.install(from: view)
         }
@@ -196,57 +222,62 @@ private struct CadenceKeyboardDismissInstaller: UIViewRepresentable {
         }
     }
 
-    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        private weak var host: UIView?
-        private var recognizer: UITapGestureRecognizer?
-
+    final class Coordinator {
         func install(from probe: UIView) {
-            // Prefer the scroll/form container, not the zero-size probe itself.
-            guard let target = probe.superview ?? probe.window else { return }
-            if host === target, recognizer != nil { return }
-            if let old = recognizer {
-                old.view?.removeGestureRecognizer(old)
-            }
-            let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
-            tap.cancelsTouchesInView = false
-            tap.requiresExclusiveTouchType = false
-            tap.delegate = self
-            target.addGestureRecognizer(tap)
-            host = target
-            recognizer = tap
+            let window = probe.window
+                ?? UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap(\.windows)
+                .first { $0.isKeyWindow }
+            guard let window else { return }
+            CadenceKeyboardDismissTap.shared.install(on: window)
         }
+    }
+}
 
-        @objc func dismissKeyboard() {
-            UIApplication.shared.sendAction(
-                #selector(UIResponder.resignFirstResponder),
-                to: nil,
-                from: nil,
-                for: nil
-            )
-        }
+private final class CadenceKeyboardDismissTap: NSObject, UIGestureRecognizerDelegate {
+    static let shared = CadenceKeyboardDismissTap()
 
-        func gestureRecognizer(
-            _ gestureRecognizer: UIGestureRecognizer,
-            shouldReceive touch: UITouch
-        ) -> Bool {
-            // Don't fight controls — only dismiss when tapping non-control chrome.
-            if touch.view is UIControl { return false }
-            var view = touch.view
-            while let current = view {
-                if current is UITextField || current is UITextView { return false }
-                // UICollectionViewListCell / buttons inside list rows
-                if String(describing: type(of: current)).contains("Button") { return false }
-                view = current.superview
-            }
-            return true
-        }
+    private weak var window: UIWindow?
+    private var recognizer: UITapGestureRecognizer?
 
-        func gestureRecognizer(
-            _ gestureRecognizer: UIGestureRecognizer,
-            shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
-        ) -> Bool {
-            true
+    func install(on window: UIWindow) {
+        if self.window === window, recognizer != nil { return }
+        if let old = recognizer {
+            old.view?.removeGestureRecognizer(old)
         }
+        let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        tap.cancelsTouchesInView = false
+        tap.requiresExclusiveTouchType = false
+        tap.delegate = self
+        window.addGestureRecognizer(tap)
+        self.window = window
+        recognizer = tap
+    }
+
+    @objc private func dismissKeyboard() {
+        CadenceKeyboard.dismiss()
+    }
+
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldReceive touch: UITouch
+    ) -> Bool {
+        // Keep caret/selection working inside fields; dismiss on every other tap
+        // (including buttons — cancelsTouchesInView is false so controls still fire).
+        var view = touch.view
+        while let current = view {
+            if current is UITextField || current is UITextView { return false }
+            view = current.superview
+        }
+        return true
+    }
+
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool {
+        true
     }
 }
 

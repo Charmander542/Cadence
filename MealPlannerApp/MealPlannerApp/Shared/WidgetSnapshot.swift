@@ -20,6 +20,38 @@ struct WidgetNextEvent: Codable, Hashable {
     var startAt: Date
 }
 
+/// Broken-down remaining time for countdown widgets (days / hours / minutes).
+struct CountdownRemaining: Equatable {
+    var days: Int
+    var hours: Int
+    var minutes: Int
+
+    var isZero: Bool { days == 0 && hours == 0 && minutes == 0 }
+
+    static func until(_ end: Date, from start: Date = .now) -> CountdownRemaining? {
+        guard end > start else { return nil }
+        let comps = Calendar.current.dateComponents([.day, .hour, .minute], from: start, to: end)
+        let days = max(0, comps.day ?? 0)
+        let hours = max(0, comps.hour ?? 0)
+        // Round up partial minutes so "1m left" doesn't show as 0m.
+        var minutes = max(0, comps.minute ?? 0)
+        let seconds = Calendar.current.dateComponents([.second], from: start, to: end).second ?? 0
+        if seconds > 0 { minutes = max(minutes, 0) }
+        // If under a minute but still future, show 1 minute.
+        if days == 0, hours == 0, minutes == 0, end > start {
+            minutes = 1
+        }
+        return CountdownRemaining(days: days, hours: hours, minutes: minutes)
+    }
+
+    /// e.g. "2d 5h 12m", "5h 12m", "12m"
+    var compactLabel: String {
+        if days > 0 { return "\(days)d \(hours)h \(minutes)m" }
+        if hours > 0 { return "\(hours)h \(minutes)m" }
+        return "\(minutes)m"
+    }
+}
+
 /// One Eisenhower quadrant summary for the Matrix widget.
 struct WidgetMatrixQuadrant: Codable, Identifiable, Hashable {
     var id: String

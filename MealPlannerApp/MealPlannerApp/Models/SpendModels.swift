@@ -44,11 +44,33 @@ enum SpendCategory: String, CaseIterable, Identifiable, Codable {
         case .health: return "heart"
         case .home: return "house"
         case .subscriptions: return "arrow.triangle.2.circlepath"
-        case .entertainment: return "film"
+        case .entertainment: return "theatermasks"
         case .income: return "arrow.down.circle"
         case .transfer: return "arrow.left.arrow.right"
         case .other: return "ellipsis.circle"
         }
+    }
+
+    /// Rocket Money–style pastel accents for pie segments + category wells.
+    var tint: Color {
+        switch self {
+        case .groceries: return Color(red: 0.45, green: 0.78, blue: 0.62)      // mint
+        case .dining: return Color(red: 0.72, green: 0.62, blue: 0.92)         // lavender
+        case .transport: return Color(red: 0.35, green: 0.78, blue: 0.86)      // cyan
+        case .shopping: return Color(red: 0.95, green: 0.82, blue: 0.42)       // soft yellow
+        case .health: return Color(red: 0.95, green: 0.55, blue: 0.62)         // coral
+        case .home: return Color(red: 0.45, green: 0.62, blue: 0.95)           // periwinkle
+        case .subscriptions: return Color(red: 0.62, green: 0.48, blue: 0.92)  // violet
+        case .entertainment: return Color(red: 0.98, green: 0.62, blue: 0.38)  // peach
+        case .income: return Color(red: 0.35, green: 0.78, blue: 0.52)         // green
+        case .transfer: return Color(red: 0.55, green: 0.58, blue: 0.65)       // slate
+        case .other: return Color(red: 0.62, green: 0.64, blue: 0.70)          // gray
+        }
+    }
+
+    /// Categories that appear in spending breakdown / budgets (excludes money-in & transfers).
+    static var spendingCases: [SpendCategory] {
+        allCases.filter { $0 != .income && $0 != .transfer }
     }
 
     static func infer(from merchant: String, tellerCategory: String?) -> SpendCategory {
@@ -59,11 +81,43 @@ enum SpendCategory: String, CaseIterable, Identifiable, Codable {
         if hay.contains("netflix") || hay.contains("spotify") || hay.contains("apple.com/bill") { return .subscriptions }
         if hay.contains("whole foods") || hay.contains("trader joe") || hay.contains("kroger") || hay.contains("grocery") { return .groceries }
         if hay.contains("restaurant") || hay.contains("cafe") || hay.contains("coffee") || hay.contains("starbucks") { return .dining }
-        if hay.contains("amazon") || hay.contains("target") || hay.contains("walmart") { return .shopping }
+        if hay.contains("amazon") || hay.contains("target") || hay.contains("walmart") || hay.contains("ikea") { return .shopping }
         if hay.contains("pharmacy") || hay.contains("cvs") || hay.contains("gym") { return .health }
-        if hay.contains("rent") || hay.contains("utility") || hay.contains("electric") { return .home }
-        if hay.contains("movie") || hay.contains("ticket") { return .entertainment }
+        if hay.contains("rent") || hay.contains("utility") || hay.contains("electric") || hay.contains("home depot") { return .home }
+        if hay.contains("movie") || hay.contains("ticket") || hay.contains("amc") { return .entertainment }
         return .other
+    }
+}
+
+/// Snapshot used by pie chart + budget rows.
+struct SpendCategorySlice: Identifiable {
+    var id: String { category.rawValue + (subcategoryID?.uuidString ?? "") + title }
+    let category: SpendCategory
+    let subcategoryID: UUID?
+    let title: String
+    let systemImage: String
+    let color: Color
+    let amount: Double
+    let budget: Double?
+    let transactionCount: Int
+
+    func percent(of total: Double) -> Double {
+        total > 0 ? amount / total : 0
+    }
+
+    var budgetProgress: Double? {
+        guard let budget, budget > 0 else { return nil }
+        return min(amount / budget, 1.5)
+    }
+
+    var remaining: Double? {
+        guard let budget else { return nil }
+        return budget - amount
+    }
+
+    var isOverBudget: Bool {
+        guard let budget, budget > 0 else { return false }
+        return amount > budget
     }
 }
 
@@ -132,6 +186,8 @@ final class SpendTransactionEntity {
     /// Negative = money out (typical purchase).
     var postedAt: Date = Date()
     var categoryRaw: String = SpendCategory.other.rawValue
+    /// Optional custom subcategory (e.g. Kitchen under Home).
+    var subcategoryID: UUID?
     var tellerCategory: String = ""
     var notes: String = ""
     var isTracked: Bool = false
@@ -149,6 +205,7 @@ final class SpendTransactionEntity {
         amount: Double,
         postedAt: Date = Date(),
         category: SpendCategory = .other,
+        subcategoryID: UUID? = nil,
         tellerCategory: String = ""
     ) {
         self.remoteID = remoteID
@@ -157,8 +214,95 @@ final class SpendTransactionEntity {
         self.amount = amount
         self.postedAt = postedAt
         categoryRaw = category.rawValue
+        self.subcategoryID = subcategoryID
         self.tellerCategory = tellerCategory
     }
+}
+
+/// User-defined subcategory nested under a parent `SpendCategory` (Kitchen, Utilities, etc.).
+@Model
+final class SpendSubcategoryEntity {
+    var id: UUID = UUID()
+    var name: String = ""
+    var parentCategoryRaw: String = SpendCategory.home.rawValue
+    var systemImage: String = "tag"
+    /// Optional override hex (RRGGBB). Empty = inherit parent tint.
+    var colorHex: String = ""
+    var createdAt: Date = Date()
+    var sortOrder: Int = 0
+
+    var parentCategory: SpendCategory {
+        get { SpendCategory(rawValue: parentCategoryRaw) ?? .other }
+        set { parentCategoryRaw = newValue.rawValue }
+    }
+
+    var tint: Color {
+        if let custom = SpendColor.color(hex: colorHex) { return custom }
+        return parentCategory.tint
+    }
+
+    init(
+        name: String,
+        parent: SpendCategory,
+        systemImage: String = "tag",
+        colorHex: String = "",
+        sortOrder: Int = 0
+    ) {
+        self.name = name
+        parentCategoryRaw = parent.rawValue
+        self.systemImage = systemImage
+        self.colorHex = colorHex
+        self.sortOrder = sortOrder
+        createdAt = Date()
+    }
+}
+
+/// Monthly budget for a parent category or a subcategory.
+@Model
+final class SpendBudgetEntity {
+    var id: UUID = UUID()
+    /// Parent category raw value. Always set (even for subcategory budgets — for grouping).
+    var categoryRaw: String = SpendCategory.other.rawValue
+    /// When set, this budget applies to the subcategory instead of the whole category.
+    var subcategoryID: UUID?
+    var monthlyAmount: Double = 0
+    var updatedAt: Date = Date()
+
+    var category: SpendCategory {
+        get { SpendCategory(rawValue: categoryRaw) ?? .other }
+        set { categoryRaw = newValue.rawValue }
+    }
+
+    init(category: SpendCategory, subcategoryID: UUID? = nil, monthlyAmount: Double) {
+        categoryRaw = category.rawValue
+        self.subcategoryID = subcategoryID
+        self.monthlyAmount = monthlyAmount
+        updatedAt = Date()
+    }
+}
+
+enum SpendColor {
+    static func color(hex: String) -> Color? {
+        let cleaned = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#")).uppercased()
+        guard cleaned.count == 6, let value = UInt64(cleaned, radix: 16) else { return nil }
+        let r = Double((value >> 16) & 0xFF) / 255
+        let g = Double((value >> 8) & 0xFF) / 255
+        let b = Double(value & 0xFF) / 255
+        return Color(red: r, green: g, blue: b)
+    }
+
+    static let palette: [(name: String, hex: String)] = [
+        ("Mint", "73C79E"),
+        ("Lavender", "B89EEB"),
+        ("Cyan", "59C7DB"),
+        ("Butter", "F2D16B"),
+        ("Coral", "F28C9E"),
+        ("Periwinkle", "739EFF"),
+        ("Violet", "9E7AEB"),
+        ("Peach", "FA9E61"),
+        ("Fig", "9B6B9E"),
+        ("Slate", "8C94A3"),
+    ]
 }
 
 @Model

@@ -11,7 +11,7 @@ Examples:
   ./scripts/cadence_sim navigate tab today
   ./scripts/cadence_sim screenshot --name today
   ./scripts/cadence_sim describe --json
-  ./scripts/cadence_sim tap-label "Open menu"
+  ./scripts/cadence_sim tap-label "Open sidebar"
   ./scripts/cadence_sim run spot_check
   ./scripts/cadence_sim spot-check
 """
@@ -128,7 +128,24 @@ def idb(cfg: Config, *args: str, check: bool = True, capture: bool = False) -> s
 
 
 def ensure_booted(cfg: Config) -> None:
-    simctl(cfg, "boot", cfg.udid, check=False)
+    # Only boot when needed — `simctl boot` errors loudly if already Booted.
+    try:
+        proc = run(
+            ["xcrun", "simctl", "list", "devices", "booted", "-j"],
+            check=False,
+            capture=True,
+        )
+        data = json.loads(proc.stdout or "{}")
+        booted = any(
+            d.get("udid") == cfg.udid
+            for devices in (data.get("devices") or {}).values()
+            for d in devices
+            if isinstance(d, dict)
+        )
+    except Exception:
+        booted = False
+    if not booted:
+        simctl(cfg, "boot", cfg.udid, check=False, capture=True)
     run(["open", "-a", "Simulator"], check=False)
     time.sleep(0.3)
 
@@ -159,6 +176,23 @@ def normalize_elements(raw: Any) -> list[dict[str, Any]]:
 
 
 TAB_INDEX = {"today": 0, "calendar": 1, "meals": 2, "matrix": 3, "habits": 4}
+# Wheel destinations beyond the legacy 5-tab indices (launch via -openWheel).
+WHEEL_DESTINATIONS = {
+    "today",
+    "calendar",
+    "meals",
+    "matrix",
+    "habits",
+    "shop",
+    "inbox",
+    "browse",
+    "workout",
+    "spend",
+    "health",
+    "news",
+    "focus",
+    "settings",
+}
 TAB_COORDS = [(44, 915), (132, 915), (220, 915), (308, 915), (396, 915)]
 
 
@@ -258,29 +292,58 @@ def cmd_navigate(cfg: Config, target: str, value: str, in_session: bool = False)
     target_l = target.lower()
     value_l = value.lower()
 
-    if target_l == "tab":
+    if target_l in ("tab", "wheel"):
         if value_l.isdigit():
             index = int(value_l)
-        elif value_l in TAB_INDEX:
-            index = TAB_INDEX[value_l]
-        else:
-            raise CadenceSimError(f"Unknown tab: {value}")
-
-        if in_session and 0 <= index < len(TAB_COORDS):
-            x, y = TAB_COORDS[index]
-            cmd_tap(cfg, x, y)
-            emit(cfg, True, "navigate", target="tab", value=value_l, mode="tap")
+            if in_session and 0 <= index < len(TAB_COORDS):
+                x, y = TAB_COORDS[index]
+                cmd_tap(cfg, x, y)
+                emit(cfg, True, "navigate", target="tab", value=value_l, mode="tap")
+                return 0
+            pid = relaunch(cfg, "-openMainTab", str(index))
+            time.sleep(0.8)
+            emit(cfg, True, "navigate", target="tab", value=value_l, mode="launch", pid=pid)
             return 0
 
-        pid = relaunch(cfg, "-openMainTab", str(index))
-        time.sleep(0.8)
-        emit(cfg, True, "navigate", target="tab", value=value_l, mode="launch", pid=pid)
-        return 0
+        if value_l in TAB_INDEX and target_l == "tab":
+            index = TAB_INDEX[value_l]
+            if in_session and 0 <= index < len(TAB_COORDS):
+                x, y = TAB_COORDS[index]
+                cmd_tap(cfg, x, y)
+                emit(cfg, True, "navigate", target="tab", value=value_l, mode="tap")
+                return 0
+            pid = relaunch(cfg, "-openMainTab", str(index))
+            time.sleep(0.8)
+            emit(cfg, True, "navigate", target="tab", value=value_l, mode="launch", pid=pid)
+            return 0
+
+        if value_l in WHEEL_DESTINATIONS:
+            if in_session:
+                # Prefer accessibility id on the dial/grid when already running.
+                try:
+                    cmd_tap_label(cfg, f"wheel-app-{value_l}", match_key="AXUniqueId")
+                    emit(cfg, True, "navigate", target="wheel", value=value_l, mode="tap-label")
+                    return 0
+                except Exception:
+                    pass
+            pid = relaunch(cfg, "-openWheel", value_l)
+            time.sleep(0.8)
+            emit(cfg, True, "navigate", target="wheel", value=value_l, mode="launch", pid=pid)
+            return 0
+
+        raise CadenceSimError(f"Unknown tab/wheel destination: {value}")
 
     launch_flags = {
         ("open", "settings"): ["-openSettings"],
         ("open", "search"): ["-openGlobalSearch"],
         ("open", "shop"): ["-openShop"],
+        ("open", "spend"): ["-openWheel", "spend"],
+        ("open", "focus"): ["-openWheel", "focus"],
+        ("open", "news"): ["-openWheel", "news"],
+        ("open", "health"): ["-openWheel", "health"],
+        ("open", "inbox"): ["-openWheel", "inbox"],
+        ("open", "browse"): ["-openWheel", "browse"],
+        ("open", "workout"): ["-openWheel", "workout"],
     }
     key = (target_l, value_l)
     if key in launch_flags:
@@ -290,14 +353,17 @@ def cmd_navigate(cfg: Config, target: str, value: str, in_session: bool = False)
         return 0
 
     if key == ("open", "drawer"):
-        cmd_tap_label(cfg, "Open menu")
+        cmd_tap_label(cfg, "Open sidebar")
         emit(cfg, True, "navigate", target="open", value="drawer", mode="tap-label")
         return 0
 
     if target_l == "close":
         if value_l == "all":
             for step in ("settings", "search", "drawer"):
-                cmd_navigate(cfg, "close", step, in_session=True)
+                try:
+                    cmd_navigate(cfg, "close", step, in_session=True)
+                except Exception:
+                    pass
             emit(cfg, True, "navigate", target="close", value="all")
             return 0
         if value_l == "settings":
@@ -306,12 +372,17 @@ def cmd_navigate(cfg: Config, target: str, value: str, in_session: bool = False)
             emit(cfg, True, "navigate", target="close", value="settings", mode="launch", pid=pid)
             return 0
         if value_l == "search":
-            idb(cfg, "ui", "button", "escape", check=False)
-            emit(cfg, True, "navigate", target="close", value="search")
+            # idb has no escape button — dismiss via relaunch to Today.
+            pid = relaunch(cfg, "-openMainTab", "0")
+            emit(cfg, True, "navigate", target="close", value="search", mode="launch", pid=pid)
             return 0
         if value_l == "drawer":
-            cmd_tap_label(cfg, "Close menu")
-            emit(cfg, True, "navigate", target="close", value="drawer", mode="tap-label")
+            try:
+                cmd_tap_label(cfg, "Close sidebar")
+                emit(cfg, True, "navigate", target="close", value="drawer", mode="tap-label")
+            except Exception:
+                pid = relaunch(cfg, "-openMainTab", "0")
+                emit(cfg, True, "navigate", target="close", value="drawer", mode="launch", pid=pid)
             return 0
 
     raise CadenceSimError(f"Unknown navigation: {target} {value}")
@@ -483,8 +554,8 @@ def build_parser() -> argparse.ArgumentParser:
     launch.add_argument("args", nargs="*", help="Extra launch arguments")
 
     nav = sub.add_parser("navigate", help="Navigate tabs/sheets (relaunch or in-session tap)")
-    nav.add_argument("target", choices=["tab", "open", "close"])
-    nav.add_argument("value", help="tab name/index or open/close target")
+    nav.add_argument("target", choices=["tab", "wheel", "open", "close"])
+    nav.add_argument("value", help="tab/wheel name/index or open/close target")
     nav.add_argument(
         "--in-session",
         action="store_true",

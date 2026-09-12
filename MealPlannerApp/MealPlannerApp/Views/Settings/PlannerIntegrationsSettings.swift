@@ -185,15 +185,20 @@ struct CalendarSyncSettingsView: View {
 
     private var appleCalendarSection: some View {
         Section {
-            Toggle("Sync tasks", isOn: syncBinding { PlannerPreferences.syncTasksToAppleCalendar } set: { PlannerPreferences.syncTasksToAppleCalendar = $0 })
+            Toggle("Show Apple events in Cadence", isOn: syncBinding { PlannerPreferences.importFromAppleCalendar } set: { PlannerPreferences.importFromAppleCalendar = $0 })
+                .tint(Theme.cta)
+                .accessibilityLabel("Show Apple events in Cadence, \(PlannerPreferences.importFromAppleCalendar ? "on" : "off")")
+                .accessibilityHint("Imports events from selected calendars into Cadence")
+
+            Toggle("Sync tasks out", isOn: syncBinding { PlannerPreferences.syncTasksToAppleCalendar } set: { PlannerPreferences.syncTasksToAppleCalendar = $0 })
                 .tint(Theme.cta)
                 .accessibilityLabel("Sync tasks to Apple Calendar, \(PlannerPreferences.syncTasksToAppleCalendar ? "on" : "off")")
                 .accessibilityHint("Exports due tasks to Apple Calendar")
-            Toggle("Sync workouts", isOn: syncBinding { PlannerPreferences.syncWorkoutsToAppleCalendar } set: { PlannerPreferences.syncWorkoutsToAppleCalendar = $0 })
+            Toggle("Sync workouts out", isOn: syncBinding { PlannerPreferences.syncWorkoutsToAppleCalendar } set: { PlannerPreferences.syncWorkoutsToAppleCalendar = $0 })
                 .tint(Theme.cta)
                 .accessibilityLabel("Sync workouts to Apple Calendar, \(PlannerPreferences.syncWorkoutsToAppleCalendar ? "on" : "off")")
                 .accessibilityHint("Exports scheduled lift sessions to Apple Calendar")
-            Toggle("Sync meals", isOn: syncBinding { PlannerPreferences.syncMealsToAppleCalendar } set: { PlannerPreferences.syncMealsToAppleCalendar = $0 })
+            Toggle("Sync meals out", isOn: syncBinding { PlannerPreferences.syncMealsToAppleCalendar } set: { PlannerPreferences.syncMealsToAppleCalendar = $0 })
                 .tint(Theme.cta)
                 .accessibilityLabel("Sync meals to Apple Calendar, \(PlannerPreferences.syncMealsToAppleCalendar ? "on" : "off")")
                 .accessibilityHint("Exports planned dinners to Apple Calendar")
@@ -218,7 +223,7 @@ struct CalendarSyncSettingsView: View {
                     }
                     .tint(Theme.cta)
                     .accessibilityLabel("\(cal.title), \(cal.sourceKind.title), \(PlannerPreferences.isAppleCalendarEnabled(cal.id) ? "on" : "off")")
-                    .accessibilityHint("Exports Cadence items to this calendar when sync is enabled")
+                    .accessibilityHint("Include this calendar for import and export")
                 }
             }
 
@@ -228,11 +233,11 @@ struct CalendarSyncSettingsView: View {
                 settingsCTALabel(isBusy ? "Working…" : "Request calendar access", systemImage: "calendar.badge.plus")
             }
             .disabled(isBusy)
-            .accessibilityHint("Allows syncing tasks, workouts, and meals to Apple Calendar")
+            .accessibilityHint("Allows importing and exporting with Apple Calendar")
         } header: {
             settingsDetailSectionHeader("Apple Calendar")
         } footer: {
-            settingsDetailIntro("Export tasks, workouts, and meals. Turn on any sub-calendars where Cadence should write — Google calendars added to iOS appear here too.")
+            settingsDetailIntro("Turn on calendars to use, then enable “Show in Cadence” to pull events in, and/or sync toggles to push Cadence out. Google calendars added in iOS Calendar appear here too.")
         }
     }
 
@@ -259,15 +264,19 @@ struct CalendarSyncSettingsView: View {
                     .accessibilityHint("Signs in to sync with Google Calendar")
                 }
 
-                Toggle("Sync tasks", isOn: syncBinding { PlannerPreferences.syncTasksToGoogleCalendar } set: { PlannerPreferences.syncTasksToGoogleCalendar = $0 })
+                Toggle("Show Google events in Cadence", isOn: syncBinding { PlannerPreferences.importFromGoogleCalendar } set: { PlannerPreferences.importFromGoogleCalendar = $0 })
+                    .tint(Theme.cta)
+                    .accessibilityLabel("Show Google events in Cadence, \(PlannerPreferences.importFromGoogleCalendar ? "on" : "off")")
+                    .accessibilityHint("Imports events from selected Google calendars into Cadence")
+                Toggle("Sync tasks out", isOn: syncBinding { PlannerPreferences.syncTasksToGoogleCalendar } set: { PlannerPreferences.syncTasksToGoogleCalendar = $0 })
                     .tint(Theme.cta)
                     .accessibilityLabel("Sync tasks to Google Calendar, \(PlannerPreferences.syncTasksToGoogleCalendar ? "on" : "off")")
                     .accessibilityHint("Exports due tasks to Google Calendar")
-                Toggle("Sync workouts", isOn: syncBinding { PlannerPreferences.syncWorkoutsToGoogleCalendar } set: { PlannerPreferences.syncWorkoutsToGoogleCalendar = $0 })
+                Toggle("Sync workouts out", isOn: syncBinding { PlannerPreferences.syncWorkoutsToGoogleCalendar } set: { PlannerPreferences.syncWorkoutsToGoogleCalendar = $0 })
                     .tint(Theme.cta)
                     .accessibilityLabel("Sync workouts to Google Calendar, \(PlannerPreferences.syncWorkoutsToGoogleCalendar ? "on" : "off")")
                     .accessibilityHint("Exports scheduled lift sessions to Google Calendar")
-                Toggle("Sync meals", isOn: syncBinding { PlannerPreferences.syncMealsToGoogleCalendar } set: { PlannerPreferences.syncMealsToGoogleCalendar = $0 })
+                Toggle("Sync meals out", isOn: syncBinding { PlannerPreferences.syncMealsToGoogleCalendar } set: { PlannerPreferences.syncMealsToGoogleCalendar = $0 })
                     .tint(Theme.cta)
                     .accessibilityLabel("Sync meals to Google Calendar, \(PlannerPreferences.syncMealsToGoogleCalendar ? "on" : "off")")
                     .accessibilityHint("Exports planned dinners to Google Calendar")
@@ -286,7 +295,7 @@ struct CalendarSyncSettingsView: View {
                         }
                         .tint(Theme.cta)
                         .accessibilityLabel("\(cal.title), \(PlannerPreferences.isGoogleCalendarEnabled(cal.id) ? "on" : "off")")
-                        .accessibilityHint("Exports Cadence items to this Google calendar when sync is enabled")
+                        .accessibilityHint("Include this Google calendar for import and export")
                     }
                 }
 
@@ -302,7 +311,7 @@ struct CalendarSyncSettingsView: View {
             if !GoogleCalendarService.shared.isConfigured {
                 EmptyView()
             } else {
-                settingsDetailIntro("Turn on any Google calendars where Cadence should export. Workout and meal sync creates new events; toggling off does not yet remove past events.")
+                settingsDetailIntro("Connect Google, pick calendars, then enable “Show in Cadence” to pull events in. Sync-out toggles push Cadence tasks/workouts/meals to Google.")
             }
         }
     }

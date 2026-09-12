@@ -99,7 +99,7 @@ struct MealPlanView: View {
                             } else {
                                 Text(plans.isEmpty ? "PLAN WEEK" : "NEW WEEK")
                                     .font(.caption.weight(.bold))
-                                    .tracking(0.6)
+                                    .tracking(0.7)
                                     .foregroundStyle(Theme.cta)
                                     .lineLimit(1)
                                     .fixedSize(horizontal: true, vertical: false)
@@ -582,7 +582,7 @@ struct RecipeDetailView: View {
             } header: {
                 Text("PLATE")
                     .font(.caption2.weight(.bold))
-                    .tracking(0.8)
+                    .tracking(0.7)
                     .foregroundStyle(Theme.muted)
                     .textCase(nil)
                     .accessibilityAddTraits(.isHeader)
@@ -601,7 +601,7 @@ struct RecipeDetailView: View {
                 } header: {
                     Text("STEPS")
                         .font(.caption2.weight(.bold))
-                        .tracking(0.8)
+                        .tracking(0.7)
                         .foregroundStyle(Theme.muted)
                         .textCase(nil)
                         .accessibilityAddTraits(.isHeader)
@@ -642,7 +642,7 @@ struct RecipeDetailView: View {
             } header: {
                 Text((group.title ?? "Ingredients").uppercased())
                     .font(.caption2.weight(.bold))
-                    .tracking(0.8)
+                    .tracking(0.7)
                     .foregroundStyle(Theme.muted)
                     .textCase(nil)
                     .accessibilityAddTraits(.isHeader)

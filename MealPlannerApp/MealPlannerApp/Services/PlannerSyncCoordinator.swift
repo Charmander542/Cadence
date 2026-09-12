@@ -54,6 +54,7 @@ final class PlannerSyncCoordinator {
         let appleNeeded = PlannerPreferences.syncTasksToAppleCalendar
             || PlannerPreferences.syncWorkoutsToAppleCalendar
             || PlannerPreferences.syncMealsToAppleCalendar
+            || PlannerPreferences.importFromAppleCalendar
         if appleNeeded {
             _ = try? await CalendarSyncService.shared.requestAccess()
         }
@@ -82,7 +83,7 @@ final class PlannerSyncCoordinator {
         }
 
         let tasks = (try? context.fetch(FetchDescriptor<PlannerTaskEntity>())) ?? []
-        for (index, task) in tasks.enumerated() where !task.isCompleted {
+        for (index, task) in tasks.enumerated() where !task.isCompleted && !task.isImportedExternalEvent {
             try? CalendarSyncService.shared.upsertTask(task)
             try? await GoogleCalendarService.shared.upsertTaskEvent(task)
             // Keep the UI responsive during large calendar backfills.
@@ -90,6 +91,18 @@ final class PlannerSyncCoordinator {
                 await Task.yield()
             }
         }
+
+        // Import external calendars into Cadence (after export so we don't re-export imports).
+        if PlannerPreferences.importFromAppleCalendar {
+            _ = try? await CalendarSyncService.shared.requestAccess()
+            _ = try? CalendarSyncService.shared.importEvents(into: context)
+        } else {
+            _ = try? CalendarSyncService.shared.importEvents(into: context) // prunes when off
+        }
+        if PlannerPreferences.importFromGoogleCalendar || GoogleCalendarService.shared.isSignedIn {
+            _ = try? await GoogleCalendarService.shared.importEvents(into: context)
+        }
+
         try? context.save()
     }
 

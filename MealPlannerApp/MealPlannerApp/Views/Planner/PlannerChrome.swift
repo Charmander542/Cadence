@@ -23,7 +23,7 @@ extension EnvironmentValues {
 
 enum PlannerChromeMetrics {
     /// Reserved bottom inset so page layout stays put while the dial draws larger on top.
-    static let dialLayoutHeight: CGFloat = 72
+    static let dialLayoutHeight: CGFloat = 102
     static let dialFABTrailingPadding: CGFloat = 22
     /// Gap above the dial inset so + sits clearly clear of the wheel icons.
     static let dialFABBottomPadding: CGFloat = 28
@@ -35,8 +35,6 @@ enum FABAction: Equatable {
     case addEvent
     case addHabit
     case addSpendItem
-    case healthCheckIn
-    case refreshNews
 
     var accessibilityLabel: String {
         switch self {
@@ -44,8 +42,6 @@ enum FABAction: Equatable {
         case .addEvent: return "Add event"
         case .addHabit: return "Add habit"
         case .addSpendItem: return "Add tracked purchase"
-        case .healthCheckIn: return "Open recovery check-in"
-        case .refreshNews: return "Refresh news digest"
         }
     }
 
@@ -55,8 +51,6 @@ enum FABAction: Equatable {
         case .addEvent: return "Opens new calendar event"
         case .addHabit: return "Opens new habit form"
         case .addSpendItem: return "Opens cost-per-use tracker form"
-        case .healthCheckIn: return "Opens recovery detail"
-        case .refreshNews: return "Fetches today’s top stories and AI briefs"
         }
     }
 }
@@ -99,8 +93,11 @@ extension View {
     }
 }
 
-struct OrangeFAB: View {
-    var systemImage: String = "plus"
+/// Compact create control above the dial — plus only, one tap → sheet.
+/// Refs: [Todoist](https://mobbin.com/screens/1ae63b10-6840-42ec-838a-0117cb219e99),
+/// [Structured](https://mobbin.com/screens/2945ca91-3537-4a3c-82c5-0901c16a3af1)
+/// (no speed-dial fan-out).
+struct CreateFAB: View {
     var accessibilityLabel: String = "Add task"
     var accessibilityHint: String = "Opens quick add"
     var action: () -> Void
@@ -108,22 +105,35 @@ struct OrangeFAB: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemImage)
+            Image(systemName: "plus")
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(width: 58, height: 58)
                 .background(Theme.cta, in: Circle())
                 .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
-                .shadow(color: Theme.cta.opacity(0.4), radius: 14, y: 5)
-                .shadow(color: .black.opacity(0.28), radius: 4, y: 2)
+                .shadow(color: Theme.cta.opacity(0.35), radius: 12, y: 4)
+                .shadow(color: .black.opacity(0.22), radius: 3, y: 1)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(FABPressButtonStyle())
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(accessibilityHint)
         .opacity(isAppGridExpanded ? 0 : 1)
         .allowsHitTesting(!isAppGridExpanded)
         .accessibilityHidden(isAppGridExpanded)
-        .animation(.easeOut(duration: 0.2), value: isAppGridExpanded)
+        .animation(.easeOut(duration: 0.18), value: isAppGridExpanded)
+    }
+}
+
+/// Legacy name — dial create control is CTA blue, not orange.
+typealias OrangeFAB = CreateFAB
+
+/// Light press feedback only — no expand / fan-out motion.
+private struct FABPressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.92 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
@@ -164,6 +174,11 @@ struct PlannerDrawer: View {
     @State private var showNewList = false
     @State private var newListName = ""
     @State private var editingList: TaskListEntity?
+    /// Interactive swipe-to-close offset (0 = open, negative = dragging shut).
+    @State private var closeDragX: CGFloat = 0
+
+    private let panelWidth: CGFloat = 300
+    private let closeThreshold: CGFloat = 90
 
     private var navigableLists: [TaskListEntity] {
         lists.filter {
@@ -171,23 +186,54 @@ struct PlannerDrawer: View {
         }
     }
 
+    private var scrimOpacity: Double {
+        let progress = 1 - min(1, max(0, -closeDragX / panelWidth))
+        return 0.55 * Double(progress)
+    }
+
     var body: some View {
         ZStack(alignment: .leading) {
-            Color.black.opacity(0.55)
+            Color.black.opacity(scrimOpacity)
                 .ignoresSafeArea()
                 .onTapGesture(perform: onClose)
+                .accessibilityLabel("Dismiss sidebar")
+                .accessibilityAddTraits(.isButton)
 
-            VStack(alignment: .leading, spacing: 0) {
+            panel
+                .offset(x: closeDragX)
+                .simultaneousGesture(closeDragGesture)
+                .accessibilityElement(children: .contain)
+        }
+        .alert("New list", isPresented: $showNewList) {
+            TextField("List name", text: $newListName)
+            Button("Create") {
+                onAddList(newListName)
+                newListName = ""
+            }
+            .accessibilityHint("Creates custom task list with entered name")
+            Button("Cancel", role: .cancel) { newListName = "" }
+                .accessibilityHint("Discards new list")
+        } message: {
+            Text("Custom lists organize tasks outside Today and Matrix defaults.")
+                .accessibilityAddTraits(.isStaticText)
+        }
+        .sheet(item: $editingList) { list in
+            ListSettingsSheet(list: list)
+        }
+    }
+
+    private var panel: some View {
+        VStack(alignment: .leading, spacing: 0) {
                 HStack {
-                    Text("Menu")
+                    Text("Sidebar")
                         .font(Theme.title(.title3))
                     Spacer()
                     Button(action: onClose) {
                         Image(systemName: "xmark")
                             .foregroundStyle(Theme.muted)
                     }
-                    .accessibilityLabel("Close menu")
-                    .accessibilityHint("Closes planner drawer")
+                    .accessibilityLabel("Close sidebar")
+                    .accessibilityHint("Closes the sidebar")
                 }
                 .padding(.horizontal, Theme.Space.lg + 2)
                 .padding(.top, Theme.Space.lg + 2)
@@ -298,37 +344,55 @@ struct PlannerDrawer: View {
                     .accessibilityHint("Opens app settings")
                 }
             }
-            .frame(width: 300, alignment: .leading)
+            .frame(width: panelWidth, alignment: .leading)
             .frame(maxHeight: .infinity)
             .background(Theme.surface)
             .overlay(alignment: .trailing) {
-                Rectangle()
-                    .fill(Theme.hairline)
-                    .frame(width: 1)
+                // Grabber strip for swipe-to-close.
+                ZStack(alignment: .trailing) {
+                    Rectangle()
+                        .fill(Theme.hairline)
+                        .frame(width: 1)
+                    Capsule()
+                        .fill(Theme.muted.opacity(0.35))
+                        .frame(width: 4, height: 36)
+                        .padding(.trailing, 6)
+                        .accessibilityHidden(true)
+                }
+                .frame(width: 28, alignment: .trailing)
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .highPriorityGesture(closeDragGesture)
+                .accessibilityLabel("Sidebar edge")
+                .accessibilityHint("Swipe left to close the sidebar")
             }
-        }
-        .alert("New list", isPresented: $showNewList) {
-            TextField("List name", text: $newListName)
-            Button("Create") {
-                onAddList(newListName)
-                newListName = ""
+    }
+
+    private var closeDragGesture: some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .local)
+            .onChanged { value in
+                // Prefer horizontal dismiss; ignore mostly-vertical scrolls in the list.
+                guard abs(value.translation.width) > abs(value.translation.height) * 0.65 else { return }
+                closeDragX = min(0, value.translation.width)
             }
-            .accessibilityHint("Creates custom task list with entered name")
-            Button("Cancel", role: .cancel) { newListName = "" }
-                .accessibilityHint("Discards new list")
-        } message: {
-            Text("Custom lists organize tasks outside Today and Matrix defaults.")
-                .accessibilityAddTraits(.isStaticText)
-        }
-        .sheet(item: $editingList) { list in
-            ListSettingsSheet(list: list)
-        }
+            .onEnded { value in
+                let shouldClose = value.translation.width < -closeThreshold
+                    || value.predictedEndTranslation.width < -closeThreshold * 1.35
+                if shouldClose {
+                    onClose()
+                    closeDragX = 0
+                } else {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.88)) {
+                        closeDragX = 0
+                    }
+                }
+            }
     }
 
     private func drawerSectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
             .font(.caption2.weight(.bold))
-            .tracking(0.8)
+            .tracking(0.7)
             .foregroundStyle(Theme.muted)
             .textCase(nil)
             .padding(.horizontal, Theme.Space.md)
@@ -484,7 +548,7 @@ struct PlannerHeaderActions: View {
     }
 }
 
-/// Opens the planner lists drawer (Today, Inbox, custom lists, search, settings).
+/// Opens the planner sidebar (Today, Inbox, custom lists, search, settings).
 struct PlannerMenuButton: View {
     var action: () -> Void
 
@@ -496,8 +560,8 @@ struct PlannerMenuButton: View {
                 .frame(width: 36, height: 36)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Open menu")
-        .accessibilityHint("Opens planner drawer with lists, search, shop, and settings")
+        .accessibilityLabel("Open sidebar")
+        .accessibilityHint("Opens the sidebar with lists, search, shop, and settings")
     }
 }
 
@@ -812,7 +876,7 @@ struct GlobalSearchSheet: View {
     private func searchSectionHeader(_ title: String) -> some View {
         Text(title.uppercased())
             .font(.caption2.weight(.bold))
-            .tracking(0.6)
+            .tracking(0.7)
             .foregroundStyle(Theme.muted)
             .accessibilityAddTraits(.isHeader)
     }
@@ -968,7 +1032,7 @@ struct GlobalSearchSheet: View {
                         Theme.IconWell(systemImage: "magnifyingglass", tint: Theme.muted, size: 48)
                         Text("NO RESULTS")
                             .font(.caption2.weight(.bold))
-                            .tracking(0.6)
+                            .tracking(0.7)
                             .foregroundStyle(Theme.muted)
                         Text("No results found")
                             .font(Theme.display(.headline))
@@ -985,7 +1049,7 @@ struct GlobalSearchSheet: View {
                         } label: {
                             Text("CLEAR SEARCH")
                                 .font(.caption.weight(.bold))
-                                .tracking(0.6)
+                                .tracking(0.7)
                                 .foregroundStyle(Color.white)
                                 .padding(.horizontal, Theme.Space.lg)
                                 .padding(.vertical, Theme.Space.sm + 2)

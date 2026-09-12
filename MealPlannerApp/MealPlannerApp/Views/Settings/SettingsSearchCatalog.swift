@@ -13,6 +13,7 @@ enum SettingsRoute: Hashable {
     case spend
     case health
     case news
+    case focus
     case reminders
     case calendar
     case ai
@@ -27,7 +28,7 @@ struct SettingsSearchMatch: Identifiable {
 
     /// Routes shown on the Settings hub (no duplicate pages).
     static let hubRoutes: [SettingsRoute] = [
-        .profile, .apps, .meals, .health, .spend, .news, .reminders, .calendar, .ai,
+        .profile, .apps, .meals, .health, .spend, .news, .focus, .reminders, .calendar, .ai,
     ]
 
     static let catalog: [SettingsSearchMatch] = [
@@ -47,13 +48,13 @@ struct SettingsSearchMatch: Identifiable {
             route: .apps,
             title: "Apps & wheel",
             subtitle: "Choose which apps appear on the dial, including Lift",
-            keywords: "apps wheel customize navigation tabs hide meals workout lift dumbbell spend health news grid edit schedule"
+            keywords: "apps wheel customize navigation tabs hide meals workout lift dumbbell spend health news focus pomo grid edit schedule"
         ),
         SettingsSearchMatch(
             route: .spend,
             title: "Spend",
             subtitle: "Bank purchases, categories, and cost-per-use",
-            keywords: "spend budget plaid bank card purchases transactions cost per use tracking money"
+            keywords: "spend budget plaid bank card purchases transactions cost per use tracking money pie chart categories subcategory kitchen"
         ),
         SettingsSearchMatch(
             route: .health,
@@ -68,6 +69,12 @@ struct SettingsSearchMatch: Identifiable {
             keywords: "news digest rss headlines science world ai summarize articles briefing"
         ),
         SettingsSearchMatch(
+            route: .focus,
+            title: "Focus",
+            subtitle: "Pomodoro, stopwatch, and focus statistics",
+            keywords: "focus pomo pomodoro stopwatch timer stats productivity deep work"
+        ),
+        SettingsSearchMatch(
             route: .reminders,
             title: "Reminders",
             subtitle: "Task, habit, workout, and meal notifications",
@@ -77,7 +84,7 @@ struct SettingsSearchMatch: Identifiable {
             route: .calendar,
             title: "Calendar",
             subtitle: "Apple Calendar and Google Calendar export",
-            keywords: "calendar sync apple google export events tasks workouts meals integration"
+            keywords: "calendar sync apple google import export events tasks workouts meals integration show in cadence"
         ),
         SettingsSearchMatch(
             route: .ai,

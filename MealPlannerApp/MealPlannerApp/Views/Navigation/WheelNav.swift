@@ -32,6 +32,9 @@ struct WheelNav: View {
     @State private var commitHaptics = UIImpactFeedbackGenerator(style: .rigid)
     @State private var tickHaptics = UIImpactFeedbackGenerator(style: .heavy)
     @State private var lightHaptics = UIImpactFeedbackGenerator(style: .light)
+    /// Auto-clears when the dial gesture ends *or is cancelled* — prevents a stuck pull-up peek.
+    @GestureState private var dialGestureActive = false
+    @Environment(\.colorScheme) private var colorScheme
 
     private enum DragAxis {
         case undecided, horizontal, vertical
@@ -44,10 +47,19 @@ struct WheelNav: View {
     private let segmentWidth: CGFloat = 63
     private let maxCoastSegments: Double = 2.4
     /// Visual dial (~1.5× original). Page inset stays `PlannerChromeMetrics.dialLayoutHeight`.
-    private let dialHeight: CGFloat = 87
-    private let hitSlop: CGFloat = 21
+    private let dialHeight: CGFloat = 104
+    private let hitSlop: CGFloat = 40
     private let flatIconSpacing: CGFloat = 72
     private let idleDelaySeconds: Double = 5.0
+
+    /// True black / white plate — matches theme, not charcoal surface.
+    private var dockFill: Color {
+        colorScheme == .dark ? .black : .white
+    }
+
+    private var dockIconColor: Color {
+        colorScheme == .dark ? .white : .black
+    }
 
     private var expandSpring: Animation {
         .spring(response: 0.42, dampingFraction: 0.88, blendDuration: 0.1)
@@ -65,57 +77,124 @@ struct WheelNav: View {
     var body: some View {
         // Dial only — fixed height so safeAreaInset never pushes page content.
         // Pull-up peek is drawn by RootView (sibling overlay), not as dial background.
+        dialStack
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Navigation dial")
+            .accessibilityValue(selectedItem?.label ?? "")
+            .accessibilityHint("Drag sideways to spin. Flick for momentum. Swipe up to expand the menu.")
+            .accessibilityAction(named: "Expand menu") {
+                withAnimation(expandSpring) { isExpanded = true }
+            }
+            .accessibilityAdjustableAction(handleAccessibilityAdjust)
+    }
+
+    private var dialStack: some View {
         ZStack(alignment: .bottom) {
+            dockPlate
             dialInterior
         }
         .frame(maxWidth: .infinity)
         .frame(height: dialHeight + hitSlop, alignment: .bottom)
         .animation(idleSpring, value: idleAmount)
-        .onAppear {
-            commitHaptics.prepare()
-            tickHaptics.prepare()
-            lightHaptics.prepare()
-            syncPositionToSelection(animated: false)
-            scheduleIdle()
-        }
+        .onAppear(perform: handleAppear)
         .onChange(of: selectedId) { _, _ in
-            // Commit/snap already animate position — don't stack a second easeOut.
             if !isDragging { syncPositionToSelection(animated: false) }
         }
-        .onChange(of: isExpanded) { _, expanded in
-            if expanded {
-                wake(animated: true)
-                lightHaptics.impactOccurred(intensity: 0.55)
-                lightHaptics.prepare()
-            } else {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    scheduleIdle()
+        .onChange(of: isExpanded, perform: handleExpandedChange)
+        .onChange(of: dialGestureActive, perform: handleGestureActiveChange)
+        .onDisappear(perform: handleDisappear)
+    }
+
+    /// Solid theme plate behind the icons — idle bar sized so icons sit evenly; arc while scrolling.
+    /// Circle mode: the arc tip fades in opacity so page content soft-blends above the icons.
+    private var dockPlate: some View {
+        let awake = max(0, 1 - idleAmount)
+        // Slightly under dialHeight so padding above/below idle icons reads even (incl. home indicator).
+        let idleBarHeight: CGFloat = dialHeight - 6
+        let arcRise: CGFloat = 40 * awake
+
+        return VStack(spacing: 0) {
+            DockScrollArc(rise: max(arcRise, 0.01))
+                .fill(dockFill)
+                .frame(height: max(arcRise, 0.01))
+                // Fade only the curved lip — icons live below this band.
+                .mask(
+                    LinearGradient(
+                        colors: [
+                            Color.black.opacity(0.15),
+                            Color.black.opacity(0.55),
+                            Color.black
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .opacity(awake)
+                .allowsHitTesting(false)
+
+            Rectangle()
+                .fill(dockFill)
+                .frame(height: idleBarHeight)
+                .frame(maxWidth: .infinity)
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06))
+                        .frame(height: 1)
+                        .opacity(1 - awake * 0.85)
                 }
+        }
+        .ignoresSafeArea(edges: .bottom)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func handleAppear() {
+        commitHaptics.prepare()
+        tickHaptics.prepare()
+        lightHaptics.prepare()
+        expandPull = 0
+        syncPositionToSelection(animated: false)
+        scheduleIdle()
+    }
+
+    private func handleDisappear() {
+        expandPull = 0
+        idleTask?.cancel()
+        labelHideTask?.cancel()
+        momentumTask?.cancel()
+    }
+
+    private func handleExpandedChange(_ expanded: Bool) {
+        if expanded {
+            wake(animated: true)
+            lightHaptics.impactOccurred(intensity: 0.55)
+            lightHaptics.prepare()
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                scheduleIdle()
             }
-            expandPull = 0
         }
-        .onDisappear {
-            idleTask?.cancel()
-            labelHideTask?.cancel()
-            momentumTask?.cancel()
+        expandPull = 0
+    }
+
+    private func handleGestureActiveChange(_ active: Bool) {
+        // GestureState resets on cancel as well as end — clear any orphaned peek chrome.
+        guard !active else { return }
+        expandPull = 0
+        if dragAxis == .vertical {
+            dragAxis = .undecided
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Navigation dial")
-        .accessibilityValue(selectedItem?.label ?? "")
-        .accessibilityHint("Drag sideways to spin. Flick for momentum. Swipe up to expand the menu.")
-        .accessibilityAction(named: "Expand menu") {
-            withAnimation(expandSpring) { isExpanded = true }
+    }
+
+    private func handleAccessibilityAdjust(_ direction: AccessibilityAdjustmentDirection) {
+        guard let current = selectedIndex else { return }
+        let next: Int
+        switch direction {
+        case .increment: next = (current + 1) % count
+        case .decrement: next = (current - 1 + count) % count
+        @unknown default: return
         }
-        .accessibilityAdjustableAction { direction in
-            guard let current = selectedIndex else { return }
-            let next: Int
-            switch direction {
-            case .increment: next = (current + 1) % count
-            case .decrement: next = (current - 1 + count) % count
-            @unknown default: return
-            }
-            commit(to: next, haptic: true)
-        }
+        commit(to: next, haptic: true)
     }
 
     // MARK: - Dial (collapsed)
@@ -124,7 +203,7 @@ struct WheelNav: View {
         ZStack(alignment: .top) {
             Text(selectedItem?.label ?? "")
                 .font(.callout.weight(.semibold))
-                .foregroundStyle(Color.white.opacity(0.92))
+                .foregroundStyle(dockIconColor.opacity(0.92))
                 .padding(.horizontal, Theme.Space.md + 1)
                 .padding(.vertical, Theme.Space.sm - 2)
                 .background(.ultraThinMaterial, in: Capsule())
@@ -138,16 +217,19 @@ struct WheelNav: View {
                 let midY = hitSlop + dialHeight * 0.48
 
                 ZStack {
-                    submergedGlass(width: geo.size.width, height: geo.size.height)
-                        // Keep glass contrast in idle so neighbor icons don’t jump in brightness.
-                        .opacity(1 - idleAmount * 0.35)
-
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                         dialIcon(item: item, index: index, midX: midX, midY: midY)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Rectangle())
+                // Only the dock band takes hits — the hitSlop above is visual/layout only so
+                // page controls (Focus Start, etc.) win over the dial scroller like the FAB.
+                .contentShape(
+                    Path { path in
+                        let bandTop = max(0, geo.size.height - dialHeight)
+                        path.addRect(CGRect(x: 0, y: bandTop, width: geo.size.width, height: dialHeight))
+                    }
+                )
                 .gesture(dialGesture)
                 .onAppear { dialWidth = geo.size.width }
                 .onChange(of: geo.size.width) { _, w in dialWidth = w }
@@ -155,47 +237,6 @@ struct WheelNav: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .padding(.top, -hitSlop)
-    }
-
-    private func submergedGlass(width: CGFloat, height: CGFloat) -> some View {
-        let visualMid = height * 0.55 + hitSlop * 0.15
-        return ZStack {
-            Ellipse()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            Color.white.opacity(0.14),
-                            Color.white.opacity(0.05),
-                            Color.clear,
-                        ],
-                        center: UnitPoint(x: 0.5, y: 0.15),
-                        startRadius: 3,
-                        endRadius: max(height, 105)
-                    )
-                )
-                .frame(width: min(width * 0.88, 510), height: height * 1.35)
-                .offset(y: visualMid)
-                .blur(radius: 1.2)
-
-            Capsule()
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.0),
-                            Color.white.opacity(0.28),
-                            Color.white.opacity(0.45),
-                            Color.white.opacity(0.28),
-                            Color.white.opacity(0.0),
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    lineWidth: 1.8
-                )
-                .frame(width: min(width * 0.68, 390), height: 51)
-                .offset(y: visualMid + 6)
-        }
-        .allowsHitTesting(false)
     }
 
     @ViewBuilder
@@ -213,20 +254,21 @@ struct WheelNav: View {
             let focus = max(0, 1 - absDelta)
             let isCenter = absDelta < 0.45
 
-            // Shared for wheel + idle: primary full; all other icons one opacity (no blur mismatch).
+            // Shared for wheel + idle: primary full; neighbors dimmer (keep light-mode icons reading black).
             let iconScale: CGFloat = isCenter ? 1.0 : (0.72 + 0.16 * pow(focus, 0.65))
-            let iconOpacity: CGFloat = isCenter ? 1.0 : 0.42
+            let neighborOpacity: CGFloat = colorScheme == .dark ? 0.42 : 0.72
+            let iconOpacity: CGFloat = isCenter ? 1.0 : neighborOpacity
 
-            // Flat pill layout (idle) — 5 evenly spaced slots
+            // Flat pill layout (idle) — 5 evenly spaced slots, vertically centered in the dock bar.
             let flatX = midX + CGFloat(delta) * flatIconSpacing
-            let flatY = midY + 24
+            let flatY = midY + 14
 
             let x = arcX + (flatX - arcX) * t
             let y = arcY + (flatY - arcY) * t
 
             Image(systemName: item.systemImage)
                 .font(.system(size: isCenter ? 33 : 26, weight: isCenter ? .semibold : .regular))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(dockIconColor)
                 .frame(width: 66, height: 66)
                 .background {
                     if isCenter {
@@ -271,6 +313,9 @@ struct WheelNav: View {
 
     private var dialGesture: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
+            .updating($dialGestureActive) { _, state, _ in
+                state = true
+            }
             .onChanged { value in
                 let tx = value.translation.width
                 let ty = value.translation.height
@@ -296,6 +341,7 @@ struct WheelNav: View {
                     position = dragOrigin - Double(tx / segmentWidth)
                     tickIfNeeded()
                 case .vertical:
+                    // Only peek while pulling up; ignore downward noise so chrome never sticks.
                     expandPull = max(0, -ty)
                 case .undecided:
                     break
@@ -305,16 +351,17 @@ struct WheelNav: View {
                 let axis = dragAxis
                 let tx = value.translation.width
                 let ty = value.translation.height
+                let pull = expandPull
                 dragAxis = .undecided
                 isDragging = false
                 lastTickIndex = nil
+                expandPull = 0
 
                 switch axis {
                 case .horizontal:
                     settleHorizontal(translation: tx, predicted: value.predictedEndTranslation.width)
                 case .vertical:
-                    let shouldExpand = -ty > 40 || -value.predictedEndTranslation.height > 70 || expandPull > 100
-                    expandPull = 0
+                    let shouldExpand = -ty > 40 || -value.predictedEndTranslation.height > 70 || pull > 100
                     if shouldExpand {
                         withAnimation(expandSpring) {
                             isExpanded = true
@@ -915,7 +962,7 @@ struct WheelAppMenuOverlay: View {
                 let predicted = value.predictedEndTranslation.height
                 let shouldClose = dy > 90 || predicted > 160 || dragOffset > 140
                 if shouldClose {
-                    dismiss()
+                    dismiss(animatedSlideOff: true)
                 } else {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.84)) {
                         dragOffset = 0
@@ -924,15 +971,50 @@ struct WheelAppMenuOverlay: View {
             }
     }
 
-    private func dismiss() {
-        withAnimation(dismissSpring) {
-            dragOffset = 0
-            isEditing = false
-            draggingId = nil
-            dragTranslation = .zero
-            hoverTargetId = nil
-            onDismiss()
+    private func dismiss(animatedSlideOff: Bool = false) {
+        isEditing = false
+        draggingId = nil
+        dragTranslation = .zero
+        hoverTargetId = nil
+
+        // Finish the downward swipe off-screen first. Resetting dragOffset to 0 here
+        // used to snap the sheet *up* while the dial faded in → ghost app icons.
+        if animatedSlideOff || dragOffset > 8 {
+            let distance = max(dragOffset, panelHeight * 0.4)
+            withAnimation(dismissSpring) {
+                dragOffset = distance + panelHeight
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
+                onDismiss()
+            }
+        } else {
+            withAnimation(dismissSpring) {
+                onDismiss()
+            }
         }
+    }
+}
+
+/// Full-width gradual arc that rises above the idle dock while scrolling.
+private struct DockScrollArc: Shape, Animatable {
+    var rise: CGFloat
+
+    var animatableData: CGFloat {
+        get { rise }
+        set { rise = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard rect.width > 0, rise > 0.5 else { return path }
+        // Flat base along the idle bar; top is a gentle quadratic across the full width.
+        path.move(to: CGPoint(x: 0, y: rect.maxY))
+        path.addQuadCurve(
+            to: CGPoint(x: rect.maxX, y: rect.maxY),
+            control: CGPoint(x: rect.midX, y: rect.minY)
+        )
+        path.closeSubpath()
+        return path
     }
 }
 

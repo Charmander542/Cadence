@@ -80,11 +80,6 @@ struct NewsHomeView: View {
         .onAppear {
             NewsStore.seedDemoIfNeeded(in: modelContext)
         }
-        .onChange(of: appModel.requestedFABAction) { _, action in
-            guard action == .refreshNews else { return }
-            Task { await refresh() }
-            appModel.requestedFABAction = nil
-        }
         .sheet(item: $selected) { article in
             NewsArticleDetailView(article: article)
         }

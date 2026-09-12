@@ -19,7 +19,7 @@ struct HealthMetricDetailView: View {
                         chart
                             .padding(.horizontal, Theme.Space.lg)
                     }
-                    Text("Scoring is a lightweight placeholder — swap algorithms later without redesigning this screen.")
+                    Text("Scores use Bevel-style components from Apple Health when available.")
                         .font(.footnote)
                         .foregroundStyle(Theme.muted)
                         .padding(.horizontal, Theme.Space.lg)

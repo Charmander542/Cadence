@@ -1,6 +1,6 @@
 {
   "name": "spot_check",
-  "description": "Screenshot all five tabs plus shop, settings, and global search.",
+  "description": "Screenshot core dial apps (legacy + Spend/Focus/News) plus shop, settings, and global search.",
   "restore_dark": true,
   "steps": [
     { "action": "boot" },
@@ -20,6 +20,15 @@
     { "action": "navigate", "target": "tab", "value": "habits" },
     { "action": "wait", "seconds": 1.2 },
     { "action": "screenshot", "name": "tab-habits" },
+    { "action": "navigate", "target": "wheel", "value": "spend" },
+    { "action": "wait", "seconds": 1.2 },
+    { "action": "screenshot", "name": "wheel-spend" },
+    { "action": "navigate", "target": "wheel", "value": "focus" },
+    { "action": "wait", "seconds": 1.2 },
+    { "action": "screenshot", "name": "wheel-focus" },
+    { "action": "navigate", "target": "wheel", "value": "news" },
+    { "action": "wait", "seconds": 1.2 },
+    { "action": "screenshot", "name": "wheel-news" },
     { "action": "swipe", "x1": 220, "y1": 920, "x2": 220, "y2": 520 },
     { "action": "wait", "seconds": 0.8 },
     { "action": "screenshot", "name": "app-grid" },

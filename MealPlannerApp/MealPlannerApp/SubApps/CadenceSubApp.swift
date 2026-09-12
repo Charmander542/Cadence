@@ -6,6 +6,7 @@ enum CadenceSubAppID: String, CaseIterable, Identifiable, Hashable {
     case spend
     case health
     case news
+    case focus
 
     var id: String { rawValue }
 }
@@ -24,6 +25,7 @@ struct CadenceSubAppManifest: Identifiable, Hashable {
         case .spend: return SpendPreferences.isEnabled
         case .health: return HealthPreferences.isEnabled
         case .news: return NewsPreferences.isEnabled
+        case .focus: return FocusPreferences.isEnabled
         }
     }
 }
@@ -56,6 +58,15 @@ enum CadenceSubAppRegistry {
             wheelDestination: .news,
             settingsRoute: .news,
             docsPath: "docs/NEWS_SETUP.md"
+        ),
+        CadenceSubAppManifest(
+            id: .focus,
+            title: "Focus",
+            systemImage: "target",
+            blurb: "Pomodoro and stopwatch with focus statistics.",
+            wheelDestination: .focus,
+            settingsRoute: .focus,
+            docsPath: "docs/SUBAPPS.md"
         ),
     ]
 

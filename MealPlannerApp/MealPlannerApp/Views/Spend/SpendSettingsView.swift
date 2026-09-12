@@ -14,6 +14,7 @@ struct SpendSettingsView: View {
     @State private var environment: SpendPreferences.PlaidEnvironment = SpendPreferences.environment
     @State private var redirectURI: String = SpendPreferences.redirectURI
     @State private var enabled: Bool = SpendPreferences.isEnabled
+    @State private var iCloudKeychainSync: Bool = SpendPreferences.plaidICloudKeychainSync
     @State private var statusMessage: String?
     @State private var statusTone: Theme.MetaPill.MetaTone = .accent
     @State private var statusIcon = "checkmark.circle.fill"
@@ -32,6 +33,23 @@ struct SpendSettingsView: View {
                 settingsDetailSectionHeader("On dial")
             } footer: {
                 settingsDetailIntro("Hide Spend without deleting purchases or cost-per-use trackers.")
+            }
+
+            Section {
+                NavigationLink {
+                    SpendBudgetsView()
+                } label: {
+                    Label("Category budgets", systemImage: "chart.pie.fill")
+                }
+                NavigationLink {
+                    SpendCategoriesManageView()
+                } label: {
+                    Label("Subcategories", systemImage: "tag.fill")
+                }
+            } header: {
+                settingsDetailSectionHeader("Budgets & categories")
+            } footer: {
+                settingsDetailIntro("Set monthly limits per type (and nested groups like Kitchen). Colors drive the Overview pie chart.")
             }
 
             Section {
@@ -71,7 +89,26 @@ struct SpendSettingsView: View {
             } header: {
                 settingsDetailSectionHeader("Plaid")
             } footer: {
-                settingsDetailIntro("Sandbox secret from Plaid Dashboard → Keys. Redirect URI is required for many OAuth banks (Chase, etc.) — see docs/PLAID_SETUP.md. Secret stays on-device in Keychain.")
+                settingsDetailIntro("Sandbox secret from Plaid Dashboard → Keys. Redirect URI is required for many OAuth banks (Chase, etc.) — see docs/PLAID_SETUP.md. Secret stays in Keychain (optionally iCloud Keychain).")
+            }
+
+            Section {
+                Toggle("Sync connections via iCloud Keychain", isOn: $iCloudKeychainSync)
+                    .tint(Theme.cta)
+                    .onChange(of: iCloudKeychainSync) { _, value in
+                        SpendPreferences.plaidICloudKeychainSync = value
+                        KeychainStore.repersistAllPlaidKeychainItems()
+                        showStatus(
+                            value
+                                ? "Bank tokens will sync with iCloud Keychain (same Apple ID)."
+                                : "Bank tokens stay on this device only.",
+                            tone: .neutral
+                        )
+                    }
+            } header: {
+                settingsDetailSectionHeader("Backup")
+            } footer: {
+                settingsDetailIntro("Requires Settings → [your name] → iCloud → Passwords & Keychain. Survives delete/reinstall on the same Apple ID. Do not share that Apple ID.")
             }
 
             Section {
@@ -175,6 +212,7 @@ struct SpendSettingsView: View {
             clientID = SpendPreferences.clientID
             environment = SpendPreferences.environment
             redirectURI = SpendPreferences.redirectURI
+            iCloudKeychainSync = SpendPreferences.plaidICloudKeychainSync
             hasStoredSecret = !(KeychainStore.loadPlaidSecret()?.isEmpty ?? true)
         }
         .onReceive(NotificationCenter.default.publisher(for: .plaidItemLinked)) { note in

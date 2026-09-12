@@ -145,7 +145,7 @@ struct GroceryListView: View {
                             return HStack {
                                 Text(category.uppercased())
                                     .font(.caption2.weight(.bold))
-                                    .tracking(0.8)
+                                    .tracking(0.7)
                                     .foregroundStyle(Theme.cta)
                                     .textCase(nil)
                                 Spacer()
@@ -203,7 +203,7 @@ struct GroceryListView: View {
                     HStack {
                         Button("DONE") { dismiss() }
                             .font(.caption.weight(.bold))
-                            .tracking(0.6)
+                            .tracking(0.7)
                             .foregroundStyle(Theme.cta)
                             .accessibilityLabel("Done")
                             .accessibilityHint("Closes shop and returns to Meals")
@@ -273,6 +273,8 @@ struct GroceryListView: View {
             }
             .scrollContentBackground(.hidden)
             .background(Theme.canvas)
+            .listStyle(.plain)
+            .contentMargins(.horizontal, Theme.Space.sm, for: .scrollContent)
             .scrollDismissesKeyboard(.interactively)
             .cadenceDismissKeyboardOnTap()
         }
@@ -515,35 +517,43 @@ struct PantryEditor: View {
                 }
                 Section {
                     ForEach(visibleItems) { item in
-                        Text(item.name.capitalized)
-                            .accessibilityLabel("\(item.name.capitalized), pantry staple")
-                            .swipeActions(edge: .leading) {
-                                Button {
-                                    addToShop(item)
-                                } label: {
-                                    Label("Add to Shop", systemImage: "cart")
-                                }
-                                .tint(.green)
-                                .accessibilityLabel("Add \(item.name) to shop list")
-                                .accessibilityHint("Adds staple to this week's shop list")
+                        HStack(spacing: Theme.Space.md) {
+                            Theme.IconWell(systemImage: "cabinet", tint: Theme.cta, size: 36)
+                            Text(item.name.capitalized)
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(Theme.ink)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 2)
+                        .accessibilityLabel("\(item.name.capitalized), pantry staple")
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                addToShop(item)
+                            } label: {
+                                Label("Add to Shop", systemImage: "cart")
                             }
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    modelContext.delete(item)
-                                    try? modelContext.save()
-                                } label: {
-                                    Label("Remove", systemImage: "trash")
-                                }
-                                .accessibilityLabel("Remove \(item.name) from pantry")
-                                .accessibilityHint("Stops keeping this staple off shop lists")
+                            .tint(.green)
+                            .accessibilityLabel("Add \(item.name) to shop list")
+                            .accessibilityHint("Adds staple to this week's shop list")
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                modelContext.delete(item)
+                                try? modelContext.save()
+                            } label: {
+                                Label("Remove", systemImage: "trash")
                             }
+                            .accessibilityLabel("Remove \(item.name) from pantry")
+                            .accessibilityHint("Stops keeping this staple off shop lists")
+                        }
+                        .listRowBackground(Theme.surface)
                     }
                     if visibleItems.isEmpty, !query.trimmingCharacters(in: .whitespaces).isEmpty {
                         VStack(spacing: Theme.Space.sm) {
                             Theme.IconWell(systemImage: "magnifyingglass", tint: Theme.muted, size: 40)
                             Text("NO MATCHES")
                                 .font(.caption2.weight(.bold))
-                                .tracking(0.6)
+                                .tracking(0.7)
                                 .foregroundStyle(Theme.muted)
                             Text("No staples match “\(query.trimmingCharacters(in: .whitespacesAndNewlines))”.")
                                 .font(.subheadline)
@@ -569,7 +579,7 @@ struct PantryEditor: View {
                 } header: {
                     Text("STAPLES")
                         .font(.caption2.weight(.bold))
-                        .tracking(0.8)
+                        .tracking(0.7)
                         .foregroundStyle(Theme.muted)
                         .textCase(nil)
                         .accessibilityAddTraits(.isHeader)

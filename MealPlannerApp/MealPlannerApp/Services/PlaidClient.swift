@@ -295,12 +295,20 @@ actor PlaidClient {
     }
 }
 
-// MARK: - Keychain (secret + Item access tokens + sync cursors)
+// MARK: - Keychain (secret + Item access tokens + sync cursors + registry)
 
 extension KeychainStore {
     private static let plaidSecretAccount = "plaid_secret"
     private static let plaidAccessPrefix = "plaid_access_"
     private static let plaidCursorPrefix = "plaid_cursor_"
+    private static let plaidRegistryAccount = "plaid_item_registry_v1"
+    private static let plaidService = "com.musclemeal.app"
+
+    struct PlaidItemRecord: Codable, Equatable {
+        var itemID: String
+        var institutionName: String
+        var isSandbox: Bool
+    }
 
     static func savePlaidSecret(_ secret: String) throws {
         try saveGeneric(account: plaidSecretAccount, value: secret)
@@ -325,6 +333,7 @@ extension KeychainStore {
     static func deletePlaidAccessToken(itemID: String) {
         deleteGeneric(account: plaidAccessPrefix + itemID)
         deleteGeneric(account: plaidCursorPrefix + itemID)
+        removePlaidItemRecord(itemID: itemID)
     }
 
     static func savePlaidSyncCursor(_ cursor: String, itemID: String) {
@@ -335,18 +344,121 @@ extension KeychainStore {
         loadGeneric(account: plaidCursorPrefix + itemID) ?? ""
     }
 
-    private static func saveGeneric(account: String, value: String) throws {
+    /// All Item IDs that still have an access token in Keychain (local and/or iCloud Keychain).
+    static func listPlaidAccessTokenItemIDs() -> [String] {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.musclemeal.app",
-            kSecAttrAccount as String: account,
+            kSecAttrService as String: plaidService,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll,
         ]
-        SecItemDelete(query as CFDictionary)
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let items = result as? [[String: Any]] else { return [] }
+        var seen = Set<String>()
+        var ordered: [String] = []
+        for dict in items {
+            guard let account = dict[kSecAttrAccount as String] as? String,
+                  account.hasPrefix(plaidAccessPrefix) else { continue }
+            let id = String(account.dropFirst(plaidAccessPrefix.count))
+            guard !id.isEmpty, seen.insert(id).inserted else { continue }
+            ordered.append(id)
+        }
+        return ordered
+    }
+
+    static func upsertPlaidItemRecord(itemID: String, institutionName: String, isSandbox: Bool) {
+        var registry = loadPlaidItemRegistry()
+        if let idx = registry.firstIndex(where: { $0.itemID == itemID }) {
+            registry[idx].institutionName = institutionName.isEmpty ? registry[idx].institutionName : institutionName
+            registry[idx].isSandbox = isSandbox
+        } else {
+            registry.append(
+                PlaidItemRecord(
+                    itemID: itemID,
+                    institutionName: institutionName.isEmpty ? "Linked bank" : institutionName,
+                    isSandbox: isSandbox
+                )
+            )
+        }
+        savePlaidItemRegistry(registry)
+    }
+
+    static func removePlaidItemRecord(itemID: String) {
+        var registry = loadPlaidItemRegistry()
+        registry.removeAll { $0.itemID == itemID }
+        savePlaidItemRegistry(registry)
+    }
+
+    static func loadPlaidItemRegistry() -> [PlaidItemRecord] {
+        guard let raw = loadGeneric(account: plaidRegistryAccount),
+              let data = raw.data(using: .utf8),
+              let decoded = try? JSONDecoder().decode([PlaidItemRecord].self, from: data)
+        else { return [] }
+        return decoded
+    }
+
+    /// Rewrite Plaid Keychain entries for current accessibility + iCloud Keychain preference.
+    static func migratePlaidKeychainAccessibilityIfNeeded() {
+        let flagKey = "plaid_keychain_accessibility_v3_icloud"
+        guard !UserDefaults.standard.bool(forKey: flagKey) else { return }
+        repersistAllPlaidKeychainItems()
+        UserDefaults.standard.set(true, forKey: flagKey)
+    }
+
+    /// Call after toggling `SpendPreferences.plaidICloudKeychainSync`.
+    static func repersistAllPlaidKeychainItems() {
+        if let secret = loadPlaidSecret(), !secret.isEmpty {
+            try? savePlaidSecret(secret)
+        }
+        for itemID in listPlaidAccessTokenItemIDs() {
+            if let token = plaidAccessToken(itemID: itemID), !token.isEmpty {
+                savePlaidAccessToken(token, itemID: itemID)
+            }
+            let cursor = plaidSyncCursor(itemID: itemID)
+            if !cursor.isEmpty {
+                savePlaidSyncCursor(cursor, itemID: itemID)
+            }
+        }
+        let registry = loadPlaidItemRegistry()
+        if !registry.isEmpty {
+            savePlaidItemRegistry(registry)
+        }
+    }
+
+    private static func savePlaidItemRegistry(_ records: [PlaidItemRecord]) {
+        guard let data = try? JSONEncoder().encode(records),
+              let raw = String(data: data, encoding: .utf8)
+        else { return }
+        saveGenericBestEffort(account: plaidRegistryAccount, value: raw)
+    }
+
+    private static var useICloudKeychain: Bool {
+        SpendPreferences.plaidICloudKeychainSync
+    }
+
+    private static func saveGeneric(account: String, value: String) throws {
+        // Clear both local and iCloud copies so we don't leave stale duplicates.
+        deleteGeneric(account: account)
         guard !value.isEmpty else { return }
-        var add = query
-        add[kSecValueData as String] = Data(value.utf8)
-        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        let status = SecItemAdd(add as CFDictionary, nil)
+
+        var add: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: plaidService,
+            kSecAttrAccount as String: account,
+            kSecValueData as String: Data(value.utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+        ]
+        if useICloudKeychain {
+            add[kSecAttrSynchronizable as String] = kCFBooleanTrue!
+        }
+        var status = SecItemAdd(add as CFDictionary, nil)
+        // Simulator / iCloud Keychain-off often rejects synchronizable writes — fall back local.
+        if status != errSecSuccess, useICloudKeychain {
+            add.removeValue(forKey: kSecAttrSynchronizable as String)
+            status = SecItemAdd(add as CFDictionary, nil)
+        }
         guard status == errSecSuccess else { throw KeychainError.unhandled(status) }
     }
 
@@ -357,8 +469,9 @@ extension KeychainStore {
     private static func loadGeneric(account: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.musclemeal.app",
+            kSecAttrService as String: plaidService,
             kSecAttrAccount as String: account,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
@@ -369,11 +482,14 @@ extension KeychainStore {
     }
 
     private static func deleteGeneric(account: String) {
-        let query: [String: Any] = [
+        let base: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.musclemeal.app",
+            kSecAttrService as String: plaidService,
             kSecAttrAccount as String: account,
         ]
-        SecItemDelete(query as CFDictionary)
+        var sync = base
+        sync[kSecAttrSynchronizable as String] = kCFBooleanTrue!
+        SecItemDelete(sync as CFDictionary)
+        SecItemDelete(base as CFDictionary)
     }
 }

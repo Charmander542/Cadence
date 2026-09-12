@@ -5,8 +5,9 @@ enum SpendPreferences {
     private static let clientIDKey = "plaid_client_id"
     private static let environmentKey = "plaid_environment"
     private static let redirectURIKey = "plaid_redirect_uri"
-    private static let demoSeededKey = "spend_demo_seeded"
+    private static let demoSeededKey = "spend_demo_seeded_v9"
     private static let clientUserIDKey = "plaid_client_user_id"
+    private static let iCloudKeychainSyncKey = "plaid_icloud_keychain_sync"
 
     /// Prefill only — not a secret. Secret stays in Keychain / PlaidLocal.plist.
     static let defaultClientID = "6aa4147dd8c4dd000dcfc579"
@@ -78,6 +79,16 @@ enum SpendPreferences {
     static var hasDemoSeed: Bool {
         get { UserDefaults.standard.bool(forKey: demoSeededKey) }
         set { UserDefaults.standard.set(newValue, forKey: demoSeededKey) }
+    }
+
+    /// When on (default), Plaid secret + Item tokens sync via **iCloud Keychain** so
+    /// delete/reinstall (same Apple ID + iCloud Keychain) can restore connections.
+    static var plaidICloudKeychainSync: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: iCloudKeychainSyncKey) == nil { return true }
+            return UserDefaults.standard.bool(forKey: iCloudKeychainSyncKey)
+        }
+        set { UserDefaults.standard.set(newValue, forKey: iCloudKeychainSyncKey) }
     }
 
     static var isConfigured: Bool {

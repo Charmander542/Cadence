@@ -317,7 +317,7 @@ private struct LiveWorkoutScreen: View {
                 Button(action: onFinish) {
                     Text("FINISH")
                         .font(.caption.weight(.bold))
-                        .tracking(0.6)
+                        .tracking(0.7)
                         .foregroundStyle(Color.white)
                         .padding(.horizontal, Theme.Space.md)
                         .padding(.vertical, Theme.Space.sm)
@@ -504,7 +504,7 @@ private struct LiveWorkoutScreen: View {
                 VStack(alignment: .leading, spacing: Theme.Space.xs) {
                     Text("REST")
                         .font(.caption2.weight(.bold))
-                        .tracking(0.8)
+                        .tracking(0.7)
                         .foregroundStyle(Theme.muted)
                     Text(formatElapsed(live.restRemaining))
                         .font(.title.monospacedDigit().weight(.bold))
@@ -548,7 +548,7 @@ private struct LiveWorkoutScreen: View {
     private func colHeader(_ title: String, width: CGFloat? = nil, flex: Bool = false) -> some View {
         Text(title.uppercased())
             .font(.caption2.weight(.bold))
-            .tracking(0.8)
+            .tracking(0.7)
             .foregroundStyle(Theme.muted)
             .frame(width: width, alignment: .leading)
             .frame(maxWidth: flex ? .infinity : nil, alignment: .leading)
@@ -724,41 +724,83 @@ private struct WorkoutSummarySheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    Text("\(sessionName) logged.")
-                        .font(.headline)
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityLabel("\(sessionName) logged")
-                }
-                if !notes.isEmpty {
-                    Section("Next time") {
-                        ForEach(notes.keys.sorted(), id: \.self) { key in
-                            if let msg = notes[key] {
-                                VStack(alignment: .leading, spacing: Theme.Space.xs) {
-                                    Text(prettyName(key))
-                                        .font(.subheadline.weight(.semibold))
-                                    Text(msg)
-                                        .font(.footnote)
-                                        .foregroundStyle(Theme.muted)
-                                        .accessibilityAddTraits(.isStaticText)
+            ScrollView {
+                VStack(spacing: Theme.Space.xl) {
+                    VStack(spacing: Theme.Space.md) {
+                        Theme.IconWell(systemImage: "checkmark.circle.fill", tint: Theme.accent, size: 72)
+                        Text("WORKOUT SAVED")
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.7)
+                            .foregroundStyle(Theme.muted)
+                        Text(sessionName)
+                            .font(Theme.title(.title2))
+                            .foregroundStyle(Theme.ink)
+                            .multilineTextAlignment(.center)
+                        Text("Nice work — session logged.")
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.muted)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, Theme.Space.lg)
+
+                    if !notes.isEmpty {
+                        VStack(alignment: .leading, spacing: Theme.Space.sm) {
+                            Text("NEXT TIME")
+                                .font(.caption2.weight(.bold))
+                                .tracking(0.7)
+                                .foregroundStyle(Theme.muted)
+                                .padding(.horizontal, Theme.Space.xs)
+                            ForEach(notes.keys.sorted(), id: \.self) { key in
+                                if let msg = notes[key] {
+                                    HStack(alignment: .top, spacing: Theme.Space.md) {
+                                        Theme.IconWell(systemImage: "arrow.up.right", tint: Theme.cta, size: 36)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(prettyName(key))
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(Theme.ink)
+                                            Text(msg)
+                                                .font(.footnote)
+                                                .foregroundStyle(Theme.muted)
+                                        }
+                                        Spacer(minLength: 0)
+                                    }
+                                    .padding(Theme.Space.md)
+                                    .background(
+                                        Theme.surface,
+                                        in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                                            .strokeBorder(Theme.hairline, lineWidth: 1)
+                                    )
+                                    .accessibilityElement(children: .combine)
+                                    .accessibilityLabel("\(prettyName(key)). \(msg)")
                                 }
-                                .accessibilityElement(children: .combine)
-                                .accessibilityLabel("\(prettyName(key)). \(msg)")
                             }
                         }
                     }
+
+                    Theme.PrimaryButton(title: "Done", systemImage: "checkmark") {
+                        onDone()
+                    }
+                    .padding(.top, Theme.Space.sm)
+                    .accessibilityHint("Closes workout summary")
                 }
+                .padding(Theme.Space.lg)
             }
-            .navigationTitle("Workout saved")
+            .scrollContentBackground(.hidden)
+            .background(Theme.canvas.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done", action: onDone)
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close", action: onDone)
+                        .foregroundStyle(Theme.muted)
                         .accessibilityHint("Closes workout summary")
                 }
             }
         }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
     private func prettyName(_ id: String) -> String {

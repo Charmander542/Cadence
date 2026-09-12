@@ -118,6 +118,17 @@ struct SettingsView: View {
                                 )
                             }
                         }
+                        if matches(.focus) {
+                            settingsLink(.focus) {
+                                SettingsCategoryRow(
+                                    title: "Focus",
+                                    subtitle: focusSubtitle,
+                                    systemImage: "target",
+                                    tint: Theme.accent,
+                                    status: FocusPreferences.isEnabled ? "On" : "Off"
+                                )
+                            }
+                        }
                     } header: {
                         settingsSectionHeader("Modules")
                     }
@@ -293,6 +304,8 @@ struct SettingsView: View {
             HealthSettingsView()
         case .news:
             NewsSettingsView()
+        case .focus:
+            FocusSettingsView()
         case .reminders:
             RemindersSettingsView()
         case .calendar:
@@ -376,6 +389,11 @@ struct SettingsView: View {
     private var newsSubtitle: String {
         if !NewsPreferences.isEnabled { return "Hidden from wheel" }
         return NewsPreferences.hasAIKey ? "AI digests on" : "RSS · add AI key for briefs"
+    }
+
+    private var focusSubtitle: String {
+        if !FocusPreferences.isEnabled { return "Hidden from wheel" }
+        return "\(FocusPreferences.pomoMinutes) min pomo · stopwatch"
     }
 
     private var remindersSubtitle: String {

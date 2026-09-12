@@ -372,7 +372,7 @@ struct TodayView: View {
                 HStack(spacing: Theme.Space.sm) {
                     Text(title.uppercased())
                         .font(.caption2.weight(.bold))
-                        .tracking(0.6)
+                        .tracking(0.7)
                         .foregroundStyle(id == "overdue" ? Theme.danger : Theme.muted)
                     Theme.CountBadge(count: count, emphasized: id == "tasks")
                     Spacer()
@@ -686,12 +686,7 @@ struct QuickAddSheet: View {
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Space.md + 2) {
-                Text("SAVE TO LIST")
-                    .font(.caption2.weight(.bold))
-                    .tracking(0.6)
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityAddTraits(.isHeader)
+                quickAddSectionHeader("LIST")
                 HStack {
                     Menu {
                         ForEach(pickerLists) { list in
@@ -714,6 +709,7 @@ struct QuickAddSheet: View {
                         PriorityFlagIcon(priority: priority)
                     }
                 }
+                quickAddSectionHeader("TASK")
                 HStack(alignment: .center) {
                     Theme.CheckGlyph(checked: false)
                     TextField("What do you want to do?", text: $title)
@@ -737,12 +733,7 @@ struct QuickAddSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityLabel("Tips: type tomorrow or hash tag in the title")
                     .accessibilityAddTraits(.isStaticText)
-                Text("DUE DATE")
-                    .font(.caption2.weight(.bold))
-                    .tracking(0.6)
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityAddTraits(.isHeader)
+                quickAddSectionHeader("WHEN")
                 if hasDue {
                     Button {
                         showDatePicker = true
@@ -757,7 +748,6 @@ struct QuickAddSheet: View {
                     .accessibilityHint("Opens calendar to change due date")
                     Toggle("Remind me", isOn: $hasReminder)
                         .font(.subheadline)
-                        .tint(Theme.cta)
                         .accessibilityLabel("Remind me, \(hasReminder ? "on" : "off")")
                         .accessibilityHint("Schedules notification on due date")
                 } else {
@@ -802,6 +792,7 @@ struct QuickAddSheet: View {
         .scrollDismissesKeyboard(.interactively)
         .cadenceDismissKeyboardOnTap()
         .background(Theme.canvas)
+        .tint(Theme.cta)
         .presentationDetents([Self.compactDetent, Self.expandedDetent], selection: $sheetDetent)
         .presentationDragIndicator(.visible)
         .presentationContentInteraction(.scrolls)
@@ -815,6 +806,15 @@ struct QuickAddSheet: View {
         .sheet(isPresented: $showDatePicker) {
             DueDatePickerSheet(date: $due, hasDue: $hasDue)
         }
+    }
+
+    private func quickAddSectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2.weight(.bold))
+            .tracking(0.7)
+            .foregroundStyle(Theme.muted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityAddTraits(.isHeader)
     }
 
     private func applyParsedHints() {
@@ -897,126 +897,151 @@ struct TaskEditorSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                TextField("Title", text: $task.title)
-                    .onChange(of: task.title) { _, newValue in
-                        let parsed = TaskTitleParser.parse(newValue)
-                        if let date = parsed.dueDate { task.dueAt = date }
-                        if !parsed.tags.isEmpty { task.tags = parsed.tags }
+                Section {
+                    TextField("Title", text: $task.title)
+                        .font(.title3.weight(.semibold))
+                        .onChange(of: task.title) { _, newValue in
+                            let parsed = TaskTitleParser.parse(newValue)
+                            if let date = parsed.dueDate { task.dueAt = date }
+                            if !parsed.tags.isEmpty { task.tags = parsed.tags }
+                        }
+                        .accessibilityLabel("Title")
+                        .accessibilityValue(task.title.isEmpty ? "Empty" : task.title)
+                        .accessibilityHint("Task name; use #tag or tomorrow in title for smart hints")
+                    if !task.tags.isEmpty {
+                        TaskTagChips(tags: task.tags, colorMap: tagColorMap)
                     }
-                    .accessibilityLabel("Title")
-                    .accessibilityValue(task.title.isEmpty ? "Empty" : task.title)
-                    .accessibilityHint("Task name; use #tag or tomorrow in title for smart hints")
-                if !task.tags.isEmpty {
-                    TaskTagChips(tags: task.tags, colorMap: tagColorMap)
+                    TextField("Notes", text: $task.notes, axis: .vertical)
+                        .lineLimit(2...5)
+                        .accessibilityLabel("Notes")
+                        .accessibilityValue(task.notes.isEmpty ? "Empty" : task.notes)
+                        .accessibilityHint("Optional notes for this task")
+                    LocationField(text: $task.location, mapsHint: "Opens task location in Apple Maps")
+                } header: {
+                    taskEditorSectionHeader("TASK")
+                } footer: {
+                    Text("Tips: tomorrow · #tag in the title")
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
                 }
-                TextField("Notes", text: $task.notes, axis: .vertical)
-                    .accessibilityLabel("Notes")
-                    .accessibilityValue(task.notes.isEmpty ? "Empty" : task.notes)
-                    .accessibilityHint("Optional notes for this task")
-                LocationField(text: $task.location, mapsHint: "Opens task location in Apple Maps")
-                PlannerDateTimeRow(
-                    label: "Due",
-                    date: Binding(
-                        get: { task.dueAt ?? .now },
-                        set: { task.dueAt = DateSnapping.tenMinutes($0) }
-                    ),
-                    hint: "Opens date and time picker in five-minute steps"
-                )
-                Toggle("Reminder", isOn: $hasReminder)
-                    .accessibilityLabel("Reminder, \(hasReminder ? "on" : "off")")
-                    .accessibilityHint("Schedules notification for this task")
-                if hasReminder {
+
+                Section {
                     PlannerDateTimeRow(
-                        label: "Remind at",
+                        label: "Due",
                         date: Binding(
-                            get: { task.reminderAt ?? task.dueAt ?? .now },
-                            set: { task.reminderAt = DateSnapping.tenMinutes($0) }
+                            get: { task.dueAt ?? .now },
+                            set: { task.dueAt = DateSnapping.tenMinutes($0) }
                         ),
-                        hint: "Opens reminder time picker in five-minute steps"
+                        hint: "Opens date and time picker in five-minute steps"
                     )
-                    Stepper(
-                        "Duration: \(task.durationMinutes) min",
-                        value: $task.durationMinutes,
-                        in: 0...240,
-                        step: 15
-                    )
-                    .accessibilityLabel("Duration, \(task.durationMinutes) minutes")
-                    .accessibilityHint("Estimated time blocked on calendar for this task")
-                }
-                Picker("Repeat", selection: Binding(
-                    get: { task.recurrence },
-                    set: { task.recurrence = $0 }
-                )) {
-                    ForEach(TaskRecurrence.allCases) { item in
-                        Text(item.title).tag(item)
+                    Toggle("Reminder", isOn: $hasReminder)
+                        .accessibilityLabel("Reminder, \(hasReminder ? "on" : "off")")
+                        .accessibilityHint("Schedules notification for this task")
+                    if hasReminder {
+                        PlannerDateTimeRow(
+                            label: "Remind at",
+                            date: Binding(
+                                get: { task.reminderAt ?? task.dueAt ?? .now },
+                                set: { task.reminderAt = DateSnapping.tenMinutes($0) }
+                            ),
+                            hint: "Opens reminder time picker in five-minute steps"
+                        )
+                        Stepper(
+                            "Duration: \(task.durationMinutes) min",
+                            value: $task.durationMinutes,
+                            in: 0...240,
+                            step: 15
+                        )
+                        .accessibilityLabel("Duration, \(task.durationMinutes) minutes")
+                        .accessibilityHint("Estimated time blocked on calendar for this task")
                     }
+                } header: {
+                    taskEditorSectionHeader("WHEN")
                 }
-                .accessibilityLabel("Repeat, \(task.recurrence.title)")
-                .accessibilityHint("Sets how often this task repeats")
-                .onChange(of: task.recurrence) { _, value in
-                    if value == .customWeekly, task.recurrenceWeekdayMask == 0 {
-                        task.recurrenceWeekdayMask = RecurrenceWeekdayMask.from(startDate: task.dueAt ?? .now)
+
+                Section {
+                    Picker("Repeat", selection: Binding(
+                        get: { task.recurrence },
+                        set: { task.recurrence = $0 }
+                    )) {
+                        ForEach(TaskRecurrence.allCases) { item in
+                            Text(item.title).tag(item)
+                        }
                     }
-                }
-                if task.recurrence == .customWeekly {
-                    VStack(alignment: .leading, spacing: Theme.Space.sm) {
-                        Text(RecurrenceWeekdayMask.summary(task.recurrenceWeekdayMask))
-                            .font(.caption)
-                            .foregroundStyle(Theme.muted)
-                            .accessibilityAddTraits(.isStaticText)
-                        HStack(spacing: Theme.Space.sm - 2) {
-                            ForEach(RecurrenceWeekdayMask.labels(), id: \.weekday) { item in
-                                let on = RecurrenceWeekdayMask.contains(item.weekday, in: task.recurrenceWeekdayMask)
-                                Button {
-                                    task.recurrenceWeekdayMask = RecurrenceWeekdayMask.toggle(item.weekday, in: task.recurrenceWeekdayMask)
-                                } label: {
-                                    Text(item.short)
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(on ? .black : Theme.ink)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, Theme.Space.sm)
-                                        .background(on ? Theme.accent : Theme.sunken, in: Capsule())
+                    .accessibilityLabel("Repeat, \(task.recurrence.title)")
+                    .accessibilityHint("Sets how often this task repeats")
+                    .onChange(of: task.recurrence) { _, value in
+                        if value == .customWeekly, task.recurrenceWeekdayMask == 0 {
+                            task.recurrenceWeekdayMask = RecurrenceWeekdayMask.from(startDate: task.dueAt ?? .now)
+                        }
+                    }
+                    if task.recurrence == .customWeekly {
+                        VStack(alignment: .leading, spacing: Theme.Space.sm) {
+                            Text(RecurrenceWeekdayMask.summary(task.recurrenceWeekdayMask))
+                                .font(.caption)
+                                .foregroundStyle(Theme.muted)
+                                .accessibilityAddTraits(.isStaticText)
+                            HStack(spacing: Theme.Space.sm - 2) {
+                                ForEach(RecurrenceWeekdayMask.labels(), id: \.weekday) { item in
+                                    let on = RecurrenceWeekdayMask.contains(item.weekday, in: task.recurrenceWeekdayMask)
+                                    Button {
+                                        task.recurrenceWeekdayMask = RecurrenceWeekdayMask.toggle(item.weekday, in: task.recurrenceWeekdayMask)
+                                    } label: {
+                                        Text(item.short)
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(on ? .black : Theme.ink)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, Theme.Space.sm)
+                                            .background(on ? Theme.accent : Theme.sunken, in: Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("\(item.short), \(on ? "repeats" : "does not repeat")")
+                                    .accessibilityHint("Double tap to toggle recurring task on this weekday")
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("\(item.short), \(on ? "repeats" : "does not repeat")")
-                                .accessibilityHint("Double tap to toggle recurring task on this weekday")
                             }
                         }
                     }
+                } header: {
+                    taskEditorSectionHeader("REPEAT")
                 }
-                Picker("Priority", selection: Binding(
-                    get: { task.priority },
-                    set: { task.priority = $0 }
-                )) {
-                    ForEach(TaskPriority.allCases) { p in
-                        HStack(spacing: Theme.Space.sm + 2) {
-                            PriorityFlagIcon(priority: p)
-                            Text(p.title)
+
+                Section {
+                    Picker("Priority", selection: Binding(
+                        get: { task.priority },
+                        set: { task.priority = $0 }
+                    )) {
+                        ForEach(TaskPriority.allCases) { p in
+                            HStack(spacing: Theme.Space.sm + 2) {
+                                PriorityFlagIcon(priority: p)
+                                Text(p.title)
+                            }
+                            .tag(p)
                         }
-                        .tag(p)
                     }
+                    .accessibilityLabel("Priority, \(task.priority.title)")
+                    .accessibilityHint("Sets task priority flag and Matrix quadrant")
+                    Picker("List", selection: Binding(
+                        get: { task.list?.id },
+                        set: { id in task.list = pickerLists.first { $0.id == id } }
+                    )) {
+                        ForEach(pickerLists) { list in
+                            Text(list.name).tag(Optional(list.id))
+                        }
+                    }
+                    .accessibilityLabel("List, \(task.list?.name ?? "None")")
+                    .accessibilityHint("Task list that owns this task")
+                    Toggle("Completed", isOn: Binding(
+                        get: { task.isCompleted },
+                        set: {
+                            task.isCompleted = $0
+                            task.completedAt = $0 ? .now : nil
+                        }
+                    ))
+                    .accessibilityLabel("Completed, \(task.isCompleted ? "on" : "off")")
+                    .accessibilityHint("Marks task done or reopens it")
+                } header: {
+                    taskEditorSectionHeader("ORGANIZE")
                 }
-                .accessibilityLabel("Priority, \(task.priority.title)")
-                .accessibilityHint("Sets task priority flag and Matrix quadrant")
-                Picker("List", selection: Binding(
-                    get: { task.list?.id },
-                    set: { id in task.list = pickerLists.first { $0.id == id } }
-                )) {
-                    ForEach(pickerLists) { list in
-                        Text(list.name).tag(Optional(list.id))
-                    }
-                }
-                .accessibilityLabel("List, \(task.list?.name ?? "None")")
-                .accessibilityHint("Task list that owns this task")
-                Toggle("Completed", isOn: Binding(
-                    get: { task.isCompleted },
-                    set: {
-                        task.isCompleted = $0
-                        task.completedAt = $0 ? .now : nil
-                    }
-                ))
-                .accessibilityLabel("Completed, \(task.isCompleted ? "on" : "off")")
-                .accessibilityHint("Marks task done or reopens it")
             }
             .scrollDismissesKeyboard(.never)
             .scrollContentBackground(.hidden)
@@ -1036,6 +1061,7 @@ struct TaskEditorSheet: View {
                         Task { await PlannerSyncCoordinator.shared.taskDidChange(task, in: modelContext) }
                         dismiss()
                     }
+                    .fontWeight(.semibold)
                     .foregroundStyle(Theme.cta)
                     .accessibilityHint("Saves task changes and closes editor")
                 }
@@ -1058,6 +1084,14 @@ struct TaskEditorSheet: View {
         .presentationDetents([Self.compactDetent, Self.expandedDetent], selection: $sheetDetent)
         .presentationDragIndicator(.visible)
         .presentationContentInteraction(.scrolls)
+    }
+
+    private func taskEditorSectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2.weight(.bold))
+            .tracking(0.7)
+            .foregroundStyle(Theme.muted)
+            .textCase(nil)
     }
 
     private func deleteTask() {

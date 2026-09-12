@@ -160,6 +160,17 @@ enum CalendarScope: String, CaseIterable, Identifiable, Hashable {
         case .day: return "rectangle.split.1x2"
         }
     }
+
+    /// Glyph shown on the calendar header view-switcher (matches active scope).
+    var viewSwitcherSymbol: String {
+        switch self {
+        case .year: return "square.grid.3x3"
+        case .month: return "calendar"
+        case .week: return "rectangle.split.3x1"
+        case .threeDay: return "rectangle.split.2x1"
+        case .day: return "rectangle.portrait"
+        }
+    }
 }
 
 enum PlannerDestination: Hashable {
@@ -244,7 +255,12 @@ final class PlannerTaskEntity {
     var googleCalendarEventID: String?
     /// Calendar events (created via PlannerEventSheet) — excluded from task/todo lists.
     var isEvent: Bool = false
+    /// Stable id for events imported from Apple/Google (`apple:…` / `google:…`). Empty = Cadence-owned.
+    var importedExternalID: String = ""
+    /// `apple` or `google` when imported; empty for local Cadence events.
+    var importedSourceRaw: String = ""
 
+    var isImportedExternalEvent: Bool { !importedExternalID.isEmpty }
     init(
         title: String,
         dueAt: Date? = nil,

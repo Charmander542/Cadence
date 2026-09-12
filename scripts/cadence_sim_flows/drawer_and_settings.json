@@ -7,7 +7,7 @@
     { "action": "install" },
     { "action": "navigate", "target": "tab", "value": "today" },
     { "action": "wait", "seconds": 1.2 },
-    { "action": "tap-label", "label": "Open menu" },
+    { "action": "tap-label", "label": "Open sidebar" },
     { "action": "wait", "seconds": 0.6 },
     { "action": "screenshot", "name": "drawer-open" },
     { "action": "tap-label", "label": "Settings" },

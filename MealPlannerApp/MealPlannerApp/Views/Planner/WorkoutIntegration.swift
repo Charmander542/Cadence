@@ -282,7 +282,7 @@ struct WorkoutWeekStrip: View {
         VStack(alignment: .leading, spacing: Theme.Space.sm + 2) {
             Text("Lift program")
                 .font(.caption2.weight(.bold))
-                .tracking(0.6)
+                .tracking(0.7)
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.muted)
                 .accessibilityAddTraits(.isHeader)
@@ -400,7 +400,7 @@ struct TonightMealCard: View {
                         VStack(alignment: .leading, spacing: Theme.Space.xs) {
                             Text("Tonight's dinner")
                                 .font(.caption2.weight(.bold))
-                                .tracking(0.6)
+                                .tracking(0.7)
                                 .textCase(.uppercase)
                                 .foregroundStyle(Theme.muted)
                             Text(Theme.recipeDisplayName(recipe.name))
@@ -433,7 +433,7 @@ struct TonightMealCard: View {
                         VStack(alignment: .leading, spacing: Theme.Space.xs) {
                             Text("Tonight's dinner")
                                 .font(.caption2.weight(.bold))
-                                .tracking(0.6)
+                                .tracking(0.7)
                                 .textCase(.uppercase)
                                 .foregroundStyle(Theme.muted)
                             Text("No dinner planned")

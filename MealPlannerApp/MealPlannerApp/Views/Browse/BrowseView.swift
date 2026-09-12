@@ -85,7 +85,7 @@ struct BrowseView: View {
                             } label: {
                                 Text("CLEAR ALL")
                                     .font(.caption.weight(.bold))
-                                    .tracking(0.6)
+                                    .tracking(0.7)
                                     .foregroundStyle(Theme.cta)
                                     .padding(.horizontal, Theme.Space.sm)
                             }
@@ -110,7 +110,7 @@ struct BrowseView: View {
                         Theme.IconWell(systemImage: "magnifyingglass", tint: Theme.muted, size: 48)
                         Text("NO MATCHES")
                             .font(.caption2.weight(.bold))
-                            .tracking(0.8)
+                            .tracking(0.7)
                             .foregroundStyle(Theme.muted)
                         Text("No recipes match")
                             .font(Theme.display(.headline))

@@ -241,7 +241,7 @@ struct WorkoutHomeView: View {
                 HStack {
                     Text("This week")
                         .font(.caption2.weight(.bold))
-                        .tracking(0.6)
+                        .tracking(0.7)
                         .textCase(.uppercase)
                         .foregroundStyle(Theme.muted)
                         .accessibilityAddTraits(.isHeader)
@@ -318,7 +318,7 @@ struct WorkoutHomeView: View {
                 HStack {
                     Text("Today’s lifts")
                         .font(.caption2.weight(.bold))
-                        .tracking(0.6)
+                        .tracking(0.7)
                         .textCase(.uppercase)
                         .foregroundStyle(Theme.muted)
                         .accessibilityAddTraits(.isHeader)
@@ -379,7 +379,7 @@ struct WorkoutHomeView: View {
             VStack(alignment: .leading, spacing: Theme.Space.sm + 2) {
                 Text("Program")
                     .font(.caption2.weight(.bold))
-                    .tracking(0.6)
+                    .tracking(0.7)
                     .textCase(.uppercase)
                     .foregroundStyle(Theme.muted)
                     .accessibilityAddTraits(.isHeader)
@@ -408,7 +408,7 @@ struct WorkoutHomeView: View {
         VStack(alignment: .leading, spacing: Theme.Space.sm + 2) {
             Text("Recent")
                 .font(.caption2.weight(.bold))
-                .tracking(0.6)
+                .tracking(0.7)
                 .textCase(.uppercase)
                 .foregroundStyle(Theme.muted)
                 .accessibilityAddTraits(.isHeader)

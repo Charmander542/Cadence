@@ -115,9 +115,25 @@ struct CadenceWidgetProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<CadenceWidgetEntry>) -> Void) {
         let snap = WidgetSnapshotStore.load()
-        let entry = CadenceWidgetEntry(date: .now, snapshot: snap)
-        let next = Calendar.current.date(byAdding: .minute, value: 15, to: .now) ?? .now.addingTimeInterval(900)
-        completion(Timeline(entries: [entry], policy: .after(next)))
+        let now = Date()
+        // Minute-level entries so countdown days/hours/mins stay accurate.
+        if let end = snap.nextEvent?.startAt, end > now {
+            var entries: [CadenceWidgetEntry] = []
+            let horizon = min(end, now.addingTimeInterval(60 * 60)) // next hour of updates
+            var tick = now
+            while tick <= horizon {
+                entries.append(CadenceWidgetEntry(date: tick, snapshot: snap))
+                guard let next = Calendar.current.date(byAdding: .minute, value: 1, to: tick) else { break }
+                tick = next
+            }
+            if entries.isEmpty {
+                entries = [CadenceWidgetEntry(date: now, snapshot: snap)]
+            }
+            completion(Timeline(entries: entries, policy: .after(horizon)))
+        } else {
+            let next = Calendar.current.date(byAdding: .minute, value: 15, to: now) ?? now.addingTimeInterval(900)
+            completion(Timeline(entries: [CadenceWidgetEntry(date: now, snapshot: snap)], policy: .after(next)))
+        }
     }
 }
 
@@ -235,20 +251,31 @@ struct TodayTasksWidgetView: View {
 
     private var countdownBody: some View {
         Group {
-            if let event = entry.snapshot.nextEvent, event.startAt > .now {
+            if let event = entry.snapshot.nextEvent,
+               event.startAt > entry.date,
+               let remaining = CountdownRemaining.until(event.startAt, from: entry.date) {
                 if family == .accessoryCircular {
-                    VStack(spacing: 2) {
-                        Text(timerInterval: .now...event.startAt, countsDown: true)
-                            .font(.caption2.monospacedDigit())
-                            .multilineTextAlignment(.center)
-                        Text("left")
-                            .font(.system(size: 8))
+                    VStack(spacing: 1) {
+                        if remaining.days > 0 {
+                            Text("\(remaining.days)d")
+                                .font(.caption.monospacedDigit().weight(.bold))
+                            Text("\(remaining.hours)h")
+                                .font(.system(size: 9).monospacedDigit())
+                        } else if remaining.hours > 0 {
+                            Text("\(remaining.hours)h")
+                                .font(.caption.monospacedDigit().weight(.bold))
+                            Text("\(remaining.minutes)m")
+                                .font(.system(size: 9).monospacedDigit())
+                        } else {
+                            Text("\(remaining.minutes)m")
+                                .font(.caption.monospacedDigit().weight(.bold))
+                        }
                     }
                 } else if family == .accessoryInline {
                     HStack(spacing: WidgetTheme.Space.xs) {
                         Image(systemName: "timer")
                         Text(event.title)
-                        Text(timerInterval: .now...event.startAt, countsDown: true)
+                        Text(remaining.compactLabel)
                     }
                     .lineLimit(1)
                 } else {
@@ -256,9 +283,9 @@ struct TodayTasksWidgetView: View {
                         Text(event.title)
                             .font(.caption.weight(.semibold))
                             .lineLimit(1)
-                        Text(timerInterval: .now...event.startAt, countsDown: true)
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(WidgetTheme.muted)
+                        Text(remaining.compactLabel)
+                            .font(.caption.monospacedDigit().weight(.bold))
+                            .foregroundStyle(WidgetTheme.accent)
                     }
                 }
             } else {
@@ -809,12 +836,13 @@ struct CountdownWidget: Widget {
             CountdownWidgetView(entry: entry)
         }
         .configurationDisplayName("Countdown")
-        .description("Time until your starred event.")
+        .description("Days, hours, and minutes until your starred or next upcoming event.")
         .supportedFamilies([
             .accessoryCircular,
             .accessoryInline,
             .accessoryRectangular,
             .systemSmall,
+            .systemMedium,
         ])
     }
 }
@@ -823,40 +851,152 @@ struct CountdownWidgetView: View {
     var entry: CadenceWidgetEntry
     @Environment(\.widgetFamily) private var family
 
+    private var event: WidgetNextEvent? {
+        guard let event = entry.snapshot.nextEvent, event.startAt > entry.date else { return nil }
+        return event
+    }
+
+    private var remaining: CountdownRemaining? {
+        guard let event else { return nil }
+        return CountdownRemaining.until(event.startAt, from: entry.date)
+    }
+
     var body: some View {
-        if let event = entry.snapshot.nextEvent, event.startAt > .now {
+        Group {
+            if let event, let remaining {
+                switch family {
+                case .accessoryCircular:
+                    circularBody(remaining)
+                case .accessoryInline:
+                    Text("\(event.title) · \(remaining.compactLabel)")
+                        .lineLimit(1)
+                case .accessoryRectangular:
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(event.title)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+                        Text(remaining.compactLabel)
+                            .font(.caption.monospacedDigit().weight(.bold))
+                            .foregroundStyle(WidgetTheme.accent)
+                    }
+                case .systemMedium:
+                    mediumBody(event, remaining)
+                default:
+                    smallBody(event, remaining)
+                }
+            } else {
+                emptyBody
+            }
+        }
+        .containerBackground(for: .widget) {
+            WidgetTheme.chromeBackground
+        }
+    }
+
+    private var emptyBody: some View {
+        VStack(alignment: .leading, spacing: WidgetTheme.Space.xs) {
+            Text("COUNTDOWN")
+                .font(.caption2.weight(.bold))
+                .tracking(0.7)
+                .foregroundStyle(WidgetTheme.muted)
+            Text("No upcoming event")
+                .font(.headline)
+            Text("Add a calendar event or star one to pin it.")
+                .font(.caption)
+                .foregroundStyle(WidgetTheme.muted)
+                .lineLimit(family == .systemSmall ? 3 : 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func smallBody(_ event: WidgetNextEvent, _ remaining: CountdownRemaining) -> some View {
+        VStack(alignment: .leading, spacing: WidgetTheme.Space.sm) {
+            Text("COUNTDOWN")
+                .font(.caption2.weight(.bold))
+                .tracking(0.7)
+                .foregroundStyle(WidgetTheme.muted)
+            Text(event.title)
+                .font(.headline)
+                .lineLimit(2)
+            Text(event.startAt, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute())
+                .font(.caption)
+                .foregroundStyle(WidgetTheme.muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Spacer(minLength: 0)
+            countdownUnits(remaining, compact: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func mediumBody(_ event: WidgetNextEvent, _ remaining: CountdownRemaining) -> some View {
+        HStack(alignment: .center, spacing: WidgetTheme.Space.md) {
             VStack(alignment: .leading, spacing: WidgetTheme.Space.sm - 2) {
-                Text("UP NEXT")
+                Text("COUNTDOWN")
                     .font(.caption2.weight(.bold))
                     .tracking(0.7)
                     .foregroundStyle(WidgetTheme.muted)
                 Text(event.title)
-                    .font(.headline)
-                    .lineLimit(family == .systemSmall ? 2 : 1)
-                Text(event.startAt, style: .time)
+                    .font(.title3.weight(.semibold))
+                    .lineLimit(2)
+                Text(event.startAt, format: .dateTime.weekday(.wide).month(.abbreviated).day().hour().minute())
                     .font(.caption)
                     .foregroundStyle(WidgetTheme.muted)
-                Text(timerInterval: .now...event.startAt, countsDown: true)
-                    .font(.title2.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(WidgetTheme.accent)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .containerBackground(for: .widget) {
-                WidgetTheme.chromeBackground
-            }
-        } else {
-            VStack(alignment: .leading, spacing: WidgetTheme.Space.xs) {
-                Text("UP NEXT")
-                    .font(.caption2.weight(.bold))
-                    .tracking(0.7)
-                    .foregroundStyle(WidgetTheme.muted)
-                Text("Star an event to track")
-                    .font(.headline)
-            }
-            .containerBackground(for: .widget) {
-                WidgetTheme.chromeBackground
+            Spacer(minLength: 0)
+            countdownUnits(remaining, compact: false)
+        }
+    }
+
+    private func circularBody(_ remaining: CountdownRemaining) -> some View {
+        VStack(spacing: 1) {
+            if remaining.days > 0 {
+                Text("\(remaining.days)d")
+                    .font(.headline.monospacedDigit().weight(.bold))
+                Text("\(remaining.hours)h")
+                    .font(.caption2.monospacedDigit())
+            } else if remaining.hours > 0 {
+                Text("\(remaining.hours)h")
+                    .font(.headline.monospacedDigit().weight(.bold))
+                Text("\(remaining.minutes)m")
+                    .font(.caption2.monospacedDigit())
+            } else {
+                Text("\(remaining.minutes)")
+                    .font(.headline.monospacedDigit().weight(.bold))
+                Text("min")
+                    .font(.system(size: 9, weight: .bold))
             }
         }
+        .foregroundStyle(WidgetTheme.accent)
+    }
+
+    private func countdownUnits(_ remaining: CountdownRemaining, compact: Bool) -> some View {
+        HStack(spacing: compact ? 6 : 10) {
+            unitCell(value: remaining.days, label: "DAYS", compact: compact)
+            unitCell(value: remaining.hours, label: "HRS", compact: compact)
+            unitCell(value: remaining.minutes, label: "MIN", compact: compact)
+        }
+    }
+
+    private func unitCell(value: Int, label: String, compact: Bool) -> some View {
+        VStack(spacing: 2) {
+            Text("\(value)")
+                .font(compact
+                      ? .title3.monospacedDigit().weight(.bold)
+                      : .largeTitle.monospacedDigit().weight(.bold))
+                .foregroundStyle(WidgetTheme.accent)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+            Text(label)
+                .font(.system(size: compact ? 8 : 9, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(WidgetTheme.muted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, compact ? 6 : 8)
+        .background(WidgetTheme.sunken, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 

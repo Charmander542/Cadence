@@ -2,6 +2,7 @@ import AuthenticationServices
 import CryptoKit
 import Foundation
 import Security
+import SwiftData
 import UIKit
 
 struct GoogleCalendarSummary: Identifiable, Hashable, Codable {
@@ -140,6 +141,7 @@ final class GoogleCalendarService: NSObject {
     }
 
     func upsertTaskEvent(_ task: PlannerTaskEntity) async throws {
+        guard !task.isImportedExternalEvent else { return }
         guard PlannerPreferences.syncTasksToGoogleCalendar,
               let dueAt = task.dueAt,
               !task.isCompleted
@@ -191,6 +193,7 @@ final class GoogleCalendarService: NSObject {
     }
 
     func deleteTaskEvent(_ task: PlannerTaskEntity) async throws {
+        guard !task.isImportedExternalEvent else { return }
         var map = task.googleCalendarEventIDs
         for (calendarID, eventID) in map {
             _ = try? await apiRequest(
@@ -199,6 +202,130 @@ final class GoogleCalendarService: NSObject {
             )
         }
         task.googleCalendarEventIDs = [:]
+    }
+
+    /// Pulls events from selected Google calendars into Cadence as calendar events.
+    @discardableResult
+    func importEvents(into context: ModelContext, lookbackDays: Int = 14, lookaheadDays: Int = 60) async throws -> Int {
+        guard PlannerPreferences.importFromGoogleCalendar, isSignedIn else {
+            try pruneImportedEvents(source: "google", keeping: [], in: context)
+            return 0
+        }
+        let calendarIDs = selectedGoogleCalendarIDs()
+        guard !calendarIDs.isEmpty else {
+            try pruneImportedEvents(source: "google", keeping: [], in: context)
+            return 0
+        }
+
+        let cal = Calendar.current
+        let start = cal.date(byAdding: .day, value: -lookbackDays, to: cal.startOfDay(for: .now)) ?? .now
+        let end = cal.date(byAdding: .day, value: lookaheadDays, to: cal.startOfDay(for: .now)) ?? .now
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+
+        var seenIDs = Set<String>()
+        var upserted = 0
+
+        struct GoogleEventDateDTO: Decodable {
+            var dateTime: String?
+            var date: String?
+        }
+        struct GoogleEventDTO: Decodable {
+            var id: String?
+            var summary: String?
+            var description: String?
+            var location: String?
+            var start: GoogleEventDateDTO?
+            var end: GoogleEventDateDTO?
+            var status: String?
+        }
+        struct GoogleEventListDTO: Decodable {
+            var items: [GoogleEventDTO]?
+            var nextPageToken: String?
+        }
+
+        for calendarID in calendarIDs {
+            var pageToken: String?
+            repeat {
+                var path = "/calendars/\(calendarID.urlPathEncoded)/events?singleEvents=true&orderBy=startTime&maxResults=250"
+                path += "&timeMin=\(formatter.string(from: start).urlQueryEncoded)"
+                path += "&timeMax=\(formatter.string(from: end).urlQueryEncoded)"
+                if let pageToken {
+                    path += "&pageToken=\(pageToken.urlQueryEncoded)"
+                }
+                let data = try await apiRequest(path: path)
+                let decoded = try JSONDecoder().decode(GoogleEventListDTO.self, from: data)
+                for item in decoded.items ?? [] {
+                    guard let eventID = item.id, !eventID.isEmpty else { continue }
+                    if item.status == "cancelled" { continue }
+                    if CalendarSyncService.isCadenceOwnedNotes(item.description) { continue }
+                    let title = item.summary ?? ""
+                    if title.hasPrefix("Lift ·") || title.hasPrefix("Lunch ·") || title.hasPrefix("Dinner ·") {
+                        continue
+                    }
+                    guard let startDate = Self.parseGoogleDate(dateTime: item.start?.dateTime, dateOnly: item.start?.date) else { continue }
+                    let endDate = Self.parseGoogleDate(dateTime: item.end?.dateTime, dateOnly: item.end?.date)
+                        ?? startDate.addingTimeInterval(3600)
+
+                    let externalID = "google:\(calendarID):\(eventID)"
+                    seenIDs.insert(externalID)
+                    let task = existingImported(externalID: externalID, in: context) ?? {
+                        let created = PlannerTaskEntity(title: title.isEmpty ? "Event" : title)
+                        created.isEvent = true
+                        created.importedExternalID = externalID
+                        created.importedSourceRaw = "google"
+                        context.insert(created)
+                        return created
+                    }()
+
+                    task.title = title.isEmpty ? "Event" : title
+                    task.notes = item.description ?? ""
+                    task.location = item.location ?? ""
+                    task.dueAt = startDate
+                    task.durationMinutes = max(Int(endDate.timeIntervalSince(startDate) / 60), 30)
+                    task.isEvent = true
+                    upserted += 1
+                }
+                pageToken = decoded.nextPageToken
+            } while pageToken != nil
+        }
+
+        try pruneImportedEvents(source: "google", keeping: seenIDs, in: context)
+        try context.save()
+        return upserted
+    }
+
+    private static func parseGoogleDate(dateTime: String?, dateOnly: String?) -> Date? {
+        if let dateTime {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let parsed = formatter.date(from: dateTime) { return parsed }
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter.date(from: dateTime)
+        }
+        if let dateOnly {
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone.current
+            formatter.dateFormat = "yyyy-MM-dd"
+            return formatter.date(from: dateOnly)
+        }
+        return nil
+    }
+
+    private func existingImported(externalID: String, in context: ModelContext) -> PlannerTaskEntity? {
+        let all = (try? context.fetch(FetchDescriptor<PlannerTaskEntity>())) ?? []
+        return all.first { $0.importedExternalID == externalID }
+    }
+
+    private func pruneImportedEvents(source: String, keeping: Set<String>, in context: ModelContext) throws {
+        let all = (try? context.fetch(FetchDescriptor<PlannerTaskEntity>())) ?? []
+        for task in all where task.importedSourceRaw == source {
+            if keeping.isEmpty || !keeping.contains(task.importedExternalID) {
+                context.delete(task)
+            }
+        }
     }
 
     func syncWorkoutProgram() async throws {
@@ -477,5 +604,9 @@ private enum EKWeekdayBridge {
 private extension String {
     var urlPathEncoded: String {
         addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? self
+    }
+
+    var urlQueryEncoded: String {
+        addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? self
     }
 }

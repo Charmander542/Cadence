@@ -58,6 +58,9 @@ enum CadenceAutomation {
             case "news":
                 appModel.requestedWheelId = WheelDestination.news.rawValue
                 log("open", "news")
+            case "focus":
+                appModel.requestedWheelId = WheelDestination.focus.rawValue
+                log("open", "focus")
             case "drawer":
                 appModel.requestedOpenDrawer = true
                 log("open", "drawer")

@@ -75,7 +75,7 @@ struct HabitsHomeView: View {
                             HStack(spacing: Theme.Space.sm) {
                                 Text(period.title.uppercased())
                                     .font(.caption2.weight(.bold))
-                                    .tracking(0.6)
+                                    .tracking(0.7)
                                     .foregroundStyle(Theme.muted)
                                 Theme.CountBadge(count: items.count)
                                 Spacer(minLength: 0)

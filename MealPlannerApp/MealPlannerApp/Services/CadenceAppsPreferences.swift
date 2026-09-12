@@ -14,7 +14,7 @@ enum CadenceAppsPreferences {
     /// Destinations users can show/hide on the dial + app grid.
     static let configurable: [WheelDestination] = [
         .calendar, .meals, .matrix, .habits, .inbox, .browse,
-        .spend, .health, .news,
+        .spend, .health, .news, .focus,
     ]
 
     /// Always present on the dial (home).
@@ -54,6 +54,8 @@ enum CadenceAppsPreferences {
             return false
         case .news:
             return NewsPreferences.isEnabled
+        case .focus:
+            return FocusPreferences.isEnabled
         default:
             let key = hiddenKeyPrefix + destination.rawValue
             if UserDefaults.standard.object(forKey: key) == nil { return true }
@@ -79,6 +81,8 @@ enum CadenceAppsPreferences {
             return
         case .news:
             NewsPreferences.isEnabled = visible
+        case .focus:
+            FocusPreferences.isEnabled = visible
         default:
             UserDefaults.standard.set(!visible, forKey: hiddenKeyPrefix + destination.rawValue)
         }
@@ -154,6 +158,7 @@ enum CadenceAppsPreferences {
         SpendPreferences.isEnabled = true
         HealthPreferences.isEnabled = true
         NewsPreferences.isEnabled = true
+        FocusPreferences.isEnabled = true
         UserDefaults.standard.removeObject(forKey: orderKey)
         notify()
     }
@@ -171,6 +176,7 @@ enum CadenceAppsPreferences {
         case .spend: return "Purchases and cost-per-use"
         case .health: return "Strain, recovery, sleep & Lift"
         case .news: return "Daily digest with AI briefs"
+        case .focus: return "Pomodoro, stopwatch & stats"
         case .shop: return "Follows Meals"
         case .settings: return "Always available from the drawer"
         }

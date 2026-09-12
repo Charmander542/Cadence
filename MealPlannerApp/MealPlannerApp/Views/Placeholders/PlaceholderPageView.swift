@@ -1,5 +1,30 @@
 import SwiftUI
 
+/// Dial Browse page — cookbook search with drawer affordance (not a Coming Soon stub).
+struct BrowseHomeView: View {
+    var onOpenDrawer: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            BrowseView()
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button(action: onOpenDrawer) {
+                            Image(systemName: "line.3.horizontal")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(Theme.ink)
+                                .frame(width: 36, height: 36)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Open sidebar")
+                        .accessibilityHint("Opens the sidebar")
+                    }
+                }
+        }
+        .tint(Theme.cta)
+    }
+}
+
 /// Lightweight stand-in page for wheel destinations that are not fully built yet.
 struct PlaceholderPageView: View {
     var title: String

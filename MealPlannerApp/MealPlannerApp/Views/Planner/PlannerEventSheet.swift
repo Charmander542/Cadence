@@ -55,6 +55,7 @@ struct PlannerEventSheet: View {
             Form {
                 Section {
                     TextField("Title", text: $title)
+                        .font(.title3.weight(.semibold))
                         .onChange(of: title) { _, _ in applyParsedHints() }
                         .accessibilityLabel("Title")
                         .accessibilityValue(title.isEmpty ? "Empty" : title)
@@ -66,6 +67,12 @@ struct PlannerEventSheet: View {
                         .accessibilityLabel("Notes")
                         .accessibilityValue(notes.isEmpty ? "Empty" : notes)
                         .accessibilityHint("Optional notes for this event")
+                } header: {
+                    eventSectionHeader("EVENT")
+                } footer: {
+                    Text("Tips: tomorrow · #tag in the title")
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
                 }
 
                 Section {
@@ -120,6 +127,24 @@ struct PlannerEventSheet: View {
                             hint: "Opens end date and time picker in five-minute steps"
                         )
                     }
+                    Toggle("Reminder", isOn: $hasReminder)
+                        .accessibilityLabel("Reminder, \(hasReminder ? "on" : "off")")
+                        .accessibilityHint("Schedules notification before the event")
+                    if hasReminder {
+                        PlannerDateTimeRow(
+                            label: "Alert",
+                            date: Binding(
+                                get: { reminderDate },
+                                set: { reminderDate = DateSnapping.tenMinutes($0) }
+                            ),
+                            hint: "Opens alert time picker in five-minute steps"
+                        )
+                    }
+                } header: {
+                    eventSectionHeader("WHEN")
+                }
+
+                Section {
                     Picker("Repeat", selection: $recurrence) {
                         ForEach(TaskRecurrence.allCases) { item in
                             Text(item.title).tag(item)
@@ -153,22 +178,8 @@ struct PlannerEventSheet: View {
                             }
                         }
                     }
-                }
-
-                Section {
-                    Toggle("Reminder", isOn: $hasReminder)
-                        .accessibilityLabel("Reminder, \(hasReminder ? "on" : "off")")
-                        .accessibilityHint("Schedules notification before the event")
-                    if hasReminder {
-                        PlannerDateTimeRow(
-                            label: "Alert",
-                            date: Binding(
-                                get: { reminderDate },
-                                set: { reminderDate = DateSnapping.tenMinutes($0) }
-                            ),
-                            hint: "Opens alert time picker in five-minute steps"
-                        )
-                    }
+                } header: {
+                    eventSectionHeader("REPEAT")
                 }
 
                 if isEditing, let task = context.task {
@@ -178,10 +189,12 @@ struct PlannerEventSheet: View {
                             Spacer()
                             CountdownTrackButton(eventID: task.id)
                         }
-                        Text("Star one event to show it on the Countdown widget. Tapping the star again clears it.")
+                        Text("Star pins this event on the Countdown widget (days / hours / mins). Without a star, the soonest upcoming event is shown. Tap again to clear.")
                             .font(.footnote)
                             .foregroundStyle(Theme.muted)
                             .accessibilityAddTraits(.isStaticText)
+                    } header: {
+                        eventSectionHeader("WIDGET")
                     }
                 }
 
@@ -214,11 +227,14 @@ struct PlannerEventSheet: View {
                             .accessibilityLabel("Completed, \(isCompleted ? "on" : "off")")
                             .accessibilityHint("Marks event done or reopens it")
                     }
+                } header: {
+                    eventSectionHeader("ORGANIZE")
                 }
             }
             .scrollDismissesKeyboard(.never)
             .scrollContentBackground(.hidden)
             .background(Theme.canvas)
+            .tint(Theme.cta)
             .navigationTitle(isEditing ? "Edit Event" : "New Event")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -378,7 +394,7 @@ struct PlannerEventSheet: View {
     private func eventSectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.caption2.weight(.bold))
-            .tracking(0.8)
+            .tracking(0.7)
             .foregroundStyle(Theme.muted)
             .textCase(nil)
             .accessibilityAddTraits(.isHeader)

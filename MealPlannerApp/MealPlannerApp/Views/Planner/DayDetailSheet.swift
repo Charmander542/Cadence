@@ -28,11 +28,14 @@ struct DayDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button("CLOSE") { dismiss() }
+                        .font(.caption.weight(.bold))
+                        .tracking(0.5)
                         .foregroundStyle(Theme.cta)
                         .accessibilityHint("Closes day agenda")
                 }
             }
+            .tint(Theme.cta)
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
@@ -105,12 +108,7 @@ struct DayAgendaSection: View {
             } else {
                 if !dayTasks.isEmpty {
                     VStack(alignment: .leading, spacing: Theme.Space.sm) {
-                        Text("Tasks")
-                            .font(.caption2.weight(.bold))
-                            .tracking(0.6)
-                            .textCase(.uppercase)
-                            .foregroundStyle(Theme.muted)
-                            .accessibilityAddTraits(.isHeader)
+                        daySectionHeader("TASKS")
                         ForEach(dayTasks) { task in
                             Button {
                                 editingTask = task
@@ -126,7 +124,7 @@ struct DayAgendaSection: View {
                                     if task.isOverdue {
                                         Text("OVERDUE")
                                             .font(.caption2.weight(.bold))
-                                            .tracking(0.6)
+                                            .tracking(0.7)
                                             .foregroundStyle(Theme.danger)
                                             .accessibilityHidden(true)
                                     }
@@ -152,12 +150,7 @@ struct DayAgendaSection: View {
                 }
                 if !dayEvents.isEmpty {
                     VStack(alignment: .leading, spacing: Theme.Space.sm) {
-                        Text("Events")
-                            .font(.caption2.weight(.bold))
-                            .tracking(0.6)
-                            .textCase(.uppercase)
-                            .foregroundStyle(Theme.muted)
-                            .accessibilityAddTraits(.isHeader)
+                        daySectionHeader("EVENTS")
                         ForEach(dayEvents) { event in
                             HStack(spacing: 4) {
                                 CountdownTrackButton(eventID: event.id)
@@ -214,6 +207,14 @@ struct DayAgendaSection: View {
         }
     }
 
+    private func daySectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption2.weight(.bold))
+            .tracking(0.7)
+            .foregroundStyle(Theme.muted)
+            .accessibilityAddTraits(.isHeader)
+    }
+
     private func dayTaskAccessibilityLabel(_ task: PlannerTaskEntity) -> String {
         var parts = [task.title]
         if task.isOverdue { parts.append("overdue") }
@@ -264,7 +265,12 @@ struct WorkoutDayDetailCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Theme.Space.md + 2) {
+            Text("WORKOUT")
+                .font(.caption2.weight(.bold))
+                .tracking(0.7)
+                .foregroundStyle(Theme.muted)
+                .accessibilityAddTraits(.isHeader)
             if let scheduled {
                 scheduledHeader(scheduled)
                 if let log = dayLog, let workout = log.decoded() {

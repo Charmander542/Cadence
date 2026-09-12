@@ -17,9 +17,17 @@ struct SpendItemDetailView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Space.lg) {
+                VStack(alignment: .leading, spacing: Theme.Space.md) {
                     hero
-                    detailsCard
+                    VStack(alignment: .leading, spacing: Theme.Space.sm) {
+                        Text("DETAILS")
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.7)
+                            .foregroundStyle(Theme.muted)
+                            .padding(.horizontal, Theme.Space.lg)
+                            .accessibilityAddTraits(.isHeader)
+                        detailsCard
+                    }
                     if item.useMode == .tapToLog {
                         Theme.PrimaryButton(title: "LOG USE", systemImage: "plus.circle.fill") {
                             SpendStore.logUse(item, in: modelContext)
@@ -29,14 +37,16 @@ struct SpendItemDetailView: View {
                     }
                     history
                 }
-                .padding(.vertical, Theme.Space.lg)
+                .padding(.vertical, Theme.Space.md)
             }
             .background(Theme.canvas.ignoresSafeArea())
             .navigationTitle(item.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                    Button("DONE") { dismiss() }
+                        .font(.caption.weight(.bold))
+                        .tracking(0.5)
                         .foregroundStyle(Theme.cta)
                 }
             }
@@ -48,7 +58,7 @@ struct SpendItemDetailView: View {
             VStack(alignment: .leading, spacing: Theme.Space.sm) {
                 Text("COST TO USE IT")
                     .font(.caption2.weight(.bold))
-                    .tracking(0.8)
+                    .tracking(0.7)
                     .foregroundStyle(Theme.muted)
                 Text(item.costPerUse.map(SpendFormat.money) ?? "Log a use to begin")
                     .font(Theme.display(.largeTitle))
@@ -94,7 +104,7 @@ struct SpendItemDetailView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Theme.ink)
         }
-        .padding(.vertical, Theme.Space.sm + 2)
+        .padding(.vertical, Theme.Space.sm)
     }
 
     @ViewBuilder
@@ -103,15 +113,27 @@ struct SpendItemDetailView: View {
             VStack(alignment: .leading, spacing: Theme.Space.sm) {
                 Text("USE LOG")
                     .font(.caption2.weight(.bold))
-                    .tracking(0.8)
+                    .tracking(0.7)
                     .foregroundStyle(Theme.muted)
                     .padding(.horizontal, Theme.Space.lg)
                     .accessibilityAddTraits(.isHeader)
                 if logs.isEmpty {
-                    Text("No uses logged yet.")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.muted)
-                        .padding(.horizontal, Theme.Space.lg)
+                    Theme.Card {
+                        VStack(spacing: Theme.Space.sm) {
+                            Theme.IconWell(systemImage: "hand.tap", tint: Theme.muted, size: 40)
+                            Text("NO USES YET")
+                                .font(.caption2.weight(.bold))
+                                .tracking(0.7)
+                                .foregroundStyle(Theme.muted)
+                            Text("Log a use to start cost-per-use.")
+                                .font(.subheadline)
+                                .foregroundStyle(Theme.muted)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Space.md)
+                    }
+                    .padding(.horizontal, Theme.Space.lg)
                 } else {
                     Theme.Card {
                         VStack(spacing: 0) {

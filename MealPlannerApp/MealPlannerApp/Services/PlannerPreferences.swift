@@ -108,6 +108,12 @@ enum PlannerPreferences {
         set { defaults.set(newValue, forKey: "planner.appleCalendarsSelectionInitialized") }
     }
 
+    /// Pull events from selected Apple/iOS calendars into Cadence’s calendar view.
+    static var importFromAppleCalendar: Bool {
+        get { defaults.bool(forKey: "planner.importFromAppleCalendar") }
+        set { defaults.set(newValue, forKey: "planner.importFromAppleCalendar") }
+    }
+
     static func setAppleCalendarEnabled(_ calendarID: String, enabled: Bool) {
         var set = appleCalendarIdentifiers
         if enabled {
@@ -165,6 +171,12 @@ enum PlannerPreferences {
     static var googleCalendarsSelectionInitialized: Bool {
         get { defaults.bool(forKey: "planner.googleCalendarsSelectionInitialized") }
         set { defaults.set(newValue, forKey: "planner.googleCalendarsSelectionInitialized") }
+    }
+
+    /// Pull events from selected Google calendars into Cadence’s calendar view.
+    static var importFromGoogleCalendar: Bool {
+        get { defaults.bool(forKey: "planner.importFromGoogleCalendar") }
+        set { defaults.set(newValue, forKey: "planner.importFromGoogleCalendar") }
     }
 
     static func setGoogleCalendarEnabled(_ calendarID: String, enabled: Bool) {

@@ -151,7 +151,7 @@ struct WorkoutSessionPreviewView: View {
         } label: {
             Text("START WORKOUT")
                 .font(.headline.weight(.bold))
-                .tracking(0.6)
+                .tracking(0.7)
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, Theme.Space.lg)

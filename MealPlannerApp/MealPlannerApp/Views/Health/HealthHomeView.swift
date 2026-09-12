@@ -6,7 +6,6 @@ import UIKit
 /// Mobbin/Bevel: dashboard rings, vital pillars; Tonal/Hevy lift CTA.
 struct HealthHomeView: View {
     @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject private var appModel: AppModel
     var onOpenDrawer: () -> Void = {}
 
     @Query(sort: \HealthDaySnapshotEntity.dayStart, order: .reverse)
@@ -77,12 +76,6 @@ struct HealthHomeView: View {
                 pulse = true
             }
             Task { await sync(forcePrompt: false) }
-        }
-        .onChange(of: appModel.requestedFABAction) { _, action in
-            guard action == .healthCheckIn else { return }
-            segment = .overview
-            showDetail = .recovery
-            appModel.requestedFABAction = nil
         }
         .sheet(isPresented: $showSettings) {
             NavigationStack {

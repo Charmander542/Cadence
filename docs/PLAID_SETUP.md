@@ -66,10 +66,13 @@ Sandbox non-OAuth institutions work without this.
 - Spend home → **SYNC**, or Settings → **Sync transactions**.
 - New Items may take a few seconds before transactions appear; sync again if the first pull is empty.
 
-## 6. Security
+## 6. Security & persistence
 
-- Secret and Item access tokens live in the **Keychain** on device.
-- Fine for a personal 2-person app; for App Store shipping, move `link/token/create` + token exchange to a tiny backend.
+- Secret and Item access tokens live in the **Keychain**.
+- Cadence also keeps a Keychain **Item registry** (item id + bank name). If SwiftData is wiped on rebuild, enrollments are **restored from Keychain** on launch.
+- **iCloud Keychain sync** (Settings → Spend → Backup, on by default): marks those Keychain items as synchronizable so delete/reinstall on the **same Apple ID** (with Passwords & Keychain enabled) can bring connections back without re-Linking / burning Trial Items.
+- Turn sync off if you want tokens device-only.
+- Fine for a personal app; for App Store shipping, move `link/token/create` + token exchange to a tiny backend.
 - If a secret was pasted into chat or committed, **rotate it** in the Plaid Dashboard immediately.
 
 ## 7. Code map
