@@ -420,7 +420,10 @@ enum SpendStore {
                 enrollmentID: itemID,
                 isSandbox: isSandbox
             )
-            enrollment.syncCursor = KeychainStore.plaidSyncCursor(itemID: itemID)
+            // Local SwiftData was wiped; any Keychain sync cursor is stale and would
+            // make /transactions/sync return only empty deltas (no historical txs).
+            enrollment.syncCursor = ""
+            KeychainStore.savePlaidSyncCursor("", itemID: itemID)
             context.insert(enrollment)
             KeychainStore.upsertPlaidItemRecord(
                 itemID: itemID,
@@ -445,7 +448,7 @@ enum SpendStore {
                         isSandbox: enrollment.isSandbox
                     )
                 }
-                _ = try? await syncEnrollment(enrollment, in: context)
+                _ = try? await syncEnrollment(enrollment, in: context, forceFullResync: true)
             }
             try? context.save()
         }
@@ -527,7 +530,8 @@ enum SpendStore {
     @discardableResult
     static func syncEnrollment(
         _ enrollment: SpendEnrollmentEntity,
-        in context: ModelContext
+        in context: ModelContext,
+        forceFullResync: Bool = false
     ) async throws -> Int {
         guard let secret = KeychainStore.loadPlaidSecret(), !secret.isEmpty else {
             throw PlaidClient.PlaidError.missingCredentials
@@ -537,23 +541,32 @@ enum SpendStore {
             throw PlaidClient.PlaidError.missingCredentials
         }
 
+        let env: SpendPreferences.PlaidEnvironment = enrollment.isSandbox ? .sandbox : .production
         let client = PlaidClient()
         let accounts = try await client.fetchAccounts(
             clientID: SpendPreferences.clientID,
             secret: secret,
-            environment: SpendPreferences.environment,
+            environment: env,
             accessToken: accessToken
         )
         let accountNames = Dictionary(uniqueKeysWithValues: accounts.accounts.map { ($0.account_id, $0.displayName) })
 
-        let cursor = enrollment.syncCursor.isEmpty
+        var cursor = enrollment.syncCursor.isEmpty
             ? KeychainStore.plaidSyncCursor(itemID: enrollment.enrollmentID)
             : enrollment.syncCursor
+
+        // After a store wipe we can keep a Keychain cursor with no local txs — force a full pull.
+        let shouldResetCursor = forceFullResync || (!cursor.isEmpty && !hasLocalPlaidTransactions(in: context))
+        if shouldResetCursor {
+            cursor = ""
+            enrollment.syncCursor = ""
+            KeychainStore.savePlaidSyncCursor("", itemID: enrollment.enrollmentID)
+        }
 
         let result = try await client.syncAllTransactions(
             clientID: SpendPreferences.clientID,
             secret: secret,
-            environment: SpendPreferences.environment,
+            environment: env,
             accessToken: accessToken,
             cursor: cursor
         )
@@ -570,6 +583,12 @@ enum SpendStore {
         KeychainStore.savePlaidSyncCursor(result.nextCursor, itemID: enrollment.enrollmentID)
         try context.save()
         return result.added.count + result.modified.count
+    }
+
+    /// True when SwiftData already holds at least one non-demo Plaid/Teller transaction.
+    private static func hasLocalPlaidTransactions(in context: ModelContext) -> Bool {
+        let rows = (try? context.fetch(FetchDescriptor<SpendTransactionEntity>())) ?? []
+        return rows.contains { !$0.remoteID.hasPrefix("demo-") }
     }
 
     static func syncAllEnrollments(in context: ModelContext) async throws -> Int {

@@ -2390,8 +2390,20 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 | Field | Value |
 |-------|-------|
 | **Phase** | `RUNNING` |
-| **Next batch** | **KS** |
-| **Summary** | Reverted KR breakdown trailing inset (broke card alignment). Next: KS. |
+| **Next batch** | **KU** |
+| **Summary** | Plaid spend history heal: clear stale sync cursor after store wipe so old txs re-pull. Next: KU. |
+
+### Batch KU — Plaid spend sync (user)
+
+- [x] **Stale cursor after SwiftData wipe** — restore/sync cleared Keychain cursor when local Plaid txs missing; sandbox-aware sync; Link lookback 730d. — 2026-09-12
+  → Fix: `SpendStore.restorePlaidEnrollmentsIfNeeded` / `syncEnrollment`; `PlaidClient` days_requested; Spend home auto-heal SYNC.
+- [x] **Append**.
+
+### Batch KT — Idle dock height (user)
+
+- [x] **Idle black too low** — restore prior taller bar minus a couple px. — 2026-09-12
+  → Fix: `WheelNav.dockPlate` `idleBarHeight` `dialHeight - 6` → `dialHeight + 6`.
+- [x] **Append**.
 
 ### Batch KS — Fresh UX audit (post-KR)
 

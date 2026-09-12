@@ -109,8 +109,8 @@ struct WheelNav: View {
     /// Circle mode: the arc tip fades in opacity so page content soft-blends above the icons.
     private var dockPlate: some View {
         let awake = max(0, 1 - idleAmount)
-        // Slightly under dialHeight so padding above/below idle icons reads even (incl. home indicator).
-        let idleBarHeight: CGFloat = dialHeight - 6
+        // Prior taller idle was dialHeight + 8; a couple px shorter for even icon padding.
+        let idleBarHeight: CGFloat = dialHeight + 12
         let arcRise: CGFloat = 40 * awake
 
         return VStack(spacing: 0) {
@@ -259,9 +259,9 @@ struct WheelNav: View {
             let neighborOpacity: CGFloat = colorScheme == .dark ? 0.42 : 0.72
             let iconOpacity: CGFloat = isCenter ? 1.0 : neighborOpacity
 
-            // Flat pill layout (idle) — 5 evenly spaced slots, vertically centered in the dock bar.
+            // Flat pill layout (idle) — 5 evenly spaced slots, seated a bit lower in the dock bar.
             let flatX = midX + CGFloat(delta) * flatIconSpacing
-            let flatY = midY + 14
+            let flatY = midY + 26
 
             let x = arcX + (flatX - arcX) * t
             let y = arcY + (flatY - arcY) * t

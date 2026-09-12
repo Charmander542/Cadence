@@ -140,7 +140,8 @@ actor PlaidClient {
             "country_codes": ["US"],
             "user": ["client_user_id": clientUserID],
             "products": ["transactions"],
-            "transactions": ["days_requested": 90],
+            // Max historical window for new Items / empty-cursor sync (Plaid cap is 730).
+            "transactions": ["days_requested": 730],
         ]
         if let redirectURI, !redirectURI.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             body["redirect_uri"] = redirectURI.trimmingCharacters(in: .whitespacesAndNewlines)

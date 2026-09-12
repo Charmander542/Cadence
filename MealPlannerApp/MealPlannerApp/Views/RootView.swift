@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct RootView: View {
     @EnvironmentObject private var appModel: AppModel
@@ -300,15 +301,22 @@ struct MainTabView: View {
                 ))
             }
         }
-        // Left-edge swipe opens the sidebar (grab the left of the screen).
+        // Left-edge swipe opens the sidebar — stop above the dial so menu swipes win.
         .overlay(alignment: .leading) {
             if !showDrawer {
-                Color.clear
-                    .frame(width: sidebarEdgeWidth)
-                    .frame(maxHeight: .infinity)
-                    .contentShape(Rectangle())
-                    .gesture(sidebarOpenEdgeGesture)
-                    .accessibilityHidden(true)
+                VStack(spacing: 0) {
+                    Color.clear
+                        .frame(width: sidebarEdgeWidth)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .gesture(sidebarOpenEdgeGesture)
+                    // Dead zone over the wheel / home-indicator band.
+                    Color.clear
+                        .frame(width: sidebarEdgeWidth, height: PlannerChromeMetrics.dialLayoutHeight + 44)
+                        .allowsHitTesting(false)
+                }
+                .ignoresSafeArea(edges: .bottom)
+                .accessibilityHidden(true)
             }
         }
         // Live preview while dragging the edge open.
@@ -416,10 +424,19 @@ struct MainTabView: View {
     private var sidebarOpenEdgeGesture: some Gesture {
         DragGesture(minimumDistance: 8, coordinateSpace: .global)
             .onChanged { value in
+                // Ignore pulls that began in the dial / menu band.
+                guard !startsInDialBand(value.startLocation) else {
+                    if sidebarOpenDragX != 0 { sidebarOpenDragX = 0 }
+                    return
+                }
                 guard abs(value.translation.width) >= abs(value.translation.height) * 0.55 else { return }
                 sidebarOpenDragX = min(sidebarWidth, max(0, value.translation.width))
             }
             .onEnded { value in
+                guard !startsInDialBand(value.startLocation) else {
+                    sidebarOpenDragX = 0
+                    return
+                }
                 let shouldOpen = value.translation.width > sidebarOpenThreshold
                     || value.predictedEndTranslation.width > sidebarOpenThreshold * 1.25
                 if shouldOpen {
@@ -433,6 +450,16 @@ struct MainTabView: View {
                     }
                 }
             }
+    }
+
+    private func startsInDialBand(_ globalPoint: CGPoint) -> Bool {
+        let screenHeight = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?
+            .screen.bounds.height
+            ?? UIScreen.main.bounds.height
+        let band = PlannerChromeMetrics.dialLayoutHeight + 44
+        return globalPoint.y >= screenHeight - band
     }
 
     private var pageContent: some View {

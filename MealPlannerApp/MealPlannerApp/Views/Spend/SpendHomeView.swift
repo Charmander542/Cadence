@@ -203,6 +203,11 @@ struct SpendHomeView: View {
         .onAppear {
             SpendPreferences.ingestLocalSecretsIfNeeded()
             SpendStore.seedDemoIfNeeded(in: modelContext)
+            // Heal empty Plaid history after a store wipe left a stale sync cursor.
+            let hasPlaidTxs = transactions.contains { !$0.remoteID.hasPrefix("demo-") }
+            if !enrollments.isEmpty, !hasPlaidTxs, !isSyncing {
+                Task { await syncNow() }
+            }
         }
         .onChange(of: monthOffset) { _, _ in
             collapsePieFocus()
