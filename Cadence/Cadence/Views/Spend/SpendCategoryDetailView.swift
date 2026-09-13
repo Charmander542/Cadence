@@ -375,7 +375,7 @@ struct SpendCategoryDetailView: View {
                                         HStack(spacing: 6) {
                                             Text(tx.merchant)
                                                 .font(.subheadline.weight(.medium))
-                                                .foregroundStyle(Theme.ink)
+                                                .foregroundStyle(tx.isIgnored ? Theme.muted : Theme.ink)
                                                 .lineLimit(1)
                                             if !tx.trimmedDescription.isEmpty {
                                                 Text(tx.trimmedDescription)
@@ -391,7 +391,7 @@ struct SpendCategoryDetailView: View {
                                     Spacer()
                                     Text(SpendFormat.money(tx.amount))
                                         .font(.subheadline.weight(.semibold).monospacedDigit())
-                                        .foregroundStyle(Theme.ink)
+                                        .foregroundStyle(tx.isIgnored ? Theme.muted : Theme.ink)
                                 }
                                 .padding(.horizontal, Theme.Space.md)
                                 .padding(.vertical, Theme.Space.sm)
@@ -632,17 +632,12 @@ private struct SpendCategoryTransactionEditor: View {
                     LabeledContent("Amount", value: SpendFormat.money(transaction.amount))
                 }
                 Section("Description") {
-                    TextField("What was this for?", text: Binding(
-                        get: { transaction.notes },
-                        set: { newValue in
-                            transaction.notes = newValue
-                            SpendStore.syncTrackedTitle(from: transaction, in: modelContext)
-                            try? modelContext.save()
-                        }
-                    ), axis: .vertical)
-                    .lineLimit(3...8)
-                    .accessibilityLabel("Description")
-                    .accessibilityHint("Optional note used as the cost per use name")
+                    SpendPurchaseDescriptionField(initial: transaction.notes) { text in
+                        guard text != transaction.notes else { return }
+                        transaction.notes = text
+                        SpendStore.syncTrackedTitle(from: transaction, in: modelContext)
+                        try? modelContext.save()
+                    }
                 }
                 Section("Category") {
                     SpendCategoryAssignmentFields(

@@ -176,6 +176,11 @@ extension View {
         background(CadenceKeyboardDismissInstaller())
     }
 
+    func cadenceKeepKeyboardWhilePresented() -> some View {
+        onAppear { CadenceKeyboard.setDismissOnTapSuspended(true) }
+            .onDisappear { CadenceKeyboard.setDismissOnTapSuspended(false) }
+    }
+
     /// Toolbar "Done" above the keyboard (especially for number pads that have no return key).
     func cadenceKeyboardDoneButton() -> some View {
         toolbar {
@@ -198,6 +203,11 @@ enum CadenceKeyboard {
             from: nil,
             for: nil
         )
+    }
+
+    /// Quick Add and similar sheets keep the title field focused while using toggles / menus.
+    static func setDismissOnTapSuspended(_ suspended: Bool) {
+        CadenceKeyboardDismissTap.shared.setSuspended(suspended)
     }
 }
 
@@ -255,7 +265,18 @@ private final class CadenceKeyboardDismissTap: NSObject, UIGestureRecognizerDele
         recognizer = tap
     }
 
+    private var suspendCount = 0
+
+    func setSuspended(_ suspended: Bool) {
+        if suspended {
+            suspendCount += 1
+        } else {
+            suspendCount = max(0, suspendCount - 1)
+        }
+    }
+
     @objc private func dismissKeyboard() {
+        guard suspendCount == 0 else { return }
         CadenceKeyboard.dismiss()
     }
 

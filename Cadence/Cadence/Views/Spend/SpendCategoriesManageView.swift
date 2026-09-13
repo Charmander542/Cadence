@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 /// Manage custom subcategories — Rocket Money Categories / New Category flow.
 struct SpendCategoriesManageView: View {
@@ -21,6 +22,27 @@ struct SpendCategoriesManageView: View {
                     .font(.footnote)
                     .foregroundStyle(Theme.muted)
                     .listRowBackground(Theme.surface)
+            }
+
+            Section {
+                HStack(alignment: .top, spacing: Theme.Space.sm) {
+                    Image(systemName: SpendCategory.ignore.systemImage)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(SpendCategory.ignore.tint)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(SpendCategory.ignore.tint.opacity(0.22)))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(SpendCategory.ignore.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.ink)
+                        Text("Savings-account activity is filed here automatically. It stays off the pie and does not count toward your budget.")
+                            .font(.footnote)
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
+                .listRowBackground(Theme.surface)
+            } header: {
+                Text("Ignore")
             }
 
             Section {
@@ -386,6 +408,88 @@ private struct ManageNewUserCategorySheet: View {
     }
 }
 
+/// Isolated from SwiftData so keystrokes don’t refresh the purchase sheet.
+struct SpendPurchaseDescriptionField: View {
+    let initial: String
+    var onCommit: (String) -> Void
+    @State private var draft: String
+
+    init(initial: String, onCommit: @escaping (String) -> Void) {
+        self.initial = initial
+        self.onCommit = onCommit
+        _draft = State(initialValue: initial)
+    }
+
+    var body: some View {
+        SpendUntrackedTextView(text: $draft, placeholder: "What was this for?")
+            .frame(minHeight: 88, maxHeight: 120)
+            .accessibilityLabel("Description")
+            .accessibilityHint("Optional note used as the cost per use name")
+            .onDisappear { onCommit(draft) }
+    }
+}
+
+/// UIKit text view — SwiftUI TextField inside a SwiftData List was dropping frames.
+private struct SpendUntrackedTextView: UIViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> UITextView {
+        let view = UITextView()
+        view.delegate = context.coordinator
+        view.font = .preferredFont(forTextStyle: .body)
+        view.backgroundColor = .clear
+        view.textContainerInset = UIEdgeInsets(top: 6, left: -4, bottom: 6, right: 0)
+        view.textContainer.lineFragmentPadding = 0
+        view.adjustsFontForContentSizeCategory = true
+        view.isScrollEnabled = true
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        context.coordinator.placeholder = placeholder
+        view.text = text.isEmpty ? placeholder : text
+        view.textColor = text.isEmpty ? .placeholderText : .label
+        return view
+    }
+
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        context.coordinator.parent = self
+        context.coordinator.placeholder = placeholder
+        if !uiView.isFirstResponder, uiView.text != text, !(text.isEmpty && uiView.text == placeholder) {
+            uiView.text = text.isEmpty ? placeholder : text
+            uiView.textColor = text.isEmpty ? .placeholderText : .label
+        }
+    }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        var parent: SpendUntrackedTextView
+        var placeholder: String = ""
+
+        init(_ parent: SpendUntrackedTextView) {
+            self.parent = parent
+        }
+
+        func textViewDidBeginEditing(_ textView: UITextView) {
+            if textView.textColor == .placeholderText {
+                textView.text = ""
+                textView.textColor = .label
+            }
+        }
+
+        func textViewDidChange(_ textView: UITextView) {
+            parent.text = textView.text
+        }
+
+        func textViewDidEndEditing(_ textView: UITextView) {
+            if textView.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                textView.text = placeholder
+                textView.textColor = .placeholderText
+                parent.text = ""
+            }
+        }
+    }
+}
+
 /// Category + optional subcategory pickers shared by purchase editors.
 struct SpendCategoryAssignmentFields: View {
     @Environment(\.modelContext) private var modelContext
@@ -407,7 +511,7 @@ struct SpendCategoryAssignmentFields: View {
             get: { currentTag },
             set: { apply(tag: $0) }
         )) {
-            ForEach(SpendCategory.spendingCases) { cat in
+            ForEach(SpendCategory.pickerCases) { cat in
                 Label(cat.title, systemImage: cat.systemImage).tag("b-\(cat.rawValue)")
             }
             ForEach(userCategories, id: \.id) { cat in

@@ -2391,7 +2391,7 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 |-------|-------|
 | **Phase** | `PAUSED` |
 | **Next batch** | **LN** |
-| **Summary** | User asked to stop batch edits. LL calendar today swipe lag fix stands; no further UX batches until resumed. |
+| **Summary** | Paused. Spend: list all linked banks; Ignore category for savings (off pie/budget). |
 
 ### Batch LL — Calendar today swipe lag (user)
 
