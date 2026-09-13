@@ -233,7 +233,7 @@ def main() -> int:
     print(f"wrote {len(cleaned)} recipes → {store.db_path}")
     print("stats:", totals)
 
-    dest = ROOT / "MealPlannerApp" / "MealPlannerApp" / "Resources" / "recipes.sqlite3"
+    dest = ROOT / "Cadence" / "Cadence" / "Resources" / "recipes.sqlite3"
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(store.db_path, dest)
     print(f"copied → {dest}")

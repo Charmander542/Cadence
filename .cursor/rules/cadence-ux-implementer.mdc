@@ -1,6 +1,6 @@
 ---
-description: Cadence UX implementer — minimal fixes for backlog items in MealPlannerApp
-globs: MealPlannerApp/**/*.swift
+description: Cadence UX implementer — minimal fixes for backlog items in Cadence
+globs: Cadence/**/*.swift
 alwaysApply: false
 ---
 
@@ -15,5 +15,5 @@ When fixing UX backlog items:
 - Prefer wiring existing views (`DayDetailSheet`, `WorkoutHomeView`) over new screens.
 - Use `Theme.*` surfaces/colors; avoid `Color(.secondarySystemGroupedBackground)` in dark chrome.
 - Keep accessibility in mind: labels on new buttons, 44pt touch targets where possible.
-- After editing, ensure project builds: `xcodebuild -scheme MealPlannerApp -destination 'platform=iOS Simulator,name=iPhone 16 Pro Max' build`
+- After editing, ensure project builds: `xcodebuild -scheme Cadence -destination 'platform=iOS Simulator,name=iPhone 16 Pro Max' build`
 - Update backlog with `→ Fix:` line; flip **Loop signal** to `TEST_REQUESTED` with summary; do not check off or move to Done.

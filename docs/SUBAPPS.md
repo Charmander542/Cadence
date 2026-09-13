@@ -6,7 +6,7 @@ Domain logic stays inside each module — only Theme, navigation, and optional T
 ## Layout
 
 ```
-MealPlannerApp/MealPlannerApp/
+Cadence/Cadence/
   SubApps/CadenceSubApp.swift
   Models/SpendModels.swift | HealthModels.swift | NewsModels.swift
   Services/…Spend* | …Health* | …News*
@@ -17,7 +17,7 @@ MealPlannerApp/MealPlannerApp/
 
 1. Add `CadenceSubAppID` + manifest in `CadenceSubApp.swift`.
 2. Add `WheelDestination` + `pageContent` in `RootView`.
-3. Register SwiftData models; bump store name in `MealPlannerAppApp`.
+3. Register SwiftData models; bump store name in `CadenceApp`.
 4. Add `SettingsRoute` + Settings row / catalog.
 5. Keep code under `Models/` + `Services/` + `Views/<Name>/`.
 6. Document setup in `docs/` and set manifest `docsPath`.

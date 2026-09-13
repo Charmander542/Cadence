@@ -19,14 +19,14 @@ The planner scores dinners for **shared groceries** (smaller shopping list) and 
 |------|------|
 | `backend/based-cooking/` | Vendored Based-Cooking: scrape, parse, FTS store, `plan_week` |
 | `scripts/build_recipe_store.py` | Import legacy JSON + scrape based.cooking → `data/recipes.sqlite3` |
-| `MealPlannerApp/` | SwiftUI app (iOS 18.6+) |
+| `Cadence/` | SwiftUI app (iOS 18.6+) |
 
 ## Build the recipe database
 
 ```bash
 cd ~/Projects/MuscleMeal
 python3 scripts/build_recipe_store.py
-# copies data/recipes.sqlite3 → MealPlannerApp/MealPlannerApp/Resources/recipes.sqlite3
+# copies data/recipes.sqlite3 → Cadence/Cadence/Resources/recipes.sqlite3
 ```
 
 To add Joy of Cooking / Food Lab / etc., drop EPUBs next to Based-Cooking and run:
@@ -42,6 +42,6 @@ Current bundled snapshot is the Based-Cooking store (~4,560 recipes: Joy of Cook
 
 ## App
 
-Open `MealPlannerApp/MealPlannerApp.xcodeproj` in Xcode 16+. No API key is required to generate a week.
+Open `Cadence/Cadence.xcodeproj` in Xcode 16+. No API key is required to generate a week.
 
 Planning is `WeekPlanner` (Swift port of `based_cooking.plan.plan_week`). Optional Claude/OpenAI is only for retuning macros.

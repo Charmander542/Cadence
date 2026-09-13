@@ -7,6 +7,6 @@ scraper/config.yaml
 *.xcuserstate
 xcuserdata/
 DerivedData/
-MealPlannerApp/MealPlannerApp/PlaidLocal.plist
+Cadence/Cadence/PlaidLocal.plist
 **/.env
 **/Secrets.local.*

@@ -22,7 +22,7 @@ log = logging.getLogger("scraper.run")
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="MuscleMeal recipe scraper")
+    parser = argparse.ArgumentParser(description="Cadence recipe scraper")
     parser.add_argument(
         "--sites",
         default="",
@@ -46,7 +46,7 @@ def main(argv: list[str] | None = None) -> int:
 
     fetcher = Fetcher(
         cache_dir=paths["cache_dir"],
-        user_agent=cfg.get("user_agent", "MuscleMealScraper/1.0"),
+        user_agent=cfg.get("user_agent", "CadenceScraper/1.0"),
         delay_min=float(cfg.get("request_delay_min_s", 1.0)),
         delay_max=float(cfg.get("request_delay_max_s", 3.0)),
     )

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the Based-Cooking recipe store used by the iOS app.
 
-Keeps cookbook / based.cooking recipes only (no MuscleMeal web scrape).
+Keeps cookbook / based.cooking recipes only (no Cadence web scrape).
 Scrapes https://based.cooking/ and copies SQLite into the app bundle.
 """
 from __future__ import annotations
@@ -65,7 +65,7 @@ def main() -> int:
     store.replace_all(recipes)
     print(f"store: {len(recipes)} recipes → {store.db_path}")
 
-    dest_dir = ROOT / "MealPlannerApp" / "MealPlannerApp" / "Resources"
+    dest_dir = ROOT / "Cadence" / "Cadence" / "Resources"
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / "recipes.sqlite3"
     shutil.copy2(store.db_path, dest)

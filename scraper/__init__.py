@@ -1,3 +1,3 @@
-"""MuscleMeal recipe scraper package."""
+"""Cadence recipe scraper package."""
 
 __version__ = "0.1.0"

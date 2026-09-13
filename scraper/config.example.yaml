@@ -1,4 +1,4 @@
-# MuscleMeal scraper config
+# Cadence scraper config
 # Copy to config.yaml and edit. Never commit real API keys.
 
 # ai_provider: anthropic | openai
@@ -12,7 +12,7 @@ openai_model: "gpt-4o-mini"  # cheapest OpenAI chat model for these prompts
 
 ingredient_batch_size: 20
 
-user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 MuscleMealScraper/1.0"
+user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 CadenceScraper/1.0"
 request_delay_min_s: 1.0
 request_delay_max_s: 3.0
 

@@ -37,7 +37,7 @@ DEFAULT_UDID = "E06A7FB1-24AB-4F46-BEB9-9A0CFFEB83F0"
 DEFAULT_DEVICE = "iPhone 16 Pro Max (no Watch)"
 DEFAULT_BUNDLE = "com.musclemeal.app"
 DEFAULT_DERIVED = "/tmp/CadenceDerived"
-DEFAULT_APP = f"{DEFAULT_DERIVED}/Build/Products/Debug-iphonesimulator/MealPlannerApp.app"
+DEFAULT_APP = f"{DEFAULT_DERIVED}/Build/Products/Debug-iphonesimulator/Cadence.app"
 DEFAULT_SHOTS = "/tmp/cadence-spot-check"
 
 
@@ -59,7 +59,7 @@ class Config:
             app_path=os.environ.get("CADENCE_APP_PATH", DEFAULT_APP),
             shot_dir=os.environ.get("CADENCE_SHOT_DIR", DEFAULT_SHOTS),
             device_name=os.environ.get("CADENCE_DEVICE", DEFAULT_DEVICE),
-            project=str(ROOT / "MealPlannerApp/MealPlannerApp.xcodeproj"),
+            project=str(ROOT / "Cadence/Cadence.xcodeproj"),
             json_output=json_output,
         )
 
@@ -241,7 +241,7 @@ def cmd_build(cfg: Config) -> int:
     cmd = [
         "xcodebuild",
         "-scheme",
-        "MealPlannerApp",
+        "Cadence",
         "-project",
         cfg.project,
         "-destination",
@@ -545,7 +545,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("doctor", help="Check simctl, idb, app bundle")
-    sub.add_parser("build", help="xcodebuild MealPlannerApp for simulator")
+    sub.add_parser("build", help="xcodebuild Cadence for simulator")
     sub.add_parser("boot", help="Boot simulator and open Simulator.app")
     sub.add_parser("install", help="Install .app on simulator")
     sub.add_parser("terminate", help="Terminate Cadence")

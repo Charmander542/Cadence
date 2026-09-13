@@ -1,0 +1,1188 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		18F15663F19C4223A3EEB03D /* MealPlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000C /* MealPlanView.swift */; };
+		3547C8B09E8340F19F758606 /* RecipeDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* RecipeDatabase.swift */; };
+		471FB2F8C5854427A5BA441C /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* RootView.swift */; };
+		568BCD155DD24C00A0569191 /* SwiftDataModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000008 /* SwiftDataModels.swift */; };
+		A200000000000000000000C1 /* CadenceCloudStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000C1 /* CadenceCloudStore.swift */; };
+		6D76318202614CD9A0492EED /* CadenceApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* CadenceApp.swift */; };
+		73DED486B4AD4CD4A08B741F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* Models.swift */; };
+		8A2D4FCFCD91432C88E995D1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000F /* Assets.xcassets */; };
+		8A4E26B7B1C4424B8D69E782 /* LLMClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000006 /* LLMClient.swift */; };
+		A20000000000000000000015 /* WeekPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* WeekPlanner.swift */; };
+		A20000000000000000000016 /* LocalMacros.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* LocalMacros.swift */; };
+		A20000000000000000000017 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* Theme.swift */; };
+		A20000000000000000000018 /* BrowseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* BrowseView.swift */; };
+		A20000000000000000000019 /* recipes.sqlite3 in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* recipes.sqlite3 */; };
+		A2000000000000000000001A /* DislikeMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001A /* DislikeMatcher.swift */; };
+		A2000000000000000000001B /* WorkoutModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* WorkoutModels.swift */; };
+		A2000000000000000000001C /* WorkoutProgression.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001C /* WorkoutProgression.swift */; };
+		A2000000000000000000001D /* WorkoutHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001D /* WorkoutHomeView.swift */; };
+		A2000000000000000000001E /* ActiveWorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001E /* ActiveWorkoutView.swift */; };
+		A2000000000000000000001F /* SideCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001F /* SideCatalog.swift */; };
+		A20000000000000000000022 /* PlannerModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000022 /* PlannerModels.swift */; };
+		A20000000000000000000023 /* PlannerChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000023 /* PlannerChrome.swift */; };
+		A20000000000000000000024 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000024 /* TodayView.swift */; };
+		A20000000000000000000025 /* CalendarPlannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* CalendarPlannerView.swift */; };
+		A20000000000000000000026 /* HabitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000026 /* HabitsView.swift */; };
+		A20000000000000000000027 /* MatrixView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000027 /* MatrixView.swift */; };
+		A20000000000000000000028 /* WorkoutIntegration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000028 /* WorkoutIntegration.swift */; };
+		A20000000000000000000029 /* DayDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000029 /* DayDetailSheet.swift */; };
+		A2000000000000000000002A /* WorkoutVisuals.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002A /* WorkoutVisuals.swift */; };
+		A2000000000000000000002B /* WorkoutSessionPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002B /* WorkoutSessionPreviewView.swift */; };
+		A2000000000000000000002C /* ExerciseCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002C /* ExerciseCatalog.swift */; };
+		A2000000000000000000002D /* ExerciseGuideView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002D /* ExerciseGuideView.swift */; };
+		A2000000000000000000002E /* WorkoutKeypadEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002E /* WorkoutKeypadEditor.swift */; };
+		A2000000000000000000002F /* exercise_catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000002F /* exercise_catalog.json */; };
+		A20000000000000000000030 /* ExerciseImages in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000030 /* ExerciseImages */; };
+		A20000000000000000000034 /* WorkoutPrescription.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000034 /* WorkoutPrescription.swift */; };
+		A20000000000000000000035 /* PlannerPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000035 /* PlannerPreferences.swift */; };
+		A20000000000000000000036 /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000036 /* NotificationScheduler.swift */; };
+		A20000000000000000000037 /* CalendarSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000037 /* CalendarSyncService.swift */; };
+		A20000000000000000000038 /* GoogleCalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* GoogleCalendarService.swift */; };
+		A20000000000000000000039 /* PlannerSyncCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000039 /* PlannerSyncCoordinator.swift */; };
+		A2000000000000000000003A /* PlannerIntegrationsSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003A /* PlannerIntegrationsSettings.swift */; };
+		A2000000000000000000003B /* HabitIconCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003B /* HabitIconCatalog.swift */; };
+		A2000000000000000000003C /* NewHabitSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003C /* NewHabitSheet.swift */; };
+		A2000000000000000000003D /* PlannerEventSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003D /* PlannerEventSheet.swift */; };
+		A2000000000000000000003E /* TaskTitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003E /* TaskTitleParser.swift */; };
+		A2000000000000000000003F /* PlannerTaskUI.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000003F /* PlannerTaskUI.swift */; };
+		A200000000000000000000A9 /* NoteEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A9 /* NoteEditorView.swift */; };
+		A20000000000000000000040 /* TagCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* TagCatalog.swift */; };
+		A20000000000000000000042 /* SettingsDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000042 /* SettingsDetailViews.swift */; };
+		A20000000000000000000043 /* SettingsSearchCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000043 /* SettingsSearchCatalog.swift */; };
+		A20000000000000000000044 /* CountdownTracking.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000044 /* CountdownTracking.swift */; };
+		A20000000000000000000050 /* CadenceSubApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000050 /* CadenceSubApp.swift */; };
+		A20000000000000000000051 /* SpendModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000051 /* SpendModels.swift */; };
+		A20000000000000000000052 /* SpendPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000052 /* SpendPreferences.swift */; };
+		A20000000000000000000053 /* PlaidClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000053 /* PlaidClient.swift */; };
+		A20000000000000000000058 /* PlaidLinkCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000058 /* PlaidLinkCoordinator.swift */; };
+		PLAID00000000000000000003 /* LinkKit in Frameworks */ = {isa = PBXBuildFile; productRef = PLAID00000000000000000002 /* LinkKit */; };
+		A20000000000000000000054 /* SpendStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000054 /* SpendStore.swift */; };
+		A20000000000000000000055 /* SpendHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000055 /* SpendHomeView.swift */; };
+		A20000000000000000000056 /* SpendItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000056 /* SpendItemDetailView.swift */; };
+		A20000000000000000000057 /* SpendSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000057 /* SpendSettingsView.swift */; };
+		A20000000000000000000060 /* HealthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000060 /* HealthModels.swift */; };
+		A20000000000000000000061 /* HealthPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000061 /* HealthPreferences.swift */; };
+		A20000000000000000000062 /* HealthKitClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000062 /* HealthKitClient.swift */; };
+		A20000000000000000000063 /* HealthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000063 /* HealthStore.swift */; };
+		A2000000000000000000006B /* BevelScoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000006B /* BevelScoring.swift */; };
+		A20000000000000000000064 /* HealthHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000064 /* HealthHomeView.swift */; };
+		A20000000000000000000065 /* HealthMetricDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000065 /* HealthMetricDetailView.swift */; };
+		A20000000000000000000066 /* HealthSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000066 /* HealthSettingsView.swift */; };
+		A20000000000000000000067 /* HealthChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000067 /* HealthChrome.swift */; };
+		A2000000000000000000006C /* WorkoutDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000006C /* WorkoutDetailSheet.swift */; };
+		A20000000000000000000068 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000068 /* HealthKit.framework */; };
+		A200000000000000000000A6 /* FocusAppLockService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A6 /* FocusAppLockService.swift */; };
+		A200000000000000000000A7 /* FamilyControls.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A7 /* FamilyControls.framework */; };
+		A200000000000000000000A8 /* ManagedSettings.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A8 /* ManagedSettings.framework */; };
+		A20000000000000000000070 /* NewsModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000070 /* NewsModels.swift */; };
+		A20000000000000000000071 /* NewsPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000071 /* NewsPreferences.swift */; };
+		A20000000000000000000072 /* NewsClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000072 /* NewsClient.swift */; };
+		A20000000000000000000073 /* NewsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000073 /* NewsStore.swift */; };
+		A20000000000000000000074 /* NewsAIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000074 /* NewsAIService.swift */; };
+		A20000000000000000000075 /* NewsHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000075 /* NewsHomeView.swift */; };
+		A20000000000000000000076 /* NewsArticleDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000076 /* NewsArticleDetailView.swift */; };
+		A20000000000000000000077 /* NewsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000077 /* NewsSettingsView.swift */; };
+		A200000000000000000000A0 /* FocusModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A0 /* FocusModels.swift */; };
+		A200000000000000000000A1 /* FocusPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* FocusPreferences.swift */; };
+		A200000000000000000000A2 /* FocusStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A2 /* FocusStore.swift */; };
+		A200000000000000000000A3 /* FocusHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A3 /* FocusHomeView.swift */; };
+		A200000000000000000000A4 /* FocusStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A4 /* FocusStatsView.swift */; };
+		A200000000000000000000A5 /* FocusSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A5 /* FocusSettingsView.swift */; };
+		A200000000000000000000B0 /* SpendCategoryDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000B0 /* SpendCategoryDetailView.swift */; };
+		A200000000000000000000B1 /* SpendBudgetsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000B1 /* SpendBudgetsView.swift */; };
+		A200000000000000000000B2 /* SpendCategoriesManageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000B2 /* SpendCategoriesManageView.swift */; };
+		A20000000000000000000078 /* NewsChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000078 /* NewsChrome.swift */; };
+		A20000000000000000000080 /* CadenceAppsPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000080 /* CadenceAppsPreferences.swift */; };
+		A20000000000000000000081 /* AppsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000081 /* AppsSettingsView.swift */; };
+		A20000000000000000000099 /* CadenceAutomation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000099 /* CadenceAutomation.swift */; };
+		A2000000000000000000009A /* ShoppingRealism.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000009A /* ShoppingRealism.swift */; };
+		A2000000000000000000009B /* WheelNav.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000009B /* WheelNav.swift */; };
+		A2000000000000000000009C /* PlaceholderPageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000009C /* PlaceholderPageView.swift */; };
+		A7A054AF0C0F44CA98D0D9E9 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* KeychainStore.swift */; };
+		B10000000000000000000001 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* libsqlite3.tbd */; };
+		B20000000000000000000020 /* PlanningQualityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* PlanningQualityTests.swift */; };
+		B20000000000000000000034 /* WorkoutProgressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000034 /* WorkoutProgressionTests.swift */; };
+		B9FE25177E404B83B9FA4048 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000E /* SettingsView.swift */; };
+		BF828D29E6414E6A907D6852 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000B /* OnboardingView.swift */; };
+		C0BD516F0D2840DAB0D81C44 /* AIServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000009 /* AIServices.swift */; };
+		CDA549DCC0784220B652C4A7 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000A /* AppModel.swift */; };
+		E2A1B3C4D5E6F708192A3B4C /* MealNutrition.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* MealNutrition.swift */; };
+		E9ECB1BB5E2B4F36B27A6E69 /* GroceryConsolidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000007 /* GroceryConsolidator.swift */; };
+		F3B2C4D5E6F708192A3B4C5D /* RecipeHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* RecipeHistory.swift */; };
+		F80D34AAC56646EDBA5D9192 /* GroceryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000D /* GroceryListView.swift */; };
+		W20000000000000000000001 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = W10000000000000000000001 /* WidgetSnapshot.swift */; };
+		W20000000000000000000002 /* WidgetSnapshotWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = W10000000000000000000002 /* WidgetSnapshotWriter.swift */; };
+		W20000000000000000000004 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = W10000000000000000000001 /* WidgetSnapshot.swift */; };
+		W20000000000000000000005 /* CadenceWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = W10000000000000000000004 /* CadenceWidgets.swift */; };
+		W20000000000000000000006 /* CadenceWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = W10000000000000000000005 /* CadenceWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		W20000000000000000000007 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = W10000000000000000000006 /* WidgetKit.framework */; };
+		W20000000000000000000008 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = W10000000000000000000007 /* SwiftUI.framework */; };
+		W20000000000000000000009 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = W10000000000000000000008 /* AppIntents.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B30000000000000000000003 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D62FA5E29A38407C93B332DC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8AA6432C2CCC4B93BA7385B9;
+			remoteInfo = Cadence;
+		};
+		W30000000000000000000004 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D62FA5E29A38407C93B332DC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = W8AA6432C2CCC4B93BA7385BA;
+			remoteInfo = CadenceWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		WEDB432E633C64B529E2AFD98 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				W20000000000000000000006 /* CadenceWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		9E73C1B0E7AB445AB4CDE86D /* Cadence.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cadence.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000001 /* CadenceApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CadenceApp.swift; sourceTree = "<group>"; };
+		A10000000000000000000002 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		A10000000000000000000003 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		A10000000000000000000004 /* RecipeDatabase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeDatabase.swift; sourceTree = "<group>"; };
+		A10000000000000000000005 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		A10000000000000000000006 /* LLMClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMClient.swift; sourceTree = "<group>"; };
+		A10000000000000000000007 /* GroceryConsolidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryConsolidator.swift; sourceTree = "<group>"; };
+		A10000000000000000000008 /* SwiftDataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataModels.swift; sourceTree = "<group>"; };
+		A100000000000000000000C1 /* CadenceCloudStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CadenceCloudStore.swift; sourceTree = "<group>"; };
+		A10000000000000000000009 /* AIServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIServices.swift; sourceTree = "<group>"; };
+		A1000000000000000000000A /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		A1000000000000000000000B /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		A1000000000000000000000C /* MealPlanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealPlanView.swift; sourceTree = "<group>"; };
+		A1000000000000000000000D /* GroceryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryListView.swift; sourceTree = "<group>"; };
+		A1000000000000000000000E /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A1000000000000000000000F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A10000000000000000000011 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		A10000000000000000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000000000000000000013 /* MealNutrition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MealNutrition.swift; sourceTree = "<group>"; };
+		A10000000000000000000014 /* RecipeHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecipeHistory.swift; sourceTree = "<group>"; };
+		A10000000000000000000015 /* WeekPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekPlanner.swift; sourceTree = "<group>"; };
+		A10000000000000000000016 /* LocalMacros.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMacros.swift; sourceTree = "<group>"; };
+		A10000000000000000000017 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		A10000000000000000000018 /* BrowseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseView.swift; sourceTree = "<group>"; };
+		A10000000000000000000019 /* recipes.sqlite3 */ = {isa = PBXFileReference; lastKnownFileType = file; path = recipes.sqlite3; sourceTree = "<group>"; };
+		A1000000000000000000001A /* DislikeMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DislikeMatcher.swift; sourceTree = "<group>"; };
+		A1000000000000000000001B /* WorkoutModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutModels.swift; sourceTree = "<group>"; };
+		A1000000000000000000001C /* WorkoutProgression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutProgression.swift; sourceTree = "<group>"; };
+		A1000000000000000000001D /* WorkoutHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutHomeView.swift; sourceTree = "<group>"; };
+		A1000000000000000000001E /* ActiveWorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveWorkoutView.swift; sourceTree = "<group>"; };
+		A1000000000000000000001F /* SideCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SideCatalog.swift; sourceTree = "<group>"; };
+		A10000000000000000000022 /* PlannerModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerModels.swift; sourceTree = "<group>"; };
+		A10000000000000000000023 /* PlannerChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerChrome.swift; sourceTree = "<group>"; };
+		A10000000000000000000024 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		A10000000000000000000025 /* CalendarPlannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarPlannerView.swift; sourceTree = "<group>"; };
+		A10000000000000000000026 /* HabitsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitsView.swift; sourceTree = "<group>"; };
+		A10000000000000000000027 /* MatrixView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatrixView.swift; sourceTree = "<group>"; };
+		A10000000000000000000028 /* WorkoutIntegration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutIntegration.swift; sourceTree = "<group>"; };
+		A10000000000000000000029 /* DayDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayDetailSheet.swift; sourceTree = "<group>"; };
+		A1000000000000000000002A /* WorkoutVisuals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutVisuals.swift; sourceTree = "<group>"; };
+		A1000000000000000000002B /* WorkoutSessionPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutSessionPreviewView.swift; sourceTree = "<group>"; };
+		A1000000000000000000002C /* ExerciseCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseCatalog.swift; sourceTree = "<group>"; };
+		A1000000000000000000002D /* ExerciseGuideView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseGuideView.swift; sourceTree = "<group>"; };
+		A1000000000000000000002E /* WorkoutKeypadEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutKeypadEditor.swift; sourceTree = "<group>"; };
+		A1000000000000000000002F /* exercise_catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = exercise_catalog.json; sourceTree = "<group>"; };
+		A10000000000000000000030 /* ExerciseImages */ = {isa = PBXFileReference; lastKnownFileType = folder; path = ExerciseImages; sourceTree = "<group>"; };
+		A10000000000000000000034 /* WorkoutPrescription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutPrescription.swift; sourceTree = "<group>"; };
+		A10000000000000000000035 /* PlannerPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerPreferences.swift; sourceTree = "<group>"; };
+		A10000000000000000000036 /* NotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
+		A10000000000000000000037 /* CalendarSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarSyncService.swift; sourceTree = "<group>"; };
+		A10000000000000000000038 /* GoogleCalendarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleCalendarService.swift; sourceTree = "<group>"; };
+		A10000000000000000000039 /* PlannerSyncCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerSyncCoordinator.swift; sourceTree = "<group>"; };
+		A1000000000000000000003A /* PlannerIntegrationsSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerIntegrationsSettings.swift; sourceTree = "<group>"; };
+		A1000000000000000000003B /* HabitIconCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HabitIconCatalog.swift; sourceTree = "<group>"; };
+		A1000000000000000000003C /* NewHabitSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewHabitSheet.swift; sourceTree = "<group>"; };
+		A1000000000000000000003D /* PlannerEventSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerEventSheet.swift; sourceTree = "<group>"; };
+		A1000000000000000000003E /* TaskTitleParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskTitleParser.swift; sourceTree = "<group>"; };
+		A1000000000000000000003F /* PlannerTaskUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerTaskUI.swift; sourceTree = "<group>"; };
+		A100000000000000000000A9 /* NoteEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteEditorView.swift; sourceTree = "<group>"; };
+		A10000000000000000000040 /* TagCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagCatalog.swift; sourceTree = "<group>"; };
+		A10000000000000000000042 /* SettingsDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDetailViews.swift; sourceTree = "<group>"; };
+		A10000000000000000000043 /* SettingsSearchCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSearchCatalog.swift; sourceTree = "<group>"; };
+		A10000000000000000000044 /* CountdownTracking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CountdownTracking.swift; sourceTree = "<group>"; };
+		A10000000000000000000050 /* CadenceSubApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CadenceSubApp.swift; sourceTree = "<group>"; };
+		A10000000000000000000051 /* SpendModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendModels.swift; sourceTree = "<group>"; };
+		A10000000000000000000052 /* SpendPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendPreferences.swift; sourceTree = "<group>"; };
+		A10000000000000000000053 /* PlaidClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaidClient.swift; sourceTree = "<group>"; };
+		A10000000000000000000058 /* PlaidLinkCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaidLinkCoordinator.swift; sourceTree = "<group>"; };
+		A10000000000000000000059 /* PlaidLocal.plist.example */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PlaidLocal.plist.example; sourceTree = "<group>"; };
+		A10000000000000000000054 /* SpendStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendStore.swift; sourceTree = "<group>"; };
+		A10000000000000000000055 /* SpendHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendHomeView.swift; sourceTree = "<group>"; };
+		A10000000000000000000056 /* SpendItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendItemDetailView.swift; sourceTree = "<group>"; };
+		A10000000000000000000057 /* SpendSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendSettingsView.swift; sourceTree = "<group>"; };
+		A10000000000000000000060 /* HealthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthModels.swift; sourceTree = "<group>"; };
+		A10000000000000000000061 /* HealthPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthPreferences.swift; sourceTree = "<group>"; };
+		A10000000000000000000062 /* HealthKitClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitClient.swift; sourceTree = "<group>"; };
+		A10000000000000000000063 /* HealthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthStore.swift; sourceTree = "<group>"; };
+		A1000000000000000000006B /* BevelScoring.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BevelScoring.swift; sourceTree = "<group>"; };
+		A10000000000000000000064 /* HealthHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthHomeView.swift; sourceTree = "<group>"; };
+		A10000000000000000000065 /* HealthMetricDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthMetricDetailView.swift; sourceTree = "<group>"; };
+		A10000000000000000000066 /* HealthSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthSettingsView.swift; sourceTree = "<group>"; };
+		A10000000000000000000067 /* HealthChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthChrome.swift; sourceTree = "<group>"; };
+		A1000000000000000000006C /* WorkoutDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutDetailSheet.swift; sourceTree = "<group>"; };
+		A10000000000000000000068 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
+		A100000000000000000000A7 /* FamilyControls.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FamilyControls.framework; path = System/Library/Frameworks/FamilyControls.framework; sourceTree = SDKROOT; };
+		A100000000000000000000A8 /* ManagedSettings.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ManagedSettings.framework; path = System/Library/Frameworks/ManagedSettings.framework; sourceTree = SDKROOT; };
+		A10000000000000000000070 /* NewsModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsModels.swift; sourceTree = "<group>"; };
+		A10000000000000000000071 /* NewsPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsPreferences.swift; sourceTree = "<group>"; };
+		A10000000000000000000072 /* NewsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsClient.swift; sourceTree = "<group>"; };
+		A10000000000000000000073 /* NewsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsStore.swift; sourceTree = "<group>"; };
+		A10000000000000000000074 /* NewsAIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsAIService.swift; sourceTree = "<group>"; };
+		A10000000000000000000075 /* NewsHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsHomeView.swift; sourceTree = "<group>"; };
+		A10000000000000000000076 /* NewsArticleDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsArticleDetailView.swift; sourceTree = "<group>"; };
+		A10000000000000000000077 /* NewsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsSettingsView.swift; sourceTree = "<group>"; };
+		A100000000000000000000A0 /* FocusModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusModels.swift; sourceTree = "<group>"; };
+		A100000000000000000000A1 /* FocusPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusPreferences.swift; sourceTree = "<group>"; };
+		A100000000000000000000A2 /* FocusStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusStore.swift; sourceTree = "<group>"; };
+		A100000000000000000000A3 /* FocusHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusHomeView.swift; sourceTree = "<group>"; };
+		A100000000000000000000A4 /* FocusStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusStatsView.swift; sourceTree = "<group>"; };
+		A100000000000000000000A5 /* FocusSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusSettingsView.swift; sourceTree = "<group>"; };
+		A100000000000000000000A6 /* FocusAppLockService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusAppLockService.swift; sourceTree = "<group>"; };
+		A100000000000000000000B0 /* SpendCategoryDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendCategoryDetailView.swift; sourceTree = "<group>"; };
+		A100000000000000000000B1 /* SpendBudgetsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendBudgetsView.swift; sourceTree = "<group>"; };
+		A100000000000000000000B2 /* SpendCategoriesManageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpendCategoriesManageView.swift; sourceTree = "<group>"; };
+		A10000000000000000000078 /* NewsChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsChrome.swift; sourceTree = "<group>"; };
+		A10000000000000000000080 /* CadenceAppsPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CadenceAppsPreferences.swift; sourceTree = "<group>"; };
+		A10000000000000000000081 /* AppsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppsSettingsView.swift; sourceTree = "<group>"; };
+		A10000000000000000000099 /* CadenceAutomation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CadenceAutomation.swift; sourceTree = "<group>"; };
+		A1000000000000000000009A /* ShoppingRealism.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShoppingRealism.swift; sourceTree = "<group>"; };
+		A1000000000000000000009B /* WheelNav.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WheelNav.swift; sourceTree = "<group>"; };
+		A1000000000000000000009C /* PlaceholderPageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceholderPageView.swift; sourceTree = "<group>"; };
+		B10000000000000000000020 /* PlanningQualityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanningQualityTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000021 /* CadenceTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CadenceTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000034 /* WorkoutProgressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutProgressionTests.swift; sourceTree = "<group>"; };
+		W10000000000000000000001 /* WidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshot.swift; sourceTree = "<group>"; };
+		W10000000000000000000002 /* WidgetSnapshotWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotWriter.swift; sourceTree = "<group>"; };
+		W10000000000000000000004 /* CadenceWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CadenceWidgets.swift; sourceTree = "<group>"; };
+		W10000000000000000000005 /* CadenceWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CadenceWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		W10000000000000000000006 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		W10000000000000000000007 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		W10000000000000000000008 /* AppIntents.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AppIntents.framework; path = System/Library/Frameworks/AppIntents.framework; sourceTree = SDKROOT; };
+		W10000000000000000000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		W10000000000000000000010 /* CadenceWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CadenceWidgets.entitlements; sourceTree = "<group>"; };
+		W10000000000000000000011 /* Cadence.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Cadence.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		07707BB997D44D6296A48DDC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10000000000000000000001 /* libsqlite3.tbd in Frameworks */,
+				A20000000000000000000068 /* HealthKit.framework in Frameworks */,
+				A200000000000000000000A7 /* FamilyControls.framework in Frameworks */,
+				A200000000000000000000A8 /* ManagedSettings.framework in Frameworks */,
+				PLAID00000000000000000003 /* LinkKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B7707BB997D44D6296A48DE0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		W7707BB997D44D6296A48DF0 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				W20000000000000000000007 /* WidgetKit.framework in Frameworks */,
+				W20000000000000000000008 /* SwiftUI.framework in Frameworks */,
+				W20000000000000000000009 /* AppIntents.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		2DA8CF8B3029751600FDF50C /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000011 /* libsqlite3.tbd */,
+				A10000000000000000000068 /* HealthKit.framework */,
+				A100000000000000000000A7 /* FamilyControls.framework */,
+				A100000000000000000000A8 /* ManagedSettings.framework */,
+				W10000000000000000000006 /* WidgetKit.framework */,
+				W10000000000000000000007 /* SwiftUI.framework */,
+				W10000000000000000000008 /* AppIntents.framework */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
+		B10000000000000000000033 /* CadenceTests */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000020 /* PlanningQualityTests.swift */,
+				B10000000000000000000034 /* WorkoutProgressionTests.swift */,
+			);
+			path = CadenceTests;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				C10000000000000000000002 /* Cadence */,
+				W10000000000000000000013 /* CadenceWidgets */,
+				B10000000000000000000033 /* CadenceTests */,
+				C10000000000000000000003 /* Products */,
+				2DA8CF8B3029751600FDF50C /* Recovered References */,
+			);
+			sourceTree = "<group>";
+		};
+		C10000000000000000000002 /* Cadence */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000001 /* CadenceApp.swift */,
+				A10000000000000000000012 /* Info.plist */,
+				A10000000000000000000059 /* PlaidLocal.plist.example */,
+				W10000000000000000000011 /* Cadence.entitlements */,
+				A1000000000000000000000F /* Assets.xcassets */,
+				C10000000000000000000012 /* SubApps */,
+				C10000000000000000000004 /* Models */,
+				C10000000000000000000005 /* Services */,
+				C10000000000000000000006 /* Persistence */,
+				W10000000000000000000012 /* Shared */,
+				C10000000000000000000007 /* Views */,
+				C10000000000000000000008 /* Resources */,
+			);
+			path = Cadence;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				9E73C1B0E7AB445AB4CDE86D /* Cadence.app */,
+				W10000000000000000000005 /* CadenceWidgets.appex */,
+				B10000000000000000000021 /* CadenceTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000004 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000003 /* Models.swift */,
+				A1000000000000000000001B /* WorkoutModels.swift */,
+				A10000000000000000000022 /* PlannerModels.swift */,
+				A10000000000000000000051 /* SpendModels.swift */,
+				A10000000000000000000060 /* HealthModels.swift */,
+				A10000000000000000000070 /* NewsModels.swift */,
+				A100000000000000000000A0 /* FocusModels.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000005 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000004 /* RecipeDatabase.swift */,
+				A10000000000000000000005 /* KeychainStore.swift */,
+				A10000000000000000000006 /* LLMClient.swift */,
+				A10000000000000000000007 /* GroceryConsolidator.swift */,
+				A10000000000000000000009 /* AIServices.swift */,
+				A1000000000000000000000A /* AppModel.swift */,
+				A10000000000000000000013 /* MealNutrition.swift */,
+				A10000000000000000000014 /* RecipeHistory.swift */,
+				A10000000000000000000015 /* WeekPlanner.swift */,
+				A1000000000000000000001F /* SideCatalog.swift */,
+				A10000000000000000000016 /* LocalMacros.swift */,
+				A1000000000000000000001A /* DislikeMatcher.swift */,
+				A1000000000000000000009A /* ShoppingRealism.swift */,
+				A1000000000000000000001C /* WorkoutProgression.swift */,
+				A10000000000000000000034 /* WorkoutPrescription.swift */,
+				A10000000000000000000035 /* PlannerPreferences.swift */,
+				A10000000000000000000036 /* NotificationScheduler.swift */,
+				A10000000000000000000037 /* CalendarSyncService.swift */,
+				A10000000000000000000038 /* GoogleCalendarService.swift */,
+				A10000000000000000000099 /* CadenceAutomation.swift */,
+				A10000000000000000000039 /* PlannerSyncCoordinator.swift */,
+				A10000000000000000000044 /* CountdownTracking.swift */,
+				A1000000000000000000003E /* TaskTitleParser.swift */,
+				A10000000000000000000040 /* TagCatalog.swift */,
+				W10000000000000000000002 /* WidgetSnapshotWriter.swift */,
+				A1000000000000000000002C /* ExerciseCatalog.swift */,
+				A10000000000000000000052 /* SpendPreferences.swift */,
+				A10000000000000000000053 /* PlaidClient.swift */,
+				A10000000000000000000058 /* PlaidLinkCoordinator.swift */,
+				A10000000000000000000054 /* SpendStore.swift */,
+				A10000000000000000000061 /* HealthPreferences.swift */,
+				A10000000000000000000062 /* HealthKitClient.swift */,
+				A10000000000000000000063 /* HealthStore.swift */,
+				A1000000000000000000006B /* BevelScoring.swift */,
+				A10000000000000000000071 /* NewsPreferences.swift */,
+				A10000000000000000000072 /* NewsClient.swift */,
+				A10000000000000000000073 /* NewsStore.swift */,
+				A10000000000000000000074 /* NewsAIService.swift */,
+				A100000000000000000000A1 /* FocusPreferences.swift */,
+				A100000000000000000000A2 /* FocusStore.swift */,
+				A100000000000000000000A6 /* FocusAppLockService.swift */,
+				A10000000000000000000080 /* CadenceAppsPreferences.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000006 /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000008 /* SwiftDataModels.swift */,
+				A100000000000000000000C1 /* CadenceCloudStore.swift */,
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000007 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000002 /* RootView.swift */,
+				A10000000000000000000017 /* Theme.swift */,
+				C10000000000000000000009 /* Onboarding */,
+				C1000000000000000000000A /* MealPlan */,
+				C1000000000000000000000B /* Grocery */,
+				C1000000000000000000000C /* Settings */,
+				C1000000000000000000000D /* Browse */,
+				C1000000000000000000000E /* Workout */,
+				C1000000000000000000000F /* Planner */,
+				C10000000000000000000010 /* Navigation */,
+				C10000000000000000000011 /* Placeholders */,
+				C10000000000000000000013 /* Spend */,
+				C10000000000000000000014 /* Health */,
+				C10000000000000000000015 /* News */,
+				C10000000000000000000016 /* Focus */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000008 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000019 /* recipes.sqlite3 */,
+				A1000000000000000000002F /* exercise_catalog.json */,
+				A10000000000000000000030 /* ExerciseImages */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000009 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000000B /* OnboardingView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		C1000000000000000000000A /* MealPlan */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000000C /* MealPlanView.swift */,
+			);
+			path = MealPlan;
+			sourceTree = "<group>";
+		};
+		C1000000000000000000000B /* Grocery */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000000D /* GroceryListView.swift */,
+			);
+			path = Grocery;
+			sourceTree = "<group>";
+		};
+		C1000000000000000000000C /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000000E /* SettingsView.swift */,
+				A10000000000000000000042 /* SettingsDetailViews.swift */,
+				A10000000000000000000043 /* SettingsSearchCatalog.swift */,
+				A10000000000000000000081 /* AppsSettingsView.swift */,
+				A1000000000000000000003A /* PlannerIntegrationsSettings.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		C1000000000000000000000D /* Browse */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000018 /* BrowseView.swift */,
+			);
+			path = Browse;
+			sourceTree = "<group>";
+		};
+		C1000000000000000000000E /* Workout */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000001D /* WorkoutHomeView.swift */,
+				A1000000000000000000001E /* ActiveWorkoutView.swift */,
+				A1000000000000000000002A /* WorkoutVisuals.swift */,
+				A1000000000000000000002B /* WorkoutSessionPreviewView.swift */,
+				A1000000000000000000002D /* ExerciseGuideView.swift */,
+				A1000000000000000000002E /* WorkoutKeypadEditor.swift */,
+			);
+			path = Workout;
+			sourceTree = "<group>";
+		};
+		C1000000000000000000000F /* Planner */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000023 /* PlannerChrome.swift */,
+				A10000000000000000000024 /* TodayView.swift */,
+				A10000000000000000000025 /* CalendarPlannerView.swift */,
+				A10000000000000000000026 /* HabitsView.swift */,
+				A10000000000000000000027 /* MatrixView.swift */,
+				A10000000000000000000028 /* WorkoutIntegration.swift */,
+				A10000000000000000000029 /* DayDetailSheet.swift */,
+				A1000000000000000000003B /* HabitIconCatalog.swift */,
+				A1000000000000000000003C /* NewHabitSheet.swift */,
+				A1000000000000000000003D /* PlannerEventSheet.swift */,
+				A1000000000000000000003F /* PlannerTaskUI.swift */,
+				A100000000000000000000A9 /* NoteEditorView.swift */,
+			);
+			path = Planner;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000010 /* Navigation */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000009B /* WheelNav.swift */,
+			);
+			path = Navigation;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000011 /* Placeholders */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000009C /* PlaceholderPageView.swift */,
+			);
+			path = Placeholders;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000012 /* SubApps */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000050 /* CadenceSubApp.swift */,
+			);
+			path = SubApps;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000013 /* Spend */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000055 /* SpendHomeView.swift */,
+				A100000000000000000000B0 /* SpendCategoryDetailView.swift */,
+				A100000000000000000000B1 /* SpendBudgetsView.swift */,
+				A100000000000000000000B2 /* SpendCategoriesManageView.swift */,
+				A10000000000000000000056 /* SpendItemDetailView.swift */,
+				A10000000000000000000057 /* SpendSettingsView.swift */,
+			);
+			path = Spend;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000014 /* Health */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000064 /* HealthHomeView.swift */,
+				A10000000000000000000065 /* HealthMetricDetailView.swift */,
+				A10000000000000000000066 /* HealthSettingsView.swift */,
+				A10000000000000000000067 /* HealthChrome.swift */,
+				A1000000000000000000006C /* WorkoutDetailSheet.swift */,
+			);
+			path = Health;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000015 /* News */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000075 /* NewsHomeView.swift */,
+				A10000000000000000000076 /* NewsArticleDetailView.swift */,
+				A10000000000000000000077 /* NewsSettingsView.swift */,
+				A10000000000000000000078 /* NewsChrome.swift */,
+			);
+			path = News;
+			sourceTree = "<group>";
+		};
+		C10000000000000000000016 /* Focus */ = {
+			isa = PBXGroup;
+			children = (
+				A100000000000000000000A3 /* FocusHomeView.swift */,
+				A100000000000000000000A4 /* FocusStatsView.swift */,
+				A100000000000000000000A5 /* FocusSettingsView.swift */,
+			);
+			path = Focus;
+			sourceTree = "<group>";
+		};
+		W10000000000000000000012 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				W10000000000000000000001 /* WidgetSnapshot.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		W10000000000000000000013 /* CadenceWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				W10000000000000000000004 /* CadenceWidgets.swift */,
+				W10000000000000000000009 /* Info.plist */,
+				W10000000000000000000010 /* CadenceWidgets.entitlements */,
+			);
+			path = CadenceWidgets;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8AA6432C2CCC4B93BA7385B9 /* Cadence */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D10000000000000000000002 /* Build configuration list for PBXNativeTarget "Cadence" */;
+			buildPhases = (
+				E6D0707D14F74DC89F541E35 /* Sources */,
+				07707BB997D44D6296A48DDC /* Frameworks */,
+				EDB432E633C64B529E2AFD97 /* Resources */,
+				A2000000000000000000005A /* Copy PlaidLocal.plist if present */,
+				WEDB432E633C64B529E2AFD98 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				W30000000000000000000002 /* PBXTargetDependency */,
+			);
+			name = Cadence;
+			packageProductDependencies = (
+				PLAID00000000000000000002 /* LinkKit */,
+			);
+			productName = Cadence;
+			productReference = 9E73C1B0E7AB445AB4CDE86D /* Cadence.app */;
+			productType = "com.apple.product-type.application";
+		};
+		B8AA6432CCCC4B93BA7385B9 /* CadenceTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B10000000000000000000030 /* Build configuration list for PBXNativeTarget "CadenceTests" */;
+			buildPhases = (
+				B6D0707D14F74DC89F541E40 /* Sources */,
+				B7707BB997D44D6296A48DE0 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B30000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = CadenceTests;
+			productName = CadenceTests;
+			productReference = B10000000000000000000021 /* CadenceTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		W8AA6432C2CCC4B93BA7385BA /* CadenceWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = W10000000000000000000020 /* Build configuration list for PBXNativeTarget "CadenceWidgets" */;
+			buildPhases = (
+				W6D0707D14F74DC89F541E36 /* Sources */,
+				W7707BB997D44D6296A48DF0 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CadenceWidgets;
+			productName = CadenceWidgets;
+			productReference = W10000000000000000000005 /* CadenceWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D62FA5E29A38407C93B332DC /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					8AA6432C2CCC4B93BA7385B9 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					B8AA6432CCCC4B93BA7385B9 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 8AA6432C2CCC4B93BA7385B9;
+					};
+				};
+			};
+			buildConfigurationList = D10000000000000000000001 /* Build configuration list for PBXProject "Cadence" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = C10000000000000000000001;
+			packageReferences = (
+				PLAID00000000000000000001 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */,
+			);
+			productRefGroup = C10000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8AA6432C2CCC4B93BA7385B9 /* Cadence */,
+				B8AA6432CCCC4B93BA7385B9 /* CadenceTests */,
+				W8AA6432C2CCC4B93BA7385BA /* CadenceWidgets */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		EDB432E633C64B529E2AFD97 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8A2D4FCFCD91432C88E995D1 /* Assets.xcassets in Resources */,
+				A20000000000000000000019 /* recipes.sqlite3 in Resources */,
+				A2000000000000000000002F /* exercise_catalog.json in Resources */,
+				A20000000000000000000030 /* ExerciseImages in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A2000000000000000000005A /* Copy PlaidLocal.plist if present */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy PlaidLocal.plist if present";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "PLIST=\"${SRCROOT}/Cadence/PlaidLocal.plist\"\nDEST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/PlaidLocal.plist\"\nif [ -f \"$PLIST\" ]; then\n  cp -f \"$PLIST\" \"$DEST\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B6D0707D14F74DC89F541E40 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B20000000000000000000020 /* PlanningQualityTests.swift in Sources */,
+				B20000000000000000000034 /* WorkoutProgressionTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E6D0707D14F74DC89F541E35 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6D76318202614CD9A0492EED /* CadenceApp.swift in Sources */,
+				471FB2F8C5854427A5BA441C /* RootView.swift in Sources */,
+				73DED486B4AD4CD4A08B741F /* Models.swift in Sources */,
+				3547C8B09E8340F19F758606 /* RecipeDatabase.swift in Sources */,
+				A7A054AF0C0F44CA98D0D9E9 /* KeychainStore.swift in Sources */,
+				8A4E26B7B1C4424B8D69E782 /* LLMClient.swift in Sources */,
+				E9ECB1BB5E2B4F36B27A6E69 /* GroceryConsolidator.swift in Sources */,
+				568BCD155DD24C00A0569191 /* SwiftDataModels.swift in Sources */,
+				A200000000000000000000C1 /* CadenceCloudStore.swift in Sources */,
+				C0BD516F0D2840DAB0D81C44 /* AIServices.swift in Sources */,
+				CDA549DCC0784220B652C4A7 /* AppModel.swift in Sources */,
+				E2A1B3C4D5E6F708192A3B4C /* MealNutrition.swift in Sources */,
+				F3B2C4D5E6F708192A3B4C5D /* RecipeHistory.swift in Sources */,
+				BF828D29E6414E6A907D6852 /* OnboardingView.swift in Sources */,
+				18F15663F19C4223A3EEB03D /* MealPlanView.swift in Sources */,
+				F80D34AAC56646EDBA5D9192 /* GroceryListView.swift in Sources */,
+				B9FE25177E404B83B9FA4048 /* SettingsView.swift in Sources */,
+				A20000000000000000000015 /* WeekPlanner.swift in Sources */,
+				A2000000000000000000001F /* SideCatalog.swift in Sources */,
+				A20000000000000000000016 /* LocalMacros.swift in Sources */,
+				A20000000000000000000017 /* Theme.swift in Sources */,
+				A2000000000000000000009B /* WheelNav.swift in Sources */,
+				A2000000000000000000009C /* PlaceholderPageView.swift in Sources */,
+				A20000000000000000000018 /* BrowseView.swift in Sources */,
+				A2000000000000000000001A /* DislikeMatcher.swift in Sources */,
+				A2000000000000000000009A /* ShoppingRealism.swift in Sources */,
+				A2000000000000000000001B /* WorkoutModels.swift in Sources */,
+				A2000000000000000000001C /* WorkoutProgression.swift in Sources */,
+				A20000000000000000000034 /* WorkoutPrescription.swift in Sources */,
+				A20000000000000000000035 /* PlannerPreferences.swift in Sources */,
+				A20000000000000000000036 /* NotificationScheduler.swift in Sources */,
+				A20000000000000000000037 /* CalendarSyncService.swift in Sources */,
+				A20000000000000000000038 /* GoogleCalendarService.swift in Sources */,
+				A20000000000000000000099 /* CadenceAutomation.swift in Sources */,
+				A20000000000000000000039 /* PlannerSyncCoordinator.swift in Sources */,
+				A2000000000000000000003E /* TaskTitleParser.swift in Sources */,
+				A20000000000000000000040 /* TagCatalog.swift in Sources */,
+				A2000000000000000000003A /* PlannerIntegrationsSettings.swift in Sources */,
+				A20000000000000000000042 /* SettingsDetailViews.swift in Sources */,
+				A20000000000000000000043 /* SettingsSearchCatalog.swift in Sources */,
+				A20000000000000000000044 /* CountdownTracking.swift in Sources */,
+				A2000000000000000000001D /* WorkoutHomeView.swift in Sources */,
+				A2000000000000000000001E /* ActiveWorkoutView.swift in Sources */,
+				A20000000000000000000022 /* PlannerModels.swift in Sources */,
+				A20000000000000000000023 /* PlannerChrome.swift in Sources */,
+				A20000000000000000000024 /* TodayView.swift in Sources */,
+				A20000000000000000000025 /* CalendarPlannerView.swift in Sources */,
+				A20000000000000000000026 /* HabitsView.swift in Sources */,
+				A20000000000000000000027 /* MatrixView.swift in Sources */,
+				A20000000000000000000028 /* WorkoutIntegration.swift in Sources */,
+				A20000000000000000000029 /* DayDetailSheet.swift in Sources */,
+				A2000000000000000000003B /* HabitIconCatalog.swift in Sources */,
+				A2000000000000000000003C /* NewHabitSheet.swift in Sources */,
+				A2000000000000000000003D /* PlannerEventSheet.swift in Sources */,
+				W20000000000000000000001 /* WidgetSnapshot.swift in Sources */,
+				W20000000000000000000002 /* WidgetSnapshotWriter.swift in Sources */,
+				A2000000000000000000003F /* PlannerTaskUI.swift in Sources */,
+				A200000000000000000000A9 /* NoteEditorView.swift in Sources */,
+				A20000000000000000000050 /* CadenceSubApp.swift in Sources */,
+				A20000000000000000000051 /* SpendModels.swift in Sources */,
+				A20000000000000000000052 /* SpendPreferences.swift in Sources */,
+				A20000000000000000000053 /* PlaidClient.swift in Sources */,
+				A20000000000000000000058 /* PlaidLinkCoordinator.swift in Sources */,
+				A20000000000000000000054 /* SpendStore.swift in Sources */,
+				A20000000000000000000055 /* SpendHomeView.swift in Sources */,
+				A20000000000000000000056 /* SpendItemDetailView.swift in Sources */,
+				A20000000000000000000057 /* SpendSettingsView.swift in Sources */,
+				A20000000000000000000060 /* HealthModels.swift in Sources */,
+				A20000000000000000000061 /* HealthPreferences.swift in Sources */,
+				A20000000000000000000062 /* HealthKitClient.swift in Sources */,
+				A20000000000000000000063 /* HealthStore.swift in Sources */,
+				A2000000000000000000006B /* BevelScoring.swift in Sources */,
+				A20000000000000000000064 /* HealthHomeView.swift in Sources */,
+				A20000000000000000000065 /* HealthMetricDetailView.swift in Sources */,
+				A20000000000000000000066 /* HealthSettingsView.swift in Sources */,
+				A20000000000000000000067 /* HealthChrome.swift in Sources */,
+				A2000000000000000000006C /* WorkoutDetailSheet.swift in Sources */,
+				A20000000000000000000070 /* NewsModels.swift in Sources */,
+				A20000000000000000000071 /* NewsPreferences.swift in Sources */,
+				A20000000000000000000072 /* NewsClient.swift in Sources */,
+				A20000000000000000000073 /* NewsStore.swift in Sources */,
+				A20000000000000000000074 /* NewsAIService.swift in Sources */,
+				A20000000000000000000075 /* NewsHomeView.swift in Sources */,
+				A20000000000000000000076 /* NewsArticleDetailView.swift in Sources */,
+				A20000000000000000000077 /* NewsSettingsView.swift in Sources */,
+				A200000000000000000000A0 /* FocusModels.swift in Sources */,
+				A200000000000000000000A1 /* FocusPreferences.swift in Sources */,
+				A200000000000000000000A2 /* FocusStore.swift in Sources */,
+				A200000000000000000000A6 /* FocusAppLockService.swift in Sources */,
+				A200000000000000000000A3 /* FocusHomeView.swift in Sources */,
+				A200000000000000000000A4 /* FocusStatsView.swift in Sources */,
+				A200000000000000000000A5 /* FocusSettingsView.swift in Sources */,
+				A200000000000000000000B0 /* SpendCategoryDetailView.swift in Sources */,
+				A200000000000000000000B1 /* SpendBudgetsView.swift in Sources */,
+				A200000000000000000000B2 /* SpendCategoriesManageView.swift in Sources */,
+				A20000000000000000000078 /* NewsChrome.swift in Sources */,
+				A20000000000000000000080 /* CadenceAppsPreferences.swift in Sources */,
+				A20000000000000000000081 /* AppsSettingsView.swift in Sources */,
+				A2000000000000000000002A /* WorkoutVisuals.swift in Sources */,
+				A2000000000000000000002B /* WorkoutSessionPreviewView.swift in Sources */,
+				A2000000000000000000002C /* ExerciseCatalog.swift in Sources */,
+				A2000000000000000000002D /* ExerciseGuideView.swift in Sources */,
+				A2000000000000000000002E /* WorkoutKeypadEditor.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		W6D0707D14F74DC89F541E36 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				W20000000000000000000004 /* WidgetSnapshot.swift in Sources */,
+				W20000000000000000000005 /* CadenceWidgets.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B30000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8AA6432C2CCC4B93BA7385B9 /* Cadence */;
+			targetProxy = B30000000000000000000003 /* PBXContainerItemProxy */;
+		};
+		W30000000000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = W8AA6432C2CCC4B93BA7385BA /* CadenceWidgets */;
+			targetProxy = W30000000000000000000004 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		B10000000000000000000031 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				MARKETING_VERSION = 2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.musclemeal.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Cadence.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Cadence";
+			};
+			name = Debug;
+		};
+		B10000000000000000000032 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				MARKETING_VERSION = 2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.musclemeal.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Cadence.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Cadence";
+			};
+			name = Release;
+		};
+		D20000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		D20000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		D20000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Cadence/Cadence.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LURJ69YS93;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Cadence/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Cadence syncs your tasks, workouts, and meal plan to Apple Calendar when you turn on calendar sync.";
+				INFOPLIST_KEY_NSCalendarsUsageDescription = "Cadence syncs your tasks, workouts, and meal plan to Apple Calendar when you turn on calendar sync.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Cadence Health reads sleep, heart rate, HRV, respiratory rate, steps, and active energy to show recovery, strain, and vitals.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Cadence may write optional health annotations in a future update. Cadence does not write data today.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.musclemeal.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D20000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Cadence/Cadence.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LURJ69YS93;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Cadence/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Cadence;
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Cadence syncs your tasks, workouts, and meal plan to Apple Calendar when you turn on calendar sync.";
+				INFOPLIST_KEY_NSCalendarsUsageDescription = "Cadence syncs your tasks, workouts, and meal plan to Apple Calendar when you turn on calendar sync.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Cadence Health reads sleep, heart rate, HRV, respiratory rate, steps, and active energy to show recovery, strain, and vitals.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Cadence may write optional health annotations in a future update. Cadence does not write data today.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UIUserInterfaceStyle = Automatic;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.musclemeal.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		W2000000000000000000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CadenceWidgets/CadenceWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LURJ69YS93;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CadenceWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.musclemeal.app.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		W2000000000000000000000B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = CadenceWidgets/CadenceWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LURJ69YS93;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CadenceWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.musclemeal.app.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B10000000000000000000030 /* Build configuration list for PBXNativeTarget "CadenceTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000000000000000000031 /* Debug */,
+				B10000000000000000000032 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D10000000000000000000001 /* Build configuration list for PBXProject "Cadence" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D20000000000000000000001 /* Debug */,
+				D20000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D10000000000000000000002 /* Build configuration list for PBXNativeTarget "Cadence" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D20000000000000000000003 /* Debug */,
+				D20000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		W10000000000000000000020 /* Build configuration list for PBXNativeTarget "CadenceWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				W2000000000000000000000A /* Debug */,
+				W2000000000000000000000B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		PLAID00000000000000000001 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/plaid/plaid-link-ios-spm.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		PLAID00000000000000000002 /* LinkKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = PLAID00000000000000000001 /* XCRemoteSwiftPackageReference "plaid-link-ios-spm" */;
+			productName = LinkKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = D62FA5E29A38407C93B332DC /* Project object */;
+}

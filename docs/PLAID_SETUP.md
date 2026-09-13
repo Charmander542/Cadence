@@ -18,8 +18,8 @@ Spend imports bank/card purchases through [Plaid](https://plaid.com/). Teller is
 Copy the example and fill secrets (gitignored):
 
 ```bash
-cp MealPlannerApp/MealPlannerApp/PlaidLocal.plist.example \
-   MealPlannerApp/MealPlannerApp/PlaidLocal.plist
+cp Cadence/Cadence/PlaidLocal.plist.example \
+   Cadence/Cadence/PlaidLocal.plist
 ```
 
 On launch, Cadence loads `PlaidLocal.plist` into Keychain if no secret is stored yet.
@@ -36,6 +36,8 @@ On launch, Cadence loads `PlaidLocal.plist` into Keychain if no secret is stored
 Sandbox and Production use **different secrets** in the Plaid Dashboard.
 
 ## 3. Connect banks
+
+You can link **multiple institutions** (each Link = one Plaid Item). Spend stores which bank each purchase came from, shows all linked names on Home, and lets you filter by bank when more than one is connected. Removing a connection deletes that bank’s imported purchases only.
 
 ### Sandbox smoke test
 

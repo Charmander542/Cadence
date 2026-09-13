@@ -62,7 +62,7 @@ Use `--json` on any command for structured output agents can parse.
 | Variable | Default |
 |----------|---------|
 | `CADENCE_SIM_UDID` | iPhone 16 Pro Max (no Watch) UDID |
-| `CADENCE_APP_PATH` | `/tmp/CadenceDerived/.../MealPlannerApp.app` |
+| `CADENCE_APP_PATH` | `/tmp/CadenceDerived/.../Cadence.app` |
 | `CADENCE_SHOT_DIR` | `/tmp/cadence-spot-check` |
 | `CADENCE_DEVICE` | `iPhone 16 Pro Max (no Watch)` |
 | `CADENCE_BUNDLE` | `com.musclemeal.app` |

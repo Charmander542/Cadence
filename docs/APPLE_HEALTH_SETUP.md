@@ -12,10 +12,10 @@ Scoring follows Bevel’s **published** components (Help Center + blog) — not 
 
 ## 1. Capabilities
 
-In Xcode → MealPlannerApp target → **Signing & Capabilities**:
+In Xcode → Cadence target → **Signing & Capabilities**:
 
 1. Add **HealthKit**.
-2. Confirm `MealPlannerApp.entitlements` contains `com.apple.developer.healthkit` = true.
+2. Confirm `Cadence.entitlements` contains `com.apple.developer.healthkit` = true.
 
 ## 2. Privacy strings
 

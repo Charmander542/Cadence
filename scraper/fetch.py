@@ -128,7 +128,7 @@ class Fetcher:
                 else:
                     rp.parse("User-agent: *\nDisallow: /\n".splitlines())
             self._robots[base] = rp
-        return self._robots[base].can_fetch("MuscleMealScraper", url)
+        return self._robots[base].can_fetch("CadenceScraper", url)
 
     def get_text(self, url: str, *, force: bool = False, suffix: str = ".html") -> Optional[str]:
         # Normalize gzip sitemap suffix for cache key

@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/data/recipes.sqlite3"
-DST="$ROOT/MealPlannerApp/MealPlannerApp/Resources/recipes.sqlite3"
+DST="$ROOT/Cadence/Cadence/Resources/recipes.sqlite3"
 if [[ ! -f "$SRC" ]]; then
   echo "Missing $SRC — run: python3 scripts/build_recipe_store.py"
   exit 1
