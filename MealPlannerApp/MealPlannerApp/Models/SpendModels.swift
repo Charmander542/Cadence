@@ -262,7 +262,7 @@ final class SpendTransactionEntity {
     var amount: Double = 0
     /// Negative = money out (typical purchase).
     var postedAt: Date = Date()
-    var categoryRaw: String = SpendCategory.other.rawValue
+    var categoryRaw: String = "other"
     /// Optional custom subcategory (e.g. Kitchen under Home).
     var subcategoryID: UUID?
     var tellerCategory: String = ""
@@ -325,7 +325,7 @@ final class SpendTransactionEntity {
 final class SpendSubcategoryEntity {
     var id: UUID = UUID()
     var name: String = ""
-    var parentCategoryRaw: String = SpendCategory.home.rawValue
+    var parentCategoryRaw: String = "home"
     var systemImage: String = "tag"
     /// Optional override hex (RRGGBB). Empty = inherit parent tint.
     var colorHex: String = ""
@@ -386,7 +386,7 @@ final class SpendUserCategoryEntity {
 final class SpendBudgetEntity {
     var id: UUID = UUID()
     /// Parent category raw value. Always set (even for subcategory budgets — for grouping).
-    var categoryRaw: String = SpendCategory.other.rawValue
+    var categoryRaw: String = "other"
     /// When set, this budget applies to the subcategory instead of the whole category.
     var subcategoryID: UUID?
     var monthlyAmount: Double = 0
@@ -435,12 +435,12 @@ final class SpendTrackedItemEntity {
     var title: String = ""
     var purchasePrice: Double = 0
     var purchasedAt: Date = Date()
-    var useModeRaw: String = SpendUseMode.tapToLog.rawValue
+    var useModeRaw: String = "tapToLog"
     var useCount: Int = 0
     var lastUsedAt: Date?
     var notes: String = ""
     var linkedTransactionRemoteID: String = ""
-    var categoryRaw: String = SpendCategory.shopping.rawValue
+    var categoryRaw: String = "shopping"
     var createdAt: Date = Date()
 
     var useMode: SpendUseMode {
@@ -519,7 +519,7 @@ final class SpendMerchantRuleEntity {
     var merchantKey: String = ""
     /// Display name shown in UI (original merchant spelling).
     var merchantDisplay: String = ""
-    var categoryRaw: String = SpendCategory.other.rawValue
+    var categoryRaw: String = "other"
     var userCategoryID: UUID?
     var updatedAt: Date = Date()
 

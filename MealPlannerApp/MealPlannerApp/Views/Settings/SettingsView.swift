@@ -10,6 +10,7 @@ struct SettingsView: View {
     @Bindable var profile: UserProfileEntity
     @State private var path = NavigationPath()
     @State private var searchText = ""
+    @State private var iCloudStatus = "Checking…"
 
     private var isSearching: Bool {
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -183,12 +184,20 @@ struct SettingsView: View {
                                     .foregroundStyle(Theme.muted)
                             }
                         }
-                        Text("One dial for meals, Body, habits, and optional Spend & News.")
+                        LabeledContent("iCloud") {
+                            Text(iCloudStatus)
+                                .foregroundStyle(Theme.muted)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        Text("One dial for meals, Body, habits, and optional Spend & News. Notes, calendar, cost/use, and other app data sync via iCloud when available.")
                             .font(.footnote)
                             .foregroundStyle(Theme.muted)
                             .accessibilityAddTraits(.isStaticText)
                     } header: {
                         settingsSectionHeader("About")
+                    }
+                    .task {
+                        iCloudStatus = await CadenceCloudStore.refreshAccountStatus()
                     }
                 } else if filteredRoutes.isEmpty {
                     Section {

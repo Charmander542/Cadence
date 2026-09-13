@@ -56,7 +56,7 @@ final class NewsArticleEntity {
     var imageURLString: String = ""
     var publishedAt: Date = Date()
     var fetchedAt: Date = Date()
-    var topicRaw: String = NewsTopic.other.rawValue
+    var topicRaw: String = "other"
     var sortOrder: Int = 0
     var isRead: Bool = false
     var dayStart: Date = Date()

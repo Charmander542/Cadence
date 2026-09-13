@@ -678,6 +678,8 @@ struct WheelAppMenuOverlay: View {
     @State private var dragTranslation: CGSize = .zero
     @State private var hoverTargetId: String?
     @State private var hoverTargetMode: GridMode?
+    /// True when the menu list is scrolled to the top — required for whole-sheet dismiss.
+    @State private var isScrollAtTop = true
     @State private var commitHaptics = UIImpactFeedbackGenerator(style: .rigid)
     @State private var editHaptics = UIImpactFeedbackGenerator(style: .heavy)
     @State private var reorderHaptics = UIImpactFeedbackGenerator(style: .medium)
@@ -721,7 +723,6 @@ struct WheelAppMenuOverlay: View {
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction { dismiss() }
                 .accessibilityHint("Swipe down to close the app menu")
-                .gesture(collapseGesture, isEnabled: !isEditing)
 
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: Theme.Space.xs) {
@@ -747,15 +748,30 @@ struct WheelAppMenuOverlay: View {
             }
             .padding(.horizontal, Theme.Space.xl + 4)
             .padding(.bottom, Theme.Space.sm)
-            // Header band dismisses the sheet so ScrollView can own vertical scrolling below.
-            .contentShape(Rectangle())
-            .gesture(collapseGesture, isEnabled: !isEditing)
 
-            // Always scroll — both sections can overflow a single viewport.
-            ScrollView(showsIndicators: false) {
-                appMenuBody
+            Group {
+                if isEditing {
+                    ScrollView(showsIndicators: false) {
+                        appMenuBody
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear.preference(
+                                        key: WheelMenuScrollOffsetKey.self,
+                                        value: geo.frame(in: .named("wheelMenuScroll")).minY
+                                    )
+                                }
+                            )
+                    }
+                    .coordinateSpace(name: "wheelMenuScroll")
+                    .onPreferenceChange(WheelMenuScrollOffsetKey.self) { minY in
+                        isScrollAtTop = minY >= -2
+                    }
+                    .scrollDisabled(draggingId != nil || dragOffset > 0)
+                } else {
+                    // Fixed layout while browsing — whole sheet owns the vertical dismiss gesture.
+                    appMenuBody
+                }
             }
-            .scrollDisabled(draggingId != nil)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity)
@@ -774,15 +790,25 @@ struct WheelAppMenuOverlay: View {
         )
         .padding(.bottom, 0)
         .offset(y: max(0, dragOffset))
+        // Swipe down from anywhere to dismiss (edit mode: only while scrolled to top).
+        .gesture(
+            collapseGesture,
+            isEnabled: draggingId == nil && (!isEditing || isScrollAtTop || dragOffset > 0)
+        )
         .accessibilityElement(children: .contain)
         .accessibilityLabel("App menu")
         .accessibilityHint(
             isEditing
                 ? "Drag apps to reorder or move between Wheel and Not on wheel"
-                : "Choose any app. Hold empty space to edit. Swipe down to collapse."
+                : "Choose any app. Hold empty space to edit. Swipe down anywhere to collapse."
         )
         .onReceive(NotificationCenter.default.publisher(for: CadenceAppsPreferences.didChange)) { _ in
             appsRevision += 1
+        }
+        .onChange(of: isEditing) { _, editing in
+            if !editing {
+                isScrollAtTop = true
+            }
         }
     }
 
@@ -1125,7 +1151,9 @@ struct WheelAppMenuOverlay: View {
     private var collapseGesture: some Gesture {
         DragGesture(minimumDistance: 16, coordinateSpace: .local)
             .onChanged { value in
-                guard !isEditing, draggingId == nil else { return }
+                guard draggingId == nil else { return }
+                // Once the sheet is moving, keep tracking; otherwise require top of scroll.
+                guard isScrollAtTop || dragOffset > 0 else { return }
                 let dx = value.translation.width
                 let dy = value.translation.height
                 // Only pull the sheet down — ignore sideways / upward noise.
@@ -1133,7 +1161,7 @@ struct WheelAppMenuOverlay: View {
                 dragOffset = dy
             }
             .onEnded { value in
-                guard !isEditing, draggingId == nil else {
+                guard draggingId == nil else {
                     dragOffset = 0
                     return
                 }
@@ -1175,6 +1203,14 @@ struct WheelAppMenuOverlay: View {
                 onDismiss()
             }
         }
+    }
+}
+
+/// Tracks the app-menu ScrollView content offset so dismiss can run from anywhere at the top.
+private struct WheelMenuScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

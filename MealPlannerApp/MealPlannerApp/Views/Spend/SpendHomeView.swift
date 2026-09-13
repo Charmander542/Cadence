@@ -980,6 +980,14 @@ struct SpendHomeView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.horizontal, Theme.Space.lg)
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            SpendStore.deleteTrackedItem(item, in: modelContext)
+                        } label: {
+                            Label("Remove", systemImage: "trash")
+                        }
+                    }
+                    .accessibilityHint("Opens editor. Long-press to remove.")
                 }
             }
         }
@@ -1111,6 +1119,8 @@ private struct SpendTransactionSheet: View {
     let subcategories: [SpendSubcategoryEntity]
     var userCategories: [SpendUserCategoryEntity] = []
     @State private var trackMode: SpendUseMode = .tapToLog
+    @State private var linkedItem: SpendTrackedItemEntity?
+    @State private var showTrackedDetail = false
 
     private var categorySubs: [SpendSubcategoryEntity] {
         subcategories.filter { $0.parentCategory == transaction.category }
@@ -1168,14 +1178,36 @@ private struct SpendTransactionSheet: View {
                                 Text(mode.title).tag(mode)
                             }
                         }
-                        Button {
-                            _ = SpendStore.trackPurchase(from: transaction, useMode: trackMode, in: modelContext)
-                            dismiss()
-                        } label: {
-                            Label(transaction.isTracked ? "ALREADY TRACKED" : "TRACK COST / USE", systemImage: "gauge.with.dots.needle.33percent")
+                        .onChange(of: trackMode) { _, newMode in
+                            // Persist mode changes on already-tracked purchases.
+                            if let linkedItem {
+                                SpendStore.updateTrackedItem(linkedItem, useMode: newMode, in: modelContext)
+                            }
                         }
-                        .disabled(transaction.isTracked)
-                        .foregroundStyle(Theme.cta)
+
+                        if let linkedItem {
+                            Button {
+                                showTrackedDetail = true
+                            } label: {
+                                Label("Edit tracked item", systemImage: "gauge.with.dots.needle.33percent")
+                            }
+                            .foregroundStyle(Theme.cta)
+
+                            Button(role: .destructive) {
+                                SpendStore.deleteTrackedItem(linkedItem, in: modelContext)
+                                self.linkedItem = nil
+                            } label: {
+                                Label("Stop tracking", systemImage: "trash")
+                            }
+                        } else {
+                            Button {
+                                let item = SpendStore.trackPurchase(from: transaction, useMode: trackMode, in: modelContext)
+                                linkedItem = item
+                            } label: {
+                                Label("TRACK COST / USE", systemImage: "gauge.with.dots.needle.33percent")
+                            }
+                            .foregroundStyle(Theme.cta)
+                        }
                     } header: {
                         spendSheetSectionHeader("COST / USE")
                     } footer: {
@@ -1196,6 +1228,26 @@ private struct SpendTransactionSheet: View {
                 }
             }
             .settingsFormChrome()
+            .onAppear {
+                if let existing = SpendStore.trackedItem(linkedTo: transaction, in: modelContext) {
+                    linkedItem = existing
+                    trackMode = existing.useMode
+                }
+            }
+            .sheet(isPresented: $showTrackedDetail) {
+                if let linkedItem {
+                    SpendItemDetailView(item: linkedItem)
+                }
+            }
+            .onChange(of: showTrackedDetail) { _, open in
+                if !open {
+                    // Refresh after edit/delete in the detail sheet.
+                    linkedItem = SpendStore.trackedItem(linkedTo: transaction, in: modelContext)
+                    if let linkedItem {
+                        trackMode = linkedItem.useMode
+                    }
+                }
+            }
         }
     }
 }

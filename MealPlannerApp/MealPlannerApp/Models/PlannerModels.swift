@@ -209,7 +209,7 @@ final class TaskListEntity {
     var showInToday: Bool = true
 
     @Relationship(deleteRule: .cascade, inverse: \PlannerTaskEntity.list)
-    var tasks: [PlannerTaskEntity] = []
+    var tasks: [PlannerTaskEntity]? = []
 
     init(name: String, isSystem: Bool = false, sortOrder: Int = 0, showInToday: Bool? = nil) {
         id = UUID()
@@ -308,14 +308,6 @@ final class PlannerTaskEntity {
         return dueAt < Calendar.current.startOfDay(for: .now)
     }
 
-    /// All-day events are stored at midnight with a ≥24h duration; midnight timed events keep a shorter duration.
-    var isAllDayEvent: Bool {
-        guard let dueAt else { return false }
-        let comps = Calendar.current.dateComponents([.hour, .minute], from: dueAt)
-        let atMidnight = (comps.hour ?? 0) == 0 && (comps.minute ?? 0) == 0
-        return atMidnight && durationMinutes >= 24 * 60
-    }
-
     var appleCalendarEventIDs: [String: String] {
         get { CalendarEventIDMap.decode(appleCalendarEventIDsJSON, legacy: appleCalendarEventID, legacyCalendarID: PlannerPreferences.appleCalendarIdentifier) }
         set {
@@ -373,7 +365,7 @@ final class HabitEntity {
     var remindersEnabled: Bool = true
 
     @Relationship(deleteRule: .cascade, inverse: \HabitLogEntity.habit)
-    var logs: [HabitLogEntity] = []
+    var logs: [HabitLogEntity]? = []
 
     init(
         name: String,
@@ -421,7 +413,7 @@ final class HabitEntity {
 
     func log(on day: Date) -> HabitLogEntity? {
         let start = Calendar.current.startOfDay(for: day)
-        return logs.first { Calendar.current.isDate($0.day, inSameDayAs: start) }
+        return (logs ?? []).first { Calendar.current.isDate($0.day, inSameDayAs: start) }
     }
 
     func isDone(on day: Date) -> Bool {
@@ -429,7 +421,7 @@ final class HabitEntity {
     }
 
     func totalDoneCount() -> Int {
-        logs.filter { $0.statusRaw == HabitLogStatus.done.rawValue }.count
+        (logs ?? []).filter { $0.statusRaw == HabitLogStatus.done.rawValue }.count
     }
 }
 
@@ -482,7 +474,7 @@ enum PlannerStore {
         let lists = (try? context.fetch(FetchDescriptor<TaskListEntity>())) ?? []
         guard let shopping = lists.first(where: isLegacyShoppingList) else { return }
         let inbox = lists.first { $0.name.lowercased() == "inbox" }
-        for task in shopping.tasks {
+        for task in shopping.tasks ?? [] {
             task.list = inbox
         }
         context.delete(shopping)

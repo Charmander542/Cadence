@@ -1081,11 +1081,22 @@ struct CalendarPlannerView: View {
     }
 
     private func timedEvents(on day: Date) -> [PlannerTaskEntity] {
-        calendarEvents(on: day).filter { !$0.isAllDayEvent }
+        calendarEvents(on: day).filter { task in
+            guard let due = task.dueAt else { return false }
+            return hasTimeComponent(due)
+        }
     }
 
     private func allDayEvents(on day: Date) -> [PlannerTaskEntity] {
-        calendarEvents(on: day).filter(\.isAllDayEvent)
+        calendarEvents(on: day).filter { task in
+            guard let due = task.dueAt else { return false }
+            return !hasTimeComponent(due)
+        }
+    }
+
+    private func hasTimeComponent(_ date: Date) -> Bool {
+        let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
+        return (comps.hour ?? 0) != 0 || (comps.minute ?? 0) != 0
     }
 
     private func workoutEvents(on day: Date, hour: Int) -> WorkoutSessionTemplate? {

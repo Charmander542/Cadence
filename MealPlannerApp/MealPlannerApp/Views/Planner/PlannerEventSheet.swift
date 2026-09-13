@@ -292,7 +292,7 @@ struct PlannerEventSheet: View {
             startDate = task.dueAt ?? context.startDate
             let duration = max(task.durationMinutes, 15)
             endDate = startDate.addingTimeInterval(TimeInterval(duration * 60))
-            isAllDay = task.isAllDayEvent
+            isAllDay = !hasTimeComponent(startDate)
             recurrence = task.recurrence
             recurrenceWeekdayMask = task.recurrenceWeekdayMask
             hasReminder = task.reminderAt != nil

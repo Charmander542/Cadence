@@ -173,6 +173,8 @@ struct PlannerDrawer: View {
     var onAddList: (String) -> Void
     var onManageTags: () -> Void
     var onSearch: () -> Void
+    /// While edge-swiping open: panel x reveal in points (0…panelWidth). `nil` = settled open.
+    var interactiveOpenX: CGFloat? = nil
 
     @State private var showNewList = false
     @State private var newListName = ""
@@ -184,13 +186,25 @@ struct PlannerDrawer: View {
     private let panelWidth: CGFloat = 300
     private let closeThreshold: CGFloat = 90
 
+    private var isInteractiveOpening: Bool { interactiveOpenX != nil }
+
     private var navigableLists: [TaskListEntity] {
         lists.filter {
             $0.name.lowercased() != "inbox" && !PlannerStore.isLegacyShoppingList($0)
         }
     }
 
+    private var panelOffset: CGFloat {
+        if let x = interactiveOpenX {
+            return -panelWidth + min(panelWidth, max(0, x))
+        }
+        return closeDragX
+    }
+
     private var scrimOpacity: Double {
+        if let x = interactiveOpenX {
+            return 0.55 * Double(min(1, max(0, x / panelWidth)))
+        }
         let progress = 1 - min(1, max(0, -closeDragX / panelWidth))
         return 0.55 * Double(progress)
     }
@@ -200,11 +214,12 @@ struct PlannerDrawer: View {
             Color.black.opacity(scrimOpacity)
                 .ignoresSafeArea()
                 .onTapGesture { closeInteractively() }
+                .allowsHitTesting(!isInteractiveOpening)
                 .accessibilityLabel("Dismiss sidebar")
                 .accessibilityAddTraits(.isButton)
 
             panel
-                .offset(x: closeDragX)
+                .offset(x: panelOffset)
                 .simultaneousGesture(closeDragGesture)
                 .accessibilityElement(children: .contain)
         }
@@ -377,12 +392,18 @@ struct PlannerDrawer: View {
     private var closeDragGesture: some Gesture {
         DragGesture(minimumDistance: 8, coordinateSpace: .local)
             .onChanged { value in
+                guard !isInteractiveOpening, !isClosing else { return }
                 // Prefer horizontal dismiss; ignore mostly-vertical scrolls in the list.
                 guard abs(value.translation.width) > abs(value.translation.height) * 0.65 else { return }
                 // Only left (close). Don’t rubber-band past the open position.
-                closeDragX = min(0, value.translation.width)
+                var t = Transaction()
+                t.disablesAnimations = true
+                withTransaction(t) {
+                    closeDragX = min(0, value.translation.width)
+                }
             }
             .onEnded { value in
+                guard !isInteractiveOpening, !isClosing else { return }
                 let shouldClose = value.translation.width < -closeThreshold
                     || value.predictedEndTranslation.width < -closeThreshold * 1.35
                 if shouldClose {

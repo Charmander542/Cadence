@@ -52,12 +52,17 @@ struct MainTabView: View {
     @Query(sort: \TaskListEntity.sortOrder) private var lists: [TaskListEntity]
 
     @State private var showDrawer = false
-    /// Interactive edge-swipe reveal while opening (0…sidebarWidth).
+    /// Interactive edge-swipe reveal while opening (0…sidebarWidth). Shared with the real drawer — no blank preview.
     @State private var sidebarOpenDragX: CGFloat = 0
+    /// Once the open drag is clearly horizontal, keep tracking even if the finger drifts vertical.
+    @State private var sidebarOpenAxisLocked = false
+    /// Bumped to cancel in-flight open settle completions.
+    @State private var sidebarOpenGeneration = 0
     @State private var showSettings = false
     private let sidebarWidth: CGFloat = 300
     private let sidebarEdgeWidth: CGFloat = 22
     private let sidebarOpenThreshold: CGFloat = 72
+    private let sidebarOpenSpring = Animation.spring(response: 0.30, dampingFraction: 0.92)
     @State private var openShopOnMeals = false
     @State private var plannerDestination: PlannerDestination = .today
     @State private var showTagManager = false
@@ -226,13 +231,14 @@ struct MainTabView: View {
         }
         .onChange(of: appModel.requestedOpenDrawer) { _, shouldOpen in
             if shouldOpen {
-                showDrawer = true
+                openSidebar(animated: true)
                 appModel.requestedOpenDrawer = false
             }
         }
         .onChange(of: appModel.requestedCloseDrawer) { _, shouldClose in
             if shouldClose {
                 showDrawer = false
+                sidebarOpenDragX = 0
                 appModel.requestedCloseDrawer = false
             }
         }
@@ -259,12 +265,13 @@ struct MainTabView: View {
             }
         }
         .overlay {
-            if showDrawer {
+            // One real drawer for finger-open + settled open — no preview handoff.
+            if showDrawer || sidebarOpenDragX > 0.01 {
                 PlannerDrawer(
                     lists: lists,
                     destination: plannerDestination,
                     onSelect: { dest in
-                        showDrawer = false
+                        closeSidebarImmediate()
                         switch dest {
                         case .matrix:
                             selectWheel(.matrix)
@@ -280,28 +287,25 @@ struct MainTabView: View {
                         }
                     },
                     onSettings: {
-                        showDrawer = false
+                        closeSidebarImmediate()
                         openSettings()
                     },
-                    onClose: { showDrawer = false },
+                    onClose: { closeSidebarImmediate() },
                     onAddList: { name in
                         PlannerStore.addList(named: name, in: modelContext)
                     },
                     onManageTags: {
-                        showDrawer = false
+                        closeSidebarImmediate()
                         showTagManager = true
                     },
                     onSearch: {
-                        showDrawer = false
+                        closeSidebarImmediate()
                         appModel.showGlobalSearchSheet = true
-                    }
+                    },
+                    interactiveOpenX: showDrawer ? nil : sidebarOpenDragX
                 )
-                .transition(.asymmetric(
-                    insertion: .move(edge: .leading).combined(with: .opacity),
-                    // Interactive close already slid the panel off-screen; fading avoids a
-                    // second slide that ghosted a duplicate sidebar.
-                    removal: .opacity
-                ))
+                .allowsHitTesting(showDrawer)
+                .transition(.identity)
             }
         }
         // Left-edge swipe opens the sidebar — stop above the dial so menu swipes win.
@@ -320,23 +324,6 @@ struct MainTabView: View {
                 }
                 .ignoresSafeArea(edges: .bottom)
                 .accessibilityHidden(true)
-            }
-        }
-        // Live preview while dragging the edge open.
-        .overlay(alignment: .leading) {
-            if !showDrawer, sidebarOpenDragX > 8 {
-                Color.black.opacity(0.4 * Double(min(1, sidebarOpenDragX / sidebarWidth)))
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .overlay(alignment: .leading) {
-                        Theme.surface
-                            .frame(width: sidebarWidth)
-                            .overlay(alignment: .trailing) {
-                                Rectangle().fill(Theme.hairline).frame(width: 1)
-                            }
-                            .offset(x: -sidebarWidth + min(sidebarOpenDragX, sidebarWidth))
-                    }
-                    .allowsHitTesting(false)
             }
         }
         .sheet(isPresented: Binding(
@@ -360,7 +347,7 @@ struct MainTabView: View {
         .sheet(isPresented: $showTagManager) {
             TagManagerSheet()
         }
-        .animation(.easeInOut(duration: 0.22), value: showDrawer)
+        .animation(nil, value: showDrawer)
         .animation(.easeInOut(duration: 0.28), value: appModel.isGeneratingPlan)
         .safeAreaInset(edge: .top) {
             if appModel.isGeneratingPlan && appModel.planGeneratingMinimized {
@@ -429,30 +416,109 @@ struct MainTabView: View {
             .onChanged { value in
                 // Ignore pulls that began in the dial / menu band.
                 guard !startsInDialBand(value.startLocation) else {
-                    if sidebarOpenDragX != 0 { sidebarOpenDragX = 0 }
+                    resetSidebarOpenDrag()
                     return
                 }
-                guard abs(value.translation.width) >= abs(value.translation.height) * 0.55 else { return }
-                sidebarOpenDragX = min(sidebarWidth, max(0, value.translation.width))
+                let tx = value.translation.width
+                let ty = value.translation.height
+                if !sidebarOpenAxisLocked {
+                    guard abs(tx) >= abs(ty) * 0.55, tx > 0 else { return }
+                    sidebarOpenAxisLocked = true
+                }
+                // Follow the finger with no implicit animation.
+                var t = Transaction()
+                t.disablesAnimations = true
+                withTransaction(t) {
+                    sidebarOpenDragX = min(sidebarWidth, max(0, tx))
+                }
             }
             .onEnded { value in
+                defer { sidebarOpenAxisLocked = false }
                 guard !startsInDialBand(value.startLocation) else {
-                    sidebarOpenDragX = 0
+                    resetSidebarOpenDrag()
                     return
                 }
-                let shouldOpen = value.translation.width > sidebarOpenThreshold
-                    || value.predictedEndTranslation.width > sidebarOpenThreshold * 1.25
+                let tx = max(value.translation.width, sidebarOpenDragX)
+                let predicted = max(value.predictedEndTranslation.width, tx)
+                let shouldOpen = tx > sidebarOpenThreshold || predicted > sidebarOpenThreshold * 1.25
                 if shouldOpen {
-                    sidebarOpenDragX = 0
-                    withAnimation(.easeInOut(duration: 0.22)) {
-                        showDrawer = true
-                    }
+                    settleSidebarOpen()
                 } else {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) {
+                    sidebarOpenGeneration += 1
+                    withAnimation(sidebarOpenSpring) {
                         sidebarOpenDragX = 0
                     }
                 }
             }
+    }
+
+    private func resetSidebarOpenDrag() {
+        sidebarOpenAxisLocked = false
+        sidebarOpenGeneration += 1
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) {
+            sidebarOpenDragX = 0
+        }
+    }
+
+    /// Button / automation open — same spring path as a completed edge swipe.
+    private func openSidebar(animated: Bool) {
+        guard !showDrawer else { return }
+        if animated {
+            sidebarOpenGeneration += 1
+            let gen = sidebarOpenGeneration
+            var t = Transaction()
+            t.disablesAnimations = true
+            withTransaction(t) {
+                sidebarOpenDragX = 1
+            }
+            withAnimation(sidebarOpenSpring) {
+                sidebarOpenDragX = sidebarWidth
+            } completion: {
+                guard gen == sidebarOpenGeneration else { return }
+                commitSidebarOpen()
+            }
+        } else {
+            commitSidebarOpen()
+        }
+    }
+
+    /// Spring the interactive reveal to full width, then mark settled (same drawer instance).
+    private func settleSidebarOpen() {
+        sidebarOpenGeneration += 1
+        let gen = sidebarOpenGeneration
+        withAnimation(sidebarOpenSpring) {
+            sidebarOpenDragX = sidebarWidth
+        } completion: {
+            guard gen == sidebarOpenGeneration else { return }
+            commitSidebarOpen()
+        }
+    }
+
+    private func commitSidebarOpen() {
+        guard !showDrawer else {
+            sidebarOpenDragX = 0
+            return
+        }
+        // Same frame: keep the drawer mounted (`showDrawer || dragX`) while switching
+        // from interactiveOpenX → settled. No second slide, no remount flash.
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) {
+            showDrawer = true
+            sidebarOpenDragX = 0
+        }
+    }
+
+    private func closeSidebarImmediate() {
+        sidebarOpenGeneration += 1
+        var t = Transaction()
+        t.disablesAnimations = true
+        withTransaction(t) {
+            showDrawer = false
+            sidebarOpenDragX = 0
+        }
     }
 
     private func startsInDialBand(_ globalPoint: CGPoint) -> Bool {
@@ -469,7 +535,7 @@ struct MainTabView: View {
         let page = contentDestination
         return ZStack {
             lazyPage(WheelDestination.today.rawValue, active: page == .today) {
-                TodayView(destination: plannerDestination, onOpenDrawer: { showDrawer = true })
+                TodayView(destination: plannerDestination, onOpenDrawer: { openSidebar(animated: true) })
             }
             lazyPage(WheelDestination.calendar.rawValue, active: page == .calendar) {
                 CalendarPlannerView()
@@ -478,35 +544,35 @@ struct MainTabView: View {
                 MealPlanView(
                     profile: profile,
                     openShop: $openShopOnMeals,
-                    onOpenDrawer: { showDrawer = true },
+                    onOpenDrawer: { openSidebar(animated: true) },
                     onShopDismiss: {
                         // Shop is a sheet, not a dial destination — stay on Meals.
                     }
                 )
             }
             lazyPage(WheelDestination.matrix.rawValue, active: page == .matrix) {
-                MatrixView(onOpenDrawer: { showDrawer = true })
+                MatrixView(onOpenDrawer: { openSidebar(animated: true) })
             }
             lazyPage(WheelDestination.habits.rawValue, active: page == .habits) {
-                HabitsHomeView(onOpenDrawer: { showDrawer = true })
+                HabitsHomeView(onOpenDrawer: { openSidebar(animated: true) })
             }
             lazyPage(WheelDestination.inbox.rawValue, active: page == .inbox) {
-                TodayView(destination: .inbox, onOpenDrawer: { showDrawer = true })
+                TodayView(destination: .inbox, onOpenDrawer: { openSidebar(animated: true) })
             }
             lazyPage(WheelDestination.browse.rawValue, active: page == .browse) {
-                BrowseHomeView(onOpenDrawer: { showDrawer = true })
+                BrowseHomeView(onOpenDrawer: { openSidebar(animated: true) })
             }
             lazyPage(WheelDestination.spend.rawValue, active: page == .spend) {
-                SpendHomeView(onOpenDrawer: { showDrawer = true })
+                SpendHomeView(onOpenDrawer: { openSidebar(animated: true) })
             }
             lazyPage(WheelDestination.health.rawValue, active: page == .health || page == .workout) {
-                HealthHomeView(onOpenDrawer: { showDrawer = true })
+                HealthHomeView(onOpenDrawer: { openSidebar(animated: true) })
             }
             lazyPage(WheelDestination.news.rawValue, active: page == .news) {
-                NewsHomeView(onOpenDrawer: { showDrawer = true })
+                NewsHomeView(onOpenDrawer: { openSidebar(animated: true) })
             }
             lazyPage(WheelDestination.focus.rawValue, active: page == .focus) {
-                FocusHomeView(onOpenDrawer: { showDrawer = true })
+                FocusHomeView(onOpenDrawer: { openSidebar(animated: true) })
             }
         }
     }

@@ -2389,9 +2389,9 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 
 | Field | Value |
 |-------|-------|
-| **Phase** | `RUNNING` |
+| **Phase** | `PAUSED` |
 | **Next batch** | **LN** |
-| **Summary** | LL verified: calendar today badge stays in sync with pager swipe. Next: LN audit/polish. |
+| **Summary** | User asked to stop batch edits. LL calendar today swipe lag fix stands; no further UX batches until resumed. |
 
 ### Batch LL — Calendar today swipe lag (user)
 

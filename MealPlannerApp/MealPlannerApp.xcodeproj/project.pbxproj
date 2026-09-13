@@ -11,6 +11,7 @@
 		3547C8B09E8340F19F758606 /* RecipeDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* RecipeDatabase.swift */; };
 		471FB2F8C5854427A5BA441C /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* RootView.swift */; };
 		568BCD155DD24C00A0569191 /* SwiftDataModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000008 /* SwiftDataModels.swift */; };
+		A200000000000000000000C1 /* CadenceCloudStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000C1 /* CadenceCloudStore.swift */; };
 		6D76318202614CD9A0492EED /* MealPlannerAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* MealPlannerAppApp.swift */; };
 		73DED486B4AD4CD4A08B741F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* Models.swift */; };
 		8A2D4FCFCD91432C88E995D1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000F /* Assets.xcassets */; };
@@ -165,6 +166,7 @@
 		A10000000000000000000006 /* LLMClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMClient.swift; sourceTree = "<group>"; };
 		A10000000000000000000007 /* GroceryConsolidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroceryConsolidator.swift; sourceTree = "<group>"; };
 		A10000000000000000000008 /* SwiftDataModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftDataModels.swift; sourceTree = "<group>"; };
+		A100000000000000000000C1 /* CadenceCloudStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CadenceCloudStore.swift; sourceTree = "<group>"; };
 		A10000000000000000000009 /* AIServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIServices.swift; sourceTree = "<group>"; };
 		A1000000000000000000000A /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		A1000000000000000000000B /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
@@ -436,6 +438,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000008 /* SwiftDataModels.swift */,
+				A100000000000000000000C1 /* CadenceCloudStore.swift */,
 			);
 			path = Persistence;
 			sourceTree = "<group>";
@@ -794,6 +797,7 @@
 				8A4E26B7B1C4424B8D69E782 /* LLMClient.swift in Sources */,
 				E9ECB1BB5E2B4F36B27A6E69 /* GroceryConsolidator.swift in Sources */,
 				568BCD155DD24C00A0569191 /* SwiftDataModels.swift in Sources */,
+				A200000000000000000000C1 /* CadenceCloudStore.swift in Sources */,
 				C0BD516F0D2840DAB0D81C44 /* AIServices.swift in Sources */,
 				CDA549DCC0784220B652C4A7 /* AppModel.swift in Sources */,
 				E2A1B3C4D5E6F708192A3B4C /* MealNutrition.swift in Sources */,

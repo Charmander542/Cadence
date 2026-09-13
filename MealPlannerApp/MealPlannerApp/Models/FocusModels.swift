@@ -18,7 +18,7 @@ enum FocusMode: String, CaseIterable, Identifiable, Codable {
 @Model
 final class FocusSessionEntity {
     var id: UUID = UUID()
-    var modeRaw: String = FocusMode.pomo.rawValue
+    var modeRaw: String = "pomo"
     var startedAt: Date = Date()
     var endedAt: Date?
     /// Completed focus seconds (excludes unfinished / cancelled).

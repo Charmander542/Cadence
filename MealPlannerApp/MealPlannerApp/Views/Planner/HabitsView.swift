@@ -245,7 +245,7 @@ struct HabitsHomeView: View {
         let cal = Calendar.current
         let start = cal.dateInterval(of: .weekOfYear, for: .now)?.start ?? .now
         let doneDays = Set(
-            habit.logs
+            (habit.logs ?? [])
                 .filter { $0.status == .done }
                 .map { cal.startOfDay(for: $0.day) }
         )

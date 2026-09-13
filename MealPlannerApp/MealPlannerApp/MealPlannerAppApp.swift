@@ -4,81 +4,11 @@ import SwiftData
 @main
 struct MealPlannerApp: App {
     @StateObject private var appModel = AppModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var sharedModelContainer: ModelContainer = {
-        Self.makeModelContainer()
+        CadenceCloudStore.makeContainer()
     }()
-
-    private static func makeModelContainer() -> ModelContainer {
-        let schema = Schema([
-            UserProfileEntity.self,
-            WeeklyPlanEntity.self,
-            GroceryItemEntity.self,
-            RecipeHistoryEntity.self,
-            PantryItemEntity.self,
-            WorkoutPlanEntity.self,
-            WorkoutLogEntity.self,
-            TaskListEntity.self,
-            PlannerTaskEntity.self,
-            PlannerTagEntity.self,
-            HabitEntity.self,
-            HabitLogEntity.self,
-            SpendEnrollmentEntity.self,
-            SpendTransactionEntity.self,
-            SpendTrackedItemEntity.self,
-            SpendUseLogEntity.self,
-            HealthDaySnapshotEntity.self,
-            NewsArticleEntity.self,
-            NewsBriefingEntity.self,
-            FocusSessionEntity.self,
-            SpendSubcategoryEntity.self,
-            SpendBudgetEntity.self,
-            SpendUserCategoryEntity.self,
-            SpendMerchantRuleEntity.self,
-        ])
-        // v10: Import Apple/Google calendar events into Cadence.
-        // Merchant rules added via lightweight schema expansion (no store rename).
-        // CloudKit syncs SwiftData across devices signed into the same iCloud account.
-        let cloudConfig = ModelConfiguration(
-            "musclemeal-v10",
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .automatic
-        )
-        do {
-            return try ModelContainer(for: schema, configurations: [cloudConfig])
-        } catch {
-            // A failed lightweight migration can leave the SQLite store unusable.
-            // Remove once and retry with CloudKit (iCloud can restore previously synced data).
-            Self.removeStoreFiles(at: cloudConfig.url)
-            do {
-                return try ModelContainer(for: schema, configurations: [cloudConfig])
-            } catch {
-                // Last resort: local-only so the app still launches without iCloud.
-                let localConfig = ModelConfiguration(
-                    "musclemeal-v10-local",
-                    isStoredInMemoryOnly: false,
-                    cloudKitDatabase: .none
-                )
-                do {
-                    return try ModelContainer(for: schema, configurations: [localConfig])
-                } catch {
-                    Self.removeStoreFiles(at: localConfig.url)
-                    do {
-                        return try ModelContainer(for: schema, configurations: [localConfig])
-                    } catch {
-                        fatalError("Could not create ModelContainer: \(error)")
-                    }
-                }
-            }
-        }
-    }
-
-    private static func removeStoreFiles(at url: URL) {
-        let fm = FileManager.default
-        for candidate in [url, URL(fileURLWithPath: url.path + "-shm"), URL(fileURLWithPath: url.path + "-wal")] {
-            try? fm.removeItem(at: candidate)
-        }
-    }
 
     var body: some Scene {
         WindowGroup {
@@ -92,6 +22,7 @@ struct MealPlannerApp: App {
                     await Task.yield()
                     SpendPreferences.ingestLocalSecretsIfNeeded()
                     let context = sharedModelContainer.mainContext
+                    context.autosaveEnabled = true
                     PlannerStore.seedIfNeeded(in: context)
                     Pantry.seedIfNeeded(in: context)
                     SpendStore.seedDemoIfNeeded(in: context)
@@ -110,6 +41,13 @@ struct MealPlannerApp: App {
                         try? await Task.sleep(for: .seconds(2))
                         await PlannerSyncCoordinator.shared.refreshAll(in: context)
                         WidgetSnapshotWriter.publishImmediately(in: context)
+                    }
+                    let iCloud = await CadenceCloudStore.refreshAccountStatus()
+                    print("Cadence iCloud: \(iCloud); cloudKitStore=\(CadenceCloudStore.isCloudKitEnabled)")
+                }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .inactive || phase == .background {
+                        CadenceCloudStore.save(sharedModelContainer.mainContext, label: "scene-\(phase)")
                     }
                 }
         }

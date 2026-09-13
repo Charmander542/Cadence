@@ -37,7 +37,7 @@ final class HealthDaySnapshotEntity {
     var energyPercent: Double = 0
     var insightTitle: String = ""
     var insightBody: String = ""
-    var sourceRaw: String = HealthDataSource.demo.rawValue
+    var sourceRaw: String = "demo"
     var updatedAt: Date = Date()
 
     /// Optional JSON array of `{s,a,b}` sleep stage segments (stage, startEpoch, endEpoch).

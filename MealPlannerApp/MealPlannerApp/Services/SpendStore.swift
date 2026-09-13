@@ -862,7 +862,7 @@ enum SpendStore {
             linkedTransactionRemoteID: transaction.remoteID
         )
         context.insert(item)
-        try? context.save()
+        CadenceCloudStore.save(context, label: "trackPurchase")
         return item
     }
 
@@ -875,7 +875,7 @@ enum SpendStore {
         for item in items where item.linkedTransactionRemoteID == remoteID {
             item.title = title
         }
-        try? context.save()
+        CadenceCloudStore.save(context, label: "syncTrackedTitle")
     }
 
     static func logUse(
@@ -887,7 +887,7 @@ enum SpendStore {
         item.useCount += 1
         item.lastUsedAt = Date()
         context.insert(SpendUseLogEntity(itemID: item.id, note: note))
-        try? context.save()
+        CadenceCloudStore.save(context, label: "logUse")
     }
 
     @discardableResult
@@ -907,8 +907,77 @@ enum SpendStore {
             category: category
         )
         context.insert(item)
-        try? context.save()
+        CadenceCloudStore.save(context, label: "addManualTrackedItem")
         return item
+    }
+
+    static func trackedItem(
+        linkedTo transaction: SpendTransactionEntity,
+        in context: ModelContext
+    ) -> SpendTrackedItemEntity? {
+        guard transaction.isTracked, !transaction.remoteID.isEmpty else { return nil }
+        let remoteID = transaction.remoteID
+        let items = (try? context.fetch(FetchDescriptor<SpendTrackedItemEntity>())) ?? []
+        return items.first { $0.linkedTransactionRemoteID == remoteID }
+    }
+
+    static func updateTrackedItem(
+        _ item: SpendTrackedItemEntity,
+        title: String? = nil,
+        purchasePrice: Double? = nil,
+        purchasedAt: Date? = nil,
+        useMode: SpendUseMode? = nil,
+        category: SpendCategory? = nil,
+        notes: String? = nil,
+        in context: ModelContext
+    ) {
+        if let title {
+            item.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let purchasePrice {
+            item.purchasePrice = abs(purchasePrice)
+        }
+        if let purchasedAt {
+            item.purchasedAt = purchasedAt
+        }
+        if let useMode {
+            item.useMode = useMode
+        }
+        if let category {
+            item.category = category
+        }
+        if let notes {
+            item.notes = notes
+        }
+        CadenceCloudStore.save(context, label: "updateTrackedItem")
+    }
+
+    static func deleteTrackedItem(_ item: SpendTrackedItemEntity, in context: ModelContext) {
+        let itemID = item.id
+        let remoteID = item.linkedTransactionRemoteID
+        let logs = (try? context.fetch(FetchDescriptor<SpendUseLogEntity>())) ?? []
+        for log in logs where log.itemID == itemID {
+            context.delete(log)
+        }
+        if !remoteID.isEmpty {
+            let txs = (try? context.fetch(FetchDescriptor<SpendTransactionEntity>())) ?? []
+            for tx in txs where tx.remoteID == remoteID {
+                tx.isTracked = false
+            }
+        }
+        context.delete(item)
+        CadenceCloudStore.save(context, label: "deleteTrackedItem")
+    }
+
+    static func deleteUseLog(_ log: SpendUseLogEntity, item: SpendTrackedItemEntity, in context: ModelContext) {
+        guard log.itemID == item.id else { return }
+        context.delete(log)
+        item.useCount = max(0, item.useCount - 1)
+        let remaining = ((try? context.fetch(FetchDescriptor<SpendUseLogEntity>())) ?? [])
+            .filter { $0.itemID == item.id }
+            .sorted { $0.usedAt > $1.usedAt }
+        item.lastUsedAt = remaining.first?.usedAt
+        CadenceCloudStore.save(context, label: "deleteUseLog")
     }
 
     /// Manual cash / card purchase (not from bank sync). Amount is money out (stored negative).
