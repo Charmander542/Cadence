@@ -560,16 +560,17 @@ struct CalendarPlannerView: View {
                     .foregroundStyle(isToday ? Color.white : (inMonth ? Theme.ink : Theme.muted.opacity(0.35)))
                     .frame(width: 30, height: 30)
                     .background {
-                        if isToday {
-                            Circle().fill(Theme.accent)
-                        } else if inFocus {
-                            Circle().fill(Theme.accent.opacity(0.18))
-                        }
+                        Circle().fill(
+                            isToday ? Theme.accent
+                            : (inFocus ? Theme.accent.opacity(0.18) : Color.clear)
+                        )
                     }
                     .overlay {
-                        if inFocus && !isToday {
-                            Circle().strokeBorder(Theme.accent.opacity(0.55), lineWidth: 1)
-                        }
+                        Circle()
+                            .strokeBorder(
+                                inFocus && !isToday ? Theme.accent.opacity(0.55) : Color.clear,
+                                lineWidth: 1
+                            )
                     }
                 Circle()
                     .fill(hasItems && inMonth ? Theme.cta.opacity(0.9) : Color.clear)
@@ -577,6 +578,7 @@ struct CalendarPlannerView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 2)
+            .transaction { $0.animation = nil }
         }
         .buttonStyle(.plain)
         .disabled(!inMonth)
@@ -634,21 +636,20 @@ struct CalendarPlannerView: View {
         let items = dayCalendarItems(for: day)
         return VStack(spacing: Theme.Space.sm - 2) {
             ZStack {
-                if isToday {
-                    Circle()
-                        .fill(Theme.accent)
-                        .frame(width: 28, height: 28)
-                } else if isPreview {
-                    Circle()
-                        .stroke(Theme.accent.opacity(0.65), lineWidth: 1.5)
-                        .frame(width: 28, height: 28)
-                }
+                // Stable layers for every cell so the today fill does not trail the pager spring.
+                Circle()
+                    .fill(isToday ? Theme.accent : Color.clear)
+                    .frame(width: 28, height: 28)
+                Circle()
+                    .stroke(isPreview && !isToday ? Theme.accent.opacity(0.65) : Color.clear, lineWidth: 1.5)
+                    .frame(width: 28, height: 28)
                 Text("\(Calendar.current.component(.day, from: day))")
                     .font(.subheadline.weight(isToday ? .bold : .medium))
                     .foregroundStyle(isToday ? Color.white : dayNumberColor(inMonth: inMonth))
             }
             .frame(maxWidth: .infinity)
             .frame(height: 28)
+            .transaction { $0.animation = nil }
             HStack(spacing: 3) {
                 ForEach(0..<min(items.count, 3), id: \.self) { idx in
                     Circle()
@@ -810,6 +811,8 @@ struct CalendarPlannerView: View {
                 dayColumnHeader(day, width: colWidth)
             }
         }
+        // Keep today badge + neighbor labels on one layer during the pager spring.
+        .compositingGroup()
     }
 
     private func focusAllDayCells(days: Int, at pageCursor: Date, colWidth: CGFloat) -> some View {
@@ -875,13 +878,14 @@ struct CalendarPlannerView: View {
                 .font(.caption.weight(.bold))
                 .foregroundStyle(isToday ? Color.white : Theme.ink)
                 .frame(width: 22, height: 22)
+                // Always allocate the circle so today does not form a separate animating layer.
                 .background {
-                    if isToday {
-                        Circle().fill(Theme.accent)
-                    }
+                    Circle().fill(isToday ? Theme.accent : Color.clear)
                 }
         }
         .frame(width: width, height: 32)
+        // Pager spring should move the strip as one unit — not re-animate badge chrome.
+        .transaction { $0.animation = nil }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel({
             let f = DateFormatter()
@@ -1077,22 +1081,11 @@ struct CalendarPlannerView: View {
     }
 
     private func timedEvents(on day: Date) -> [PlannerTaskEntity] {
-        calendarEvents(on: day).filter { task in
-            guard let due = task.dueAt else { return false }
-            return hasTimeComponent(due)
-        }
+        calendarEvents(on: day).filter { !$0.isAllDayEvent }
     }
 
     private func allDayEvents(on day: Date) -> [PlannerTaskEntity] {
-        calendarEvents(on: day).filter { task in
-            guard let due = task.dueAt else { return false }
-            return !hasTimeComponent(due)
-        }
-    }
-
-    private func hasTimeComponent(_ date: Date) -> Bool {
-        let comps = Calendar.current.dateComponents([.hour, .minute], from: date)
-        return (comps.hour ?? 0) != 0 || (comps.minute ?? 0) != 0
+        calendarEvents(on: day).filter(\.isAllDayEvent)
     }
 
     private func workoutEvents(on day: Date, hour: Int) -> WorkoutSessionTemplate? {
@@ -1147,8 +1140,22 @@ private struct CalendarPeriodStrip<Page: View>: View {
                 .allowsHitTesting(false)
         }
         .frame(width: width, height: height, alignment: .leading)
-        .offset(x: -width + dragX)
+        // GeometryEffect keeps every cell (including today chrome) on one animatable transform.
+        .modifier(CalendarPagerOffsetEffect(x: -width + dragX))
         .clipped()
+    }
+}
+
+private struct CalendarPagerOffsetEffect: GeometryEffect {
+    var x: CGFloat
+
+    var animatableData: CGFloat {
+        get { x }
+        set { x = newValue }
+    }
+
+    func effectValue(size: CGSize) -> ProjectionTransform {
+        ProjectionTransform(CGAffineTransform(translationX: x, y: 0))
     }
 }
 

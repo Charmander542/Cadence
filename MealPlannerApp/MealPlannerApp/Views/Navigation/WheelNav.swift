@@ -14,6 +14,8 @@ struct WheelNav: View {
     @Binding var isExpanded: Bool
     /// Reported to RootView so the pull-up peek can overlay without growing the dial inset.
     @Binding var expandPull: CGFloat
+    /// When true, first/last apps are hard ends (no loop). When false, the dial wraps like a wheel.
+    var endStops: Bool = false
     var onSelect: (WheelNavItem) -> Void = { _ in }
 
     /// Continuous wheel angle in item units (2.35 = 35% between item 2 and 3).
@@ -41,6 +43,8 @@ struct WheelNav: View {
     }
 
     private var count: Int { max(items.count, 1) }
+    private var minPosition: Double { 0 }
+    private var maxPosition: Double { Double(max(count - 1, 0)) }
 
     private let spacingDegrees: Double = 24
     private let arcRadius: CGFloat = 186
@@ -81,7 +85,11 @@ struct WheelNav: View {
             .accessibilityElement(children: .contain)
             .accessibilityLabel("Navigation dial")
             .accessibilityValue(selectedItem?.label ?? "")
-            .accessibilityHint("Drag sideways to spin. Flick for momentum. Swipe up to expand the menu.")
+            .accessibilityHint(
+                endStops
+                    ? "Drag sideways to scroll. Stops at the first and last app. Swipe up to expand the menu."
+                    : "Drag sideways to spin. Flick for momentum. Swipe up to expand the menu."
+            )
             .accessibilityAction(named: "Expand menu") {
                 withAnimation(expandSpring) { isExpanded = true }
             }
@@ -99,6 +107,16 @@ struct WheelNav: View {
         .onAppear(perform: handleAppear)
         .onChange(of: selectedId) { _, _ in
             if !isDragging { syncPositionToSelection(animated: false) }
+        }
+        .onChange(of: endStops) { _, _ in
+            // Drop any wrap-accumulated position into the linear 0…n-1 range.
+            if endStops, let index = selectedIndex {
+                var t = Transaction()
+                t.disablesAnimations = true
+                withTransaction(t) { position = Double(index) }
+            } else if !isDragging {
+                syncPositionToSelection(animated: false)
+            }
         }
         .onChange(of: isExpanded, perform: handleExpandedChange)
         .onChange(of: dialGestureActive, perform: handleGestureActiveChange)
@@ -190,9 +208,16 @@ struct WheelNav: View {
         guard let current = selectedIndex else { return }
         let next: Int
         switch direction {
-        case .increment: next = (current + 1) % count
-        case .decrement: next = (current - 1 + count) % count
+        case .increment:
+            next = endStops ? min(count - 1, current + 1) : (current + 1) % count
+        case .decrement:
+            next = endStops ? max(0, current - 1) : (current - 1 + count) % count
         @unknown default: return
+        }
+        guard next != current else {
+            tickHaptics.impactOccurred(intensity: 0.7)
+            tickHaptics.prepare()
+            return
         }
         commit(to: next, haptic: true)
     }
@@ -241,7 +266,7 @@ struct WheelNav: View {
 
     @ViewBuilder
     private func dialIcon(item: WheelNavItem, index: Int, midX: CGFloat, midY: CGFloat) -> some View {
-        let delta = wrappedDelta(Double(index) - position)
+        let delta = itemDelta(for: index)
         let absDelta = abs(delta)
         let visible = absDelta < 2.85
         let t = idleAmount // 0 arc → 1 flat pill
@@ -338,7 +363,8 @@ struct WheelNav: View {
 
                 switch dragAxis {
                 case .horizontal:
-                    position = dragOrigin - Double(tx / segmentWidth)
+                    let raw = dragOrigin - Double(tx / segmentWidth)
+                    position = resistancePosition(from: raw)
                     tickIfNeeded()
                 case .vertical:
                     // Only peek while pulling up; ignore downward noise so chrome never sticks.
@@ -395,7 +421,14 @@ struct WheelNav: View {
             var traveled = 0.0
             while !Task.isCancelled, abs(v) > 0.35, abs(traveled) < maxCoastSegments {
                 let step = v * 0.016
-                position += step
+                let next = position + step
+                if endStops, (next < minPosition && v < 0) || (next > maxPosition && v > 0) {
+                    position = clampedPosition(next)
+                    tickHaptics.impactOccurred(intensity: 0.9)
+                    tickHaptics.prepare()
+                    break
+                }
+                position = next
                 traveled += step
                 v *= 0.935
                 tickIfNeeded()
@@ -407,15 +440,24 @@ struct WheelNav: View {
     }
 
     private func snapToNearest(haptic: Bool) {
-        let targetIndex = Int(position.rounded())
-        let wrapped = ((targetIndex % count) + count) % count
-        let currentNearest = Int(position.rounded())
-        var delta = wrapped - ((currentNearest % count) + count) % count
-        if delta > count / 2 { delta -= count }
-        if delta < -(count / 2) { delta += count }
-        let absoluteTarget = Double(currentNearest + delta)
+        let absoluteTarget: Double
+        let item: WheelNavItem
 
-        let item = items[wrapped]
+        if endStops {
+            let targetIndex = min(count - 1, max(0, Int(position.rounded())))
+            absoluteTarget = Double(targetIndex)
+            item = items[targetIndex]
+        } else {
+            let targetIndex = Int(position.rounded())
+            let wrapped = ((targetIndex % count) + count) % count
+            let currentNearest = Int(position.rounded())
+            var delta = wrapped - ((currentNearest % count) + count) % count
+            if delta > count / 2 { delta -= count }
+            if delta < -(count / 2) { delta += count }
+            absoluteTarget = Double(currentNearest + delta)
+            item = items[wrapped]
+        }
+
         let changed = selectedId != item.id
         if changed {
             selectedId = item.id
@@ -443,7 +485,7 @@ struct WheelNav: View {
         let t = idleAmount
 
         for index in items.indices {
-            let delta = wrappedDelta(Double(index) - position)
+            let delta = itemDelta(for: index)
             guard abs(delta) < 2.85 else { continue }
             let angleRad = delta * spacingDegrees * .pi / 180
             let arcX = midX + CGFloat(sin(angleRad)) * arcRadius
@@ -460,7 +502,9 @@ struct WheelNav: View {
 
     private func tickIfNeeded() {
         let nearest = Int(position.rounded())
-        let clamped = ((nearest % count) + count) % count
+        let clamped = endStops
+            ? min(count - 1, max(0, nearest))
+            : ((nearest % count) + count) % count
         if clamped != lastTickIndex {
             lastTickIndex = clamped
             // Strong detent feel while spinning the dial.
@@ -479,6 +523,11 @@ struct WheelNav: View {
         items.firstIndex { $0.id == selectedId }
     }
 
+    private func itemDelta(for index: Int) -> Double {
+        let raw = Double(index) - position
+        return endStops ? raw : wrappedDelta(raw)
+    }
+
     private func wrappedDelta(_ delta: Double) -> Double {
         var d = delta
         let half = Double(count) / 2
@@ -487,15 +536,44 @@ struct WheelNav: View {
         return d
     }
 
+    private func clampedPosition(_ p: Double) -> Double {
+        min(maxPosition, max(minPosition, p))
+    }
+
+    /// Soft rubber-band past the ends when end stops are on; unrestricted when looping.
+    private func resistancePosition(from raw: Double) -> Double {
+        guard endStops else { return raw }
+        if raw < minPosition {
+            let over = minPosition - raw
+            return minPosition - rubberBand(over)
+        }
+        if raw > maxPosition {
+            let over = raw - maxPosition
+            return maxPosition + rubberBand(over)
+        }
+        return raw
+    }
+
+    private func rubberBand(_ overscroll: Double) -> Double {
+        // Diminishing travel past the stop — springs back on release.
+        overscroll * 0.32 / (1 + overscroll * 0.2)
+    }
+
     private func commit(to index: Int, haptic: Bool) {
         guard items.indices.contains(index) else { return }
         let item = items[index]
         let changed = selectedId != item.id
 
-        let currentNearest = Int(position.rounded())
-        var delta = index - ((currentNearest % count) + count) % count
-        if delta > count / 2 { delta -= count }
-        if delta < -(count / 2) { delta += count }
+        let target: Double
+        if endStops {
+            target = Double(index)
+        } else {
+            let currentNearest = Int(position.rounded())
+            var delta = index - ((currentNearest % count) + count) % count
+            if delta > count / 2 { delta -= count }
+            if delta < -(count / 2) { delta += count }
+            target = Double(currentNearest + delta)
+        }
 
         // Content switch first — dial spring follows so the page doesn't feel late.
         if changed {
@@ -512,18 +590,23 @@ struct WheelNav: View {
         }
 
         withAnimation(commitSpring) {
-            position = Double(currentNearest + delta)
+            position = target
         }
         scheduleIdle()
     }
 
     private func syncPositionToSelection(animated: Bool) {
         guard let index = selectedIndex else { return }
-        let currentNearest = Int(position.rounded())
-        var delta = index - ((currentNearest % count) + count) % count
-        if delta > count / 2 { delta -= count }
-        if delta < -(count / 2) { delta += count }
-        let target = Double(currentNearest + delta)
+        let target: Double
+        if endStops {
+            target = Double(index)
+        } else {
+            let currentNearest = Int(position.rounded())
+            var delta = index - ((currentNearest % count) + count) % count
+            if delta > count / 2 { delta -= count }
+            if delta < -(count / 2) { delta += count }
+            target = Double(currentNearest + delta)
+        }
         guard abs(target - position) > 0.001 else { return }
         if animated {
             withAnimation(commitSpring) {
@@ -574,11 +657,16 @@ struct WheelNav: View {
 
 // MARK: - Full app menu (overlays content — does not resize the dial inset)
 
-/// Hold empty space to edit; drag apps to reorder (Today pinned). − / + for hide/add.
+/// Hold empty space to edit; drag apps to reorder / move between Wheel and Not on wheel.
+/// Browse mode always lists every app in both sections so off-wheel apps stay reachable.
 struct WheelAppMenuOverlay: View {
+    private enum GridMode { case onDial, available }
+
     let items: [WheelNavItem]
     @Binding var selectedId: String
     var onSelect: (WheelNavItem) -> Void
+    /// Called as soon as a swipe-off dismiss starts so the dial can reappear under the sheet.
+    var onRevealDock: (() -> Void)? = nil
     var onDismiss: () -> Void
     /// Optional: sync Lift profile when Workout is toggled from the grid.
     var onWorkoutVisibilityChange: ((Bool) -> Void)? = nil
@@ -589,6 +677,7 @@ struct WheelAppMenuOverlay: View {
     @State private var draggingId: String?
     @State private var dragTranslation: CGSize = .zero
     @State private var hoverTargetId: String?
+    @State private var hoverTargetMode: GridMode?
     @State private var commitHaptics = UIImpactFeedbackGenerator(style: .rigid)
     @State private var editHaptics = UIImpactFeedbackGenerator(style: .heavy)
     @State private var reorderHaptics = UIImpactFeedbackGenerator(style: .medium)
@@ -601,14 +690,22 @@ struct WheelAppMenuOverlay: View {
         .spring(response: 0.28, dampingFraction: 0.92)
     }
 
-    private var visibleItems: [WheelNavItem] {
+    private var wheelItems: [WheelNavItem] {
         _ = appsRevision
         return CadenceAppsPreferences.orderedVisibleDialDestinations.map(\.navItem)
     }
 
-    private var availableItems: [WheelNavItem] {
+    private var offWheelItems: [WheelNavItem] {
         _ = appsRevision
         return CadenceAppsPreferences.hiddenConfigurable.map(\.navItem)
+    }
+
+    private var titleLabel: String {
+        if isEditing { return "Edit apps" }
+        if let match = (wheelItems + offWheelItems).first(where: { $0.id == selectedId }) {
+            return match.label
+        }
+        return "Apps"
     }
 
     var body: some View {
@@ -624,15 +721,16 @@ struct WheelAppMenuOverlay: View {
                 .accessibilityAddTraits(.isButton)
                 .accessibilityAction { dismiss() }
                 .accessibilityHint("Swipe down to close the app menu")
+                .gesture(collapseGesture, isEnabled: !isEditing)
 
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: Theme.Space.xs) {
-                    Text(isEditing ? "Edit apps" : (visibleItems.first(where: { $0.id == selectedId })?.label ?? "Apps"))
+                    Text(titleLabel)
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(Theme.ink)
                     Text(isEditing
-                         ? "Drag to reorder · tap − / +"
-                         : "Hold empty space to edit · swipe down to close")
+                         ? "Drag to reorder or switch · tap − / +"
+                         : "All apps · hold empty space to edit · swipe down to close")
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
                         .accessibilityHidden(true)
@@ -649,19 +747,15 @@ struct WheelAppMenuOverlay: View {
             }
             .padding(.horizontal, Theme.Space.xl + 4)
             .padding(.bottom, Theme.Space.sm)
+            // Header band dismisses the sheet so ScrollView can own vertical scrolling below.
+            .contentShape(Rectangle())
+            .gesture(collapseGesture, isEnabled: !isEditing)
 
-            // Fixed grid while browsing — vertical drag dismisses the whole sheet.
-            // Scroll only when editing (Available list can overflow).
-            Group {
-                if isEditing {
-                    ScrollView(showsIndicators: false) {
-                        appMenuBody
-                    }
-                    .scrollDisabled(draggingId != nil)
-                } else {
-                    appMenuBody
-                }
+            // Always scroll — both sections can overflow a single viewport.
+            ScrollView(showsIndicators: false) {
+                appMenuBody
             }
+            .scrollDisabled(draggingId != nil)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity)
@@ -680,14 +774,12 @@ struct WheelAppMenuOverlay: View {
         )
         .padding(.bottom, 0)
         .offset(y: max(0, dragOffset))
-        // Whole sheet swipes down as one unit (not scroll/reorder the apps).
-        .gesture(collapseGesture, isEnabled: !isEditing)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("App menu")
         .accessibilityHint(
             isEditing
-                ? "Drag apps to reorder, or add and remove apps"
-                : "Choose an app. Hold empty space to edit. Swipe down to collapse."
+                ? "Drag apps to reorder or move between Wheel and Not on wheel"
+                : "Choose any app. Hold empty space to edit. Swipe down to collapse."
         )
         .onReceive(NotificationCenter.default.publisher(for: CadenceAppsPreferences.didChange)) { _ in
             appsRevision += 1
@@ -706,17 +798,15 @@ struct WheelAppMenuOverlay: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: Theme.Space.xl) {
-                appGrid(visibleItems, mode: .onDial)
+                sectionBlock(title: "WHEEL", items: wheelItems, mode: .onDial)
 
-                if isEditing, !availableItems.isEmpty {
-                    VStack(alignment: .leading, spacing: Theme.Space.md) {
-                        Text("AVAILABLE")
-                            .font(.caption2.weight(.bold))
-                            .tracking(0.6)
-                            .foregroundStyle(Theme.muted)
-                            .padding(.horizontal, Theme.Space.xl)
-                        appGrid(availableItems, mode: .available)
-                    }
+                if !offWheelItems.isEmpty || isEditing {
+                    sectionBlock(
+                        title: "NOT ON WHEEL",
+                        items: offWheelItems,
+                        mode: .available,
+                        emptyCopy: isEditing ? "All apps are on the wheel" : nil
+                    )
                 }
             }
             .padding(.top, Theme.Space.lg)
@@ -724,7 +814,34 @@ struct WheelAppMenuOverlay: View {
         }
     }
 
-    private enum GridMode { case onDial, available }
+    @ViewBuilder
+    private func sectionBlock(
+        title: String,
+        items: [WheelNavItem],
+        mode: GridMode,
+        emptyCopy: String? = nil
+    ) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Space.md) {
+            Text(title)
+                .font(.caption2.weight(.bold))
+                .tracking(0.6)
+                .foregroundStyle(Theme.muted)
+                .padding(.horizontal, Theme.Space.xl)
+                .accessibilityAddTraits(.isHeader)
+
+            if items.isEmpty {
+                if let emptyCopy {
+                    Text(emptyCopy)
+                        .font(.footnote)
+                        .foregroundStyle(Theme.muted.opacity(0.85))
+                        .padding(.horizontal, Theme.Space.xl)
+                        .padding(.bottom, Theme.Space.sm)
+                }
+            } else {
+                appGrid(items, mode: mode)
+            }
+        }
+    }
 
     private func appGrid(_ gridItems: [WheelNavItem], mode: GridMode) -> some View {
         LazyVGrid(
@@ -740,13 +857,15 @@ struct WheelAppMenuOverlay: View {
     }
 
     private func cell(_ item: WheelNavItem, sort: Double, mode: GridMode) -> some View {
-        let selected = item.id == selectedId && mode == .onDial
+        let selected = item.id == selectedId
         let dest = WheelDestination(rawValue: item.id)
         let canRemove = mode == .onDial
             && isEditing
             && dest.map { CadenceAppsPreferences.configurable.contains($0) } == true
         let canAdd = mode == .available && isEditing
-        let canReorder = isEditing && mode == .onDial && canRemove
+        let canReorder = isEditing
+            && dest.map { CadenceAppsPreferences.configurable.contains($0) } == true
+            && (mode == .onDial ? canRemove : canAdd)
         let isDragging = draggingId == item.id
         let isHoverTarget = hoverTargetId == item.id && draggingId != nil && draggingId != item.id
 
@@ -839,18 +958,18 @@ struct WheelAppMenuOverlay: View {
                 }
                 guard draggingId == item.id else { return }
                 dragTranslation = value.translation
-                updateHoverTarget(for: item, translation: value.translation)
+                updateHoverTarget(for: item, from: mode, translation: value.translation)
             },
             onEnded: {
-                commitReorder(of: item)
+                commitReorder(of: item, from: mode)
             }
         ))
         .accessibilityLabel(item.label)
         .accessibilityHint(
             isEditing
                 ? (canRemove
-                   ? "Hides \(item.label). Drag to reorder."
-                   : (canAdd ? "Adds \(item.label) to the wheel" : "Pinned. Cannot reorder."))
+                   ? "Removes \(item.label) from the wheel. Drag to reorder or move off the wheel."
+                   : (canAdd ? "Adds \(item.label) to the wheel. Drag onto the wheel section." : "Pinned. Cannot reorder."))
                 : "Opens \(item.label)"
         )
         .accessibilityIdentifier("wheel-app-\(item.id)")
@@ -864,40 +983,99 @@ struct WheelAppMenuOverlay: View {
         }
     }
 
-    private func updateHoverTarget(for item: WheelNavItem, translation: CGSize) {
+    private func updateHoverTarget(for item: WheelNavItem, from mode: GridMode, translation: CGSize) {
         // Approximate grid cell size for 4-column layout.
         let cellW: CGFloat = (UIScreen.main.bounds.width - Theme.Space.xl * 2) / 4
         let cellH: CGFloat = 72 + 12 + 20 + 24
-        let colDelta = Int(round(translation.width / cellW))
-        let rowDelta = Int(round(translation.height / cellH))
-        guard let fromIndex = visibleItems.firstIndex(where: { $0.id == item.id }) else { return }
         let cols = 4
+        let sourceList = mode == .onDial ? wheelItems : offWheelItems
+        guard let fromIndex = sourceList.firstIndex(where: { $0.id == item.id }) else { return }
+
         let fromRow = fromIndex / cols
         let fromCol = fromIndex % cols
-        let toRow = max(0, fromRow + rowDelta)
+        let colDelta = Int(round(translation.width / cellW))
+        let rowDelta = Int(round(translation.height / cellH))
         let toCol = min(cols - 1, max(0, fromCol + colDelta))
-        let toIndex = min(visibleItems.count - 1, toRow * cols + toCol)
-        let target = visibleItems[toIndex]
-        if hoverTargetId != target.id {
+
+        // Crossing the section gap (~1 row of header + padding) switches lists.
+        let wheelRows = max(1, Int(ceil(Double(wheelItems.count) / Double(cols))))
+        let crossedOffWheel: Bool = {
+            if mode == .onDial {
+                return (fromRow + rowDelta) >= wheelRows
+            }
+            return (fromRow + rowDelta) < 0
+        }()
+
+        let targetMode: GridMode = crossedOffWheel
+            ? (mode == .onDial ? .available : .onDial)
+            : mode
+        let targetList = targetMode == .onDial ? wheelItems : offWheelItems
+
+        let localRow: Int = {
+            if mode == .onDial, targetMode == .available {
+                return max(0, fromRow + rowDelta - wheelRows)
+            }
+            if mode == .available, targetMode == .onDial {
+                return max(0, wheelRows + fromRow + rowDelta)
+            }
+            return max(0, fromRow + rowDelta)
+        }()
+
+        guard !targetList.isEmpty else {
+            if hoverTargetId != nil || hoverTargetMode != targetMode {
+                hoverTargetId = nil
+                hoverTargetMode = targetMode
+                reorderHaptics.impactOccurred(intensity: 0.55)
+                reorderHaptics.prepare()
+            }
+            return
+        }
+
+        let toIndex = min(targetList.count - 1, localRow * cols + toCol)
+        let target = targetList[toIndex]
+        if hoverTargetId != target.id || hoverTargetMode != targetMode {
             hoverTargetId = target.id
-            if target.id != item.id {
+            hoverTargetMode = targetMode
+            if target.id != item.id || targetMode != mode {
                 reorderHaptics.impactOccurred(intensity: 0.9)
                 reorderHaptics.prepare()
             }
         }
     }
 
-    private func commitReorder(of item: WheelNavItem) {
+    private func commitReorder(of item: WheelNavItem, from mode: GridMode) {
         defer {
             withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
                 draggingId = nil
                 dragTranslation = .zero
                 hoverTargetId = nil
+                hoverTargetMode = nil
             }
         }
-        guard let targetId = hoverTargetId,
+        guard let moving = WheelDestination(rawValue: item.id),
+              CadenceAppsPreferences.configurable.contains(moving) else { return }
+
+        let targetMode = hoverTargetMode ?? mode
+        let targetId = hoverTargetId
+
+        // Dropped into the other section (or empty other section).
+        if targetMode != mode {
+            let makeVisible = targetMode == .onDial
+            CadenceAppsPreferences.setVisible(moving, makeVisible)
+            if moving == .workout { onWorkoutVisibilityChange?(makeVisible) }
+            if makeVisible, let targetId, let target = WheelDestination(rawValue: targetId),
+               CadenceAppsPreferences.isVisible(target) {
+                CadenceAppsPreferences.moveDialDestination(moving, onto: target)
+            }
+            commitHaptics.impactOccurred(intensity: 1.0)
+            commitHaptics.prepare()
+            return
+        }
+
+        // Same section: reorder only on the wheel.
+        guard mode == .onDial,
+              let targetId,
               targetId != item.id,
-              let moving = WheelDestination(rawValue: item.id),
               let target = WheelDestination(rawValue: targetId) else { return }
         CadenceAppsPreferences.moveDialDestination(moving, onto: target)
         commitHaptics.impactOccurred(intensity: 1.0)
@@ -936,6 +1114,7 @@ struct WheelAppMenuOverlay: View {
         draggingId = nil
         dragTranslation = .zero
         hoverTargetId = nil
+        hoverTargetMode = nil
         withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
             isEditing = false
         }
@@ -976,18 +1155,22 @@ struct WheelAppMenuOverlay: View {
         draggingId = nil
         dragTranslation = .zero
         hoverTargetId = nil
+        hoverTargetMode = nil
 
         // Finish the downward swipe off-screen first. Resetting dragOffset to 0 here
         // used to snap the sheet *up* while the dial faded in → ghost app icons.
         if animatedSlideOff || dragOffset > 8 {
             let distance = max(dragOffset, panelHeight * 0.4)
+            // Restore dial under the sheet immediately — don't wait for slide to finish.
+            onRevealDock?()
             withAnimation(dismissSpring) {
                 dragOffset = distance + panelHeight
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.26) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
                 onDismiss()
             }
         } else {
+            onRevealDock?()
             withAnimation(dismissSpring) {
                 onDismiss()
             }

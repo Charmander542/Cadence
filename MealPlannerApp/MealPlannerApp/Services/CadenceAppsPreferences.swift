@@ -10,6 +10,7 @@ enum CadenceAppsPreferences {
 
     private static let orderKey = "cadence_apps_order_v1"
     private static let hiddenKeyPrefix = "cadence_app_hidden_"
+    private static let dialEndStopsKey = "cadence_dial_end_stops_v1"
 
     /// Destinations users can show/hide on the dial + app grid.
     static let configurable: [WheelDestination] = [
@@ -19,6 +20,15 @@ enum CadenceAppsPreferences {
 
     /// Always present on the dial (home).
     static let pinned: [WheelDestination] = [.today]
+
+    /// When true, the bottom dial stops at the first/last app instead of looping like a wheel.
+    static var dialHasEndStops: Bool {
+        get { UserDefaults.standard.bool(forKey: dialEndStopsKey) }
+        set {
+            UserDefaults.standard.set(newValue, forKey: dialEndStopsKey)
+            notify()
+        }
+    }
 
     static var orderedVisibleDialDestinations: [WheelDestination] {
         var result: [WheelDestination] = pinned.filter { isVisible($0) }
@@ -232,6 +242,11 @@ final class CadenceAppsModel: ObservableObject {
     var dialItems: [WheelNavItem] {
         _ = revision
         return CadenceAppsPreferences.orderedVisibleDialDestinations.map(\.navItem)
+    }
+
+    var dialHasEndStops: Bool {
+        _ = revision
+        return CadenceAppsPreferences.dialHasEndStops
     }
 
     func isVisible(_ destination: WheelDestination) -> Bool {

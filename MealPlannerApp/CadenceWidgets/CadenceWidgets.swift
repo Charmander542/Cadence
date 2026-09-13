@@ -39,7 +39,14 @@ private enum WidgetTheme {
 
     static var ink: Color { Color.primary }
     static var muted: Color { Color.secondary }
-    static var accent: Color { Color("AccentColor") }
+    /// Hardcoded — widget target has no Assets catalog, so `Color("AccentColor")` resolves clear.
+    static var accent: Color {
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark
+                ? UIColor(red: 1, green: 0.478, blue: 0, alpha: 1)
+                : UIColor(red: 1, green: 0.42, blue: 0, alpha: 1)
+        })
+    }
 
     static func matrixTint(_ id: String) -> Color {
         switch id {

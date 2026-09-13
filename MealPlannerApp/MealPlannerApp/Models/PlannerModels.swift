@@ -185,10 +185,10 @@ enum PlannerDestination: Hashable {
 
 @Model
 final class PlannerTagEntity {
-    var id: UUID
-    var name: String
-    var colorHex: String
-    var createdAt: Date
+    var id: UUID = UUID()
+    var name: String = ""
+    var colorHex: String = ""
+    var createdAt: Date = Date()
 
     init(name: String, colorHex: String) {
         id = UUID()
@@ -200,16 +200,16 @@ final class PlannerTagEntity {
 
 @Model
 final class TaskListEntity {
-    var id: UUID
-    var name: String
-    var isSystem: Bool
-    var sortOrder: Int
-    var createdAt: Date
+    var id: UUID = UUID()
+    var name: String = ""
+    var isSystem: Bool = false
+    var sortOrder: Int = 0
+    var createdAt: Date = Date()
     /// When true, undated open tasks in this list appear on Today.
     var showInToday: Bool = true
 
     @Relationship(deleteRule: .cascade, inverse: \PlannerTaskEntity.list)
-    var tasks: [PlannerTaskEntity]
+    var tasks: [PlannerTaskEntity] = []
 
     init(name: String, isSystem: Bool = false, sortOrder: Int = 0, showInToday: Bool? = nil) {
         id = UUID()
@@ -228,22 +228,22 @@ final class TaskListEntity {
 
 @Model
 final class PlannerTaskEntity {
-    var id: UUID
-    var title: String
-    var notes: String
+    var id: UUID = UUID()
+    var title: String = ""
+    var notes: String = ""
     var location: String = ""
     var tagsRaw: String = ""
     var colorHex: String = ""
     var dueAt: Date?
     var reminderAt: Date?
-    var durationMinutes: Int
+    var durationMinutes: Int = 60
     var recurrenceRaw: String = "none"
     /// Bitmask for custom weekly repeat (Calendar weekday 1=Sun … 7=Sat).
     var recurrenceWeekdayMask: Int = 0
-    var priorityRaw: String
-    var isCompleted: Bool
+    var priorityRaw: String = "none"
+    var isCompleted: Bool = false
     var completedAt: Date?
-    var createdAt: Date
+    var createdAt: Date = Date()
     var list: TaskListEntity?
     /// EventKit event identifiers per Apple sub-calendar (calendarIdentifier → eventIdentifier).
     var appleCalendarEventIDsJSON: String = "{}"
@@ -308,6 +308,14 @@ final class PlannerTaskEntity {
         return dueAt < Calendar.current.startOfDay(for: .now)
     }
 
+    /// All-day events are stored at midnight with a ≥24h duration; midnight timed events keep a shorter duration.
+    var isAllDayEvent: Bool {
+        guard let dueAt else { return false }
+        let comps = Calendar.current.dateComponents([.hour, .minute], from: dueAt)
+        let atMidnight = (comps.hour ?? 0) == 0 && (comps.minute ?? 0) == 0
+        return atMidnight && durationMinutes >= 24 * 60
+    }
+
     var appleCalendarEventIDs: [String: String] {
         get { CalendarEventIDMap.decode(appleCalendarEventIDsJSON, legacy: appleCalendarEventID, legacyCalendarID: PlannerPreferences.appleCalendarIdentifier) }
         set {
@@ -350,22 +358,22 @@ enum CalendarEventIDMap {
 
 @Model
 final class HabitEntity {
-    var id: UUID
-    var name: String
-    var icon: String
+    var id: UUID = UUID()
+    var name: String = ""
+    var icon: String = "checkmark.circle.fill"
     var iconColorHex: String = "5BCB8A"
-    var periodRaw: String
+    var periodRaw: String = "other"
     var frequencyRaw: String = "daily"
     /// Bitmask for Calendar weekday (1=Sun … 7=Sat) → bit (weekday - 1).
     var weekdayMask: Int = 127
-    var sortOrder: Int
-    var createdAt: Date
-    var reminderHour: Int
-    var reminderMinute: Int
+    var sortOrder: Int = 0
+    var createdAt: Date = Date()
+    var reminderHour: Int = 8
+    var reminderMinute: Int = 0
     var remindersEnabled: Bool = true
 
     @Relationship(deleteRule: .cascade, inverse: \HabitLogEntity.habit)
-    var logs: [HabitLogEntity]
+    var logs: [HabitLogEntity] = []
 
     init(
         name: String,
@@ -432,9 +440,9 @@ enum HabitLogStatus: String, Codable {
 
 @Model
 final class HabitLogEntity {
-    var id: UUID
-    var day: Date
-    var statusRaw: String
+    var id: UUID = UUID()
+    var day: Date = Date()
+    var statusRaw: String = "done"
     var habit: HabitEntity?
 
     init(day: Date, status: HabitLogStatus, habit: HabitEntity) {

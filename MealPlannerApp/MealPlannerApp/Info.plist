@@ -30,6 +30,10 @@
 	</dict>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>Cadence sends reminders for tasks, habits, workouts, and planned meals.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

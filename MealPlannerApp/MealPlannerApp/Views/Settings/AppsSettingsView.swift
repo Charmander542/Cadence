@@ -12,6 +12,23 @@ struct AppsSettingsView: View {
     var body: some View {
         Form {
             Section {
+                Toggle(isOn: endStopsBinding) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("End stops")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(Theme.ink)
+                        Text("Stop at the first and last app instead of looping")
+                            .font(.caption)
+                            .foregroundStyle(Theme.muted)
+                    }
+                }
+                .tint(Theme.cta)
+                .accessibilityHint("When on, swiping past the ends of the dial stops instead of wrapping around")
+            } header: {
+                settingsDetailSectionHeader("Dial motion")
+            }
+
+            Section {
                 ForEach(appsModel.orderedConfigurableVisible, id: \.rawValue) { dest in
                     appRow(dest, visible: true)
                 }
@@ -63,6 +80,16 @@ struct AppsSettingsView: View {
         .environment(\.editMode, $editMode)
         .settingsFormChrome()
         .id(appsModel.revision)
+    }
+
+    private var endStopsBinding: Binding<Bool> {
+        Binding(
+            get: { appsModel.dialHasEndStops },
+            set: { on in
+                CadenceAppsPreferences.dialHasEndStops = on
+                statusMessage = on ? "Dial uses end stops." : "Dial loops like a wheel."
+            }
+        )
     }
 
     @ViewBuilder

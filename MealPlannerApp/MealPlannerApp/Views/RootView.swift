@@ -160,6 +160,12 @@ struct MainTabView: View {
                             items: wheelItems,
                             selectedId: $selectedWheelId,
                             onSelect: handleWheelSelect,
+                            onRevealDock: {
+                                // While the sheet slides off, restore the dial underneath.
+                                withAnimation(.easeOut(duration: 0.12)) {
+                                    showWheelDock = true
+                                }
+                            },
                             onDismiss: {
                                 // Menu already slid off — drop overlay without bringing the dial back early.
                                 var t = Transaction()
@@ -404,17 +410,17 @@ struct MainTabView: View {
             selectedId: $selectedWheelId,
             isExpanded: $isAppGridExpanded,
             expandPull: $wheelExpandPull,
+            endStops: appsModel.dialHasEndStops,
             onSelect: handleWheelSelect
         )
         .zIndex(2)
     }
 
     private func revealWheelDockAfterMenu() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
-            guard !isAppGridExpanded else { return }
-            withAnimation(.easeOut(duration: 0.16)) {
-                showWheelDock = true
-            }
+        // Menu is already gone (or fading) — bring the dial back immediately.
+        guard !isAppGridExpanded else { return }
+        withAnimation(.easeOut(duration: 0.12)) {
+            showWheelDock = true
         }
     }
 
@@ -539,27 +545,19 @@ struct MainTabView: View {
             if dest == .workout { return .health }
             return dest
         }()
-        let target: WheelDestination = {
-            if remapped.showsContentPage, !CadenceAppsPreferences.isVisible(remapped) {
-                return .today
-            }
-            return remapped
-        }()
-        loadedPages.insert(target.rawValue)
-        selectedWheelId = target.rawValue
-        if target.showsContentPage {
-            contentDestination = target
+        // Off-wheel apps stay openable from the swipe-up menu; dial only lists on-wheel apps.
+        loadedPages.insert(remapped.rawValue)
+        selectedWheelId = remapped.rawValue
+        if remapped.showsContentPage {
+            contentDestination = remapped
         }
-        if let legacy = target.legacyTabIndex {
+        if let legacy = remapped.legacyTabIndex {
             selectedTab = legacy
         }
     }
 
     private func openShop() {
-        guard CadenceAppsPreferences.isVisible(.meals) else {
-            selectWheel(.today)
-            return
-        }
+        // Shop follows Meals; allow via menu even when Meals is off the wheel.
         loadedPages.insert(WheelDestination.meals.rawValue)
         contentDestination = .meals
         selectedTab = WheelDestination.meals.legacyTabIndex ?? 2
@@ -575,9 +573,17 @@ struct MainTabView: View {
             selectWheel(.today)
             return
         }
-        if dest.showsContentPage, !CadenceAppsPreferences.isVisible(dest) {
-            selectWheel(.today)
-        } else if !WheelDestination.dialCases.contains(dest), dest != .shop, dest != .settings {
+        if dest == .workout {
+            selectWheel(.health)
+            return
+        }
+        // Off-wheel apps remain valid (reachable from the app menu). Only bounce unknowns.
+        let known = dest.showsContentPage
+            || dest == .shop
+            || dest == .settings
+            || CadenceAppsPreferences.configurable.contains(dest)
+            || CadenceAppsPreferences.pinned.contains(dest)
+        if !known {
             selectWheel(.today)
         }
     }
@@ -693,7 +699,7 @@ enum WheelDestination: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    /// Destinations shown on the rotary dial and swipe-up app grid.
+    /// Destinations shown on the rotary dial. Swipe-up menu lists all apps in Wheel / Not on wheel.
     /// Shop and Settings open as sheets from the drawer / Meals, not the dial.
     /// Visibility comes from `CadenceAppsPreferences` (edit grid + Settings → Apps).
     static var dialCases: [WheelDestination] {

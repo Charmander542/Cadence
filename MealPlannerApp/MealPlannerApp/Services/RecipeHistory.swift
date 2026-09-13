@@ -4,11 +4,11 @@ import SwiftData
 /// Remembers recipes used in past weekly plans so we can avoid repeats/near-duplicates.
 @Model
 final class RecipeHistoryEntity {
-    var recipeID: String
-    var title: String
+    var recipeID: String = ""
+    var title: String = ""
     /// Compact similarity key: sorted tags + primary protein tokens from the title/ingredients.
-    var fingerprint: String
-    var usedAt: Date
+    var fingerprint: String = ""
+    var usedAt: Date = Date()
 
     init(recipeID: String, title: String, fingerprint: String, usedAt: Date = .now) {
         self.recipeID = recipeID

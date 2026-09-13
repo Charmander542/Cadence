@@ -26,7 +26,8 @@ MealPlannerApp/MealPlannerApp/
 
 - Do not put Spend/Health/News logic in meal planning or `WorkoutIntegration`.
 - Do not embed Plaid secrets, Teller mTLS keys, or news API secrets in the app binary (Keychain / gitignored local plist only).
-- Visibility for **all** dial apps (Meals, Workout, Habits, Spend, …) uses `CadenceAppsPreferences` — swipe-up **Edit** / hold-to-edit grid + **Settings → Apps & wheel**.
+- Visibility for **all** dial apps (Meals, Workout, Habits, Spend, …) uses `CadenceAppsPreferences` — swipe-up menu shows **Wheel** / **Not on wheel** (hold to edit, drag to reorder or switch) + **Settings → Apps & wheel**. Off-wheel apps stay openable from the menu.
+- Dial motion: **Settings → Apps & wheel → End stops** — when on, the bottom dial stops at the first/last app instead of looping.
 - Optional module manifests still live in `CadenceSubAppRegistry`; `isWheelEnabled` delegates to apps prefs.
 - Orange = nav/selection; blue = primary CTAs.
 

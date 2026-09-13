@@ -2390,8 +2390,26 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 | Field | Value |
 |-------|-------|
 | **Phase** | `RUNNING` |
-| **Next batch** | **LK** |
-| **Summary** | LJ: Mobbin Bevel redesign — stepped hypnogram + scrub tooltip; Sleep tab on-page; fewer pointless sheets. Next: LK Overview polish / cardio. |
+| **Next batch** | **LN** |
+| **Summary** | LL verified: calendar today badge stays in sync with pager swipe. Next: LN audit/polish. |
+
+### Batch LL — Calendar today swipe lag (user)
+
+- [x] **Today date lags during calendar swipe** — conditional today circle inherited the pager spring as a separate layer. — 2026-09-12
+  → Fix: stable Circle layers + `transaction { animation = nil }` on day chrome; `CalendarPagerOffsetEffect` GeometryEffect for strip offset; header `compositingGroup()`.
+- [x] **Append**.
+
+### Batch LM — Countdown widget numbers (user)
+
+- [x] **Countdown widget shows no numbers** — digit `Text` used `Color("AccentColor")` but CadenceWidgets has no asset catalog, so accent resolved clear. — 2026-09-12
+  → Fix: `WidgetTheme.accent` hardcodes AccentColor RGB (light/dark) in `CadenceWidgets.swift`.
+
+### Batch LK — Swipe-up menu all apps (user)
+
+- [x] **Menu showed only on-wheel apps** — always list **WHEEL** + **NOT ON WHEEL**; tap opens any app without adding it to the dial. — 2026-09-12
+  → Fix: `WheelAppMenuOverlay` dual sections + scroll; `RootView.selectWheel` / `ensureSelectionVisible` allow off-wheel pages.
+- [x] **Hold to edit still moves / switches** — − / + and drag reorder; drag across sections adds/removes from wheel. — 2026-09-12
+- [x] **Append**.
 
 ### Batch LJ — Mobbin Bevel redesign (user: not loving it / graph bad)
 

@@ -1,19 +1,19 @@
 import Foundation
 import SwiftData
 
-/// SwiftData models for local-only persistence (v1: no multi-device sync).
+/// SwiftData models — synced via iCloud CloudKit when available.
 @Model
 final class UserProfileEntity {
-    var weightLbs: Double
-    var heightInches: Double
-    var age: Int
-    var sexRaw: String
-    var activityRaw: String
-    var goalRaw: String
-    var servingsPerRecipe: Int
-    var dietaryRestrictionsText: String
-    var dietaryFilterJSON: String
-    var enabledSourcesJSON: String
+    var weightLbs: Double = 165
+    var heightInches: Double = 70
+    var age: Int = 30
+    var sexRaw: String = "male"
+    var activityRaw: String = "moderate"
+    var goalRaw: String = "muscleGain"
+    var servingsPerRecipe: Int = 4
+    var dietaryRestrictionsText: String = ""
+    var dietaryFilterJSON: String = "[]"
+    var enabledSourcesJSON: String = "[]"
     var availableToolsJSON: String = #"["stove","oven","microwave"]"#
     /// Days before the same recipe can be recommended again.
     var recipeCooldownDays: Int = 21
@@ -24,15 +24,15 @@ final class UserProfileEntity {
     /// When false, hide Lift schedule cards, calendar chips, and workout reminders.
     var workoutsEnabled: Bool = true
 
-    var bmr: Double
-    var tdee: Double
-    var targetCalories: Double
-    var targetProteinG: Double
-    var targetCarbsG: Double
-    var targetFatG: Double
-    var rationale: String
-    var onboardingComplete: Bool
-    var updatedAt: Date
+    var bmr: Double = 0
+    var tdee: Double = 0
+    var targetCalories: Double = 0
+    var targetProteinG: Double = 0
+    var targetCarbsG: Double = 0
+    var targetFatG: Double = 0
+    var rationale: String = ""
+    var onboardingComplete: Bool = false
+    var updatedAt: Date = Date()
 
     init() {
         weightLbs = 165
@@ -114,9 +114,9 @@ final class UserProfileEntity {
 
 @Model
 final class WeeklyPlanEntity {
-    var generatedAt: Date
-    var planJSON: String
-    var rationaleSummary: String
+    var generatedAt: Date = Date()
+    var planJSON: String = "{}"
+    var rationaleSummary: String = ""
 
     init(plan: WeeklyPlan) {
         generatedAt = plan.generatedAt
@@ -136,16 +136,16 @@ final class WeeklyPlanEntity {
 
 @Model
 final class GroceryItemEntity {
-    var ingredientName: String
-    var category: String
-    var quantity: Double
-    var unit: String
-    var isApproximate: Bool
-    var note: String
-    var isChecked: Bool
-    var isManual: Bool
-    var sortOrder: Int
-    var planGeneratedAt: Date
+    var ingredientName: String = ""
+    var category: String = ""
+    var quantity: Double = 0
+    var unit: String = ""
+    var isApproximate: Bool = false
+    var note: String = ""
+    var isChecked: Bool = false
+    var isManual: Bool = false
+    var sortOrder: Int = 0
+    var planGeneratedAt: Date = Date()
 
     init(from item: ConsolidatedGroceryItem, planGeneratedAt: Date, sortOrder: Int) {
         ingredientName = item.ingredientName
@@ -176,8 +176,8 @@ final class GroceryItemEntity {
 
 @Model
 final class PantryItemEntity {
-    var name: String
-    var createdAt: Date
+    var name: String = ""
+    var createdAt: Date = Date()
 
     init(name: String, createdAt: Date = .now) {
         self.name = name
@@ -221,8 +221,8 @@ enum Pantry {
 
 @Model
 final class WorkoutPlanEntity {
-    var planJSON: String
-    var updatedAt: Date
+    var planJSON: String = "{}"
+    var updatedAt: Date = Date()
 
     init(plan: WorkoutPlanState = .fresh) {
         updatedAt = .now
@@ -252,14 +252,14 @@ final class WorkoutPlanEntity {
 
 @Model
 final class WorkoutLogEntity {
-    var id: UUID
-    var sessionID: String
-    var sessionName: String
-    var startedAt: Date
-    var finishedAt: Date
-    var durationSec: Int
-    var logJSON: String
-    var loggedIncomplete: Bool
+    var id: UUID = UUID()
+    var sessionID: String = ""
+    var sessionName: String = ""
+    var startedAt: Date = Date()
+    var finishedAt: Date = Date()
+    var durationSec: Int = 0
+    var logJSON: String = "{}"
+    var loggedIncomplete: Bool = false
 
     init(workout: LoggedWorkout) {
         id = workout.id

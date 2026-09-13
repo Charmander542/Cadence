@@ -38,17 +38,37 @@ struct MealPlannerApp: App {
         ])
         // v10: Import Apple/Google calendar events into Cadence.
         // Merchant rules added via lightweight schema expansion (no store rename).
-        let config = ModelConfiguration("musclemeal-v10", isStoredInMemoryOnly: false)
+        // CloudKit syncs SwiftData across devices signed into the same iCloud account.
+        let cloudConfig = ModelConfiguration(
+            "musclemeal-v10",
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .automatic
+        )
         do {
-            return try ModelContainer(for: schema, configurations: [config])
+            return try ModelContainer(for: schema, configurations: [cloudConfig])
         } catch {
             // A failed lightweight migration can leave the SQLite store unusable.
-            // Remove it once and recreate so the app can launch (simulator/dev recovery).
-            Self.removeStoreFiles(at: config.url)
+            // Remove once and retry with CloudKit (iCloud can restore previously synced data).
+            Self.removeStoreFiles(at: cloudConfig.url)
             do {
-                return try ModelContainer(for: schema, configurations: [config])
+                return try ModelContainer(for: schema, configurations: [cloudConfig])
             } catch {
-                fatalError("Could not create ModelContainer: \(error)")
+                // Last resort: local-only so the app still launches without iCloud.
+                let localConfig = ModelConfiguration(
+                    "musclemeal-v10-local",
+                    isStoredInMemoryOnly: false,
+                    cloudKitDatabase: .none
+                )
+                do {
+                    return try ModelContainer(for: schema, configurations: [localConfig])
+                } catch {
+                    Self.removeStoreFiles(at: localConfig.url)
+                    do {
+                        return try ModelContainer(for: schema, configurations: [localConfig])
+                    } catch {
+                        fatalError("Could not create ModelContainer: \(error)")
+                    }
+                }
             }
         }
     }
