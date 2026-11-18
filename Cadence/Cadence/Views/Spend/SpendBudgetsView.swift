@@ -14,13 +14,30 @@ struct SpendBudgetsView: View {
         SpendStore.monthBounds()
     }
 
-    private var monthSpend: Double {
-        SpendStore.categorySlices(transactions: transactions, budgets: budgets, in: range)
-            .map(\.amount).reduce(0, +)
+    private var primary: SpendStore.PrimaryBudget? {
+        SpendStore.primaryBudget(budgets: budgets)
+    }
+
+    private var monthSpendTowardPrimary: Double {
+        SpendStore.spendTowardPrimaryBudget(
+            transactions: transactions,
+            budgets: budgets,
+            in: range,
+            excludesBillsUtilities: primary?.excludesBillsUtilities ?? false
+        )
+    }
+
+    private var discretionarySpend: Double {
+        SpendStore.spendTowardPrimaryBudget(
+            transactions: transactions,
+            budgets: budgets,
+            in: range,
+            excludesBillsUtilities: true
+        )
     }
 
     private var totalBudget: Double {
-        SpendStore.totalBudgeted(budgets: budgets)
+        primary?.amount ?? 0
     }
 
     var body: some View {
@@ -31,10 +48,10 @@ struct SpendBudgetsView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Theme.muted)
                     HStack(alignment: .firstTextBaseline) {
-                        Text(SpendFormat.money(monthSpend))
+                        Text(SpendFormat.money(monthSpendTowardPrimary))
                             .font(Theme.display(.title2))
                             .foregroundStyle(Theme.ink)
-                        Text("spent")
+                        Text(primary?.excludesBillsUtilities == true ? "discretionary" : "spent")
                             .font(.subheadline)
                             .foregroundStyle(Theme.muted)
                         Spacer()
@@ -42,12 +59,30 @@ struct SpendBudgetsView: View {
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(Theme.cta)
                     }
-                    Text("Set a limit for each category. Nested budgets (Kitchen, Utilities) are optional extras.")
+                    Text("Set All Except Bills & Utilities for a discretionary envelope, or budget each category. Nested budgets (Kitchen under Home) are optional extras.")
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .listRowBackground(Theme.surface)
+            }
+
+            Section {
+                BudgetAmountRow(
+                    title: "All Except Bills & Utilities",
+                    tint: SpendCategory.billsUtilities.tint,
+                    systemImage: "chart.pie",
+                    amount: SpendStore.allExceptBillsUtilitiesBudget(budgets: budgets),
+                    spent: discretionarySpend
+                ) { value in
+                    SpendStore.setAllExceptBillsUtilitiesBudget(value, in: modelContext)
+                }
+            } header: {
+                Label("Discretionary", systemImage: "chart.pie")
+                    .foregroundStyle(Theme.cta)
+            } footer: {
+                Text("One budget for everything except Bills & Utilities. When set, Spend’s overview uses this instead of summing category budgets.")
+                    .font(.caption)
             }
 
             ForEach(SpendCategory.spendingCases) { cat in

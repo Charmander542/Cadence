@@ -6,6 +6,7 @@ enum SpendStore {
     static func seedDemoIfNeeded(in context: ModelContext) {
         seedDefaultSubcategoriesIfNeeded(in: context)
         seedDefaultBudgetsIfNeeded(in: context)
+        migrateHomeUtilitiesToBillsCategoryIfNeeded(in: context)
         removeDemoTrackedItemsIfNeeded(in: context)
 
         guard !SpendPreferences.hasDemoSeed else { return }
@@ -18,32 +19,32 @@ enum SpendStore {
 
         let cal = Calendar.current
         let kitchen = ensureSubcategory(named: "Kitchen", parent: .home, systemImage: "fork.knife.circle", in: context)
-        let utilities = ensureSubcategory(named: "Utilities", parent: .home, systemImage: "bolt.fill", in: context)
         _ = ensureSubcategory(named: "Coffee", parent: .dining, systemImage: "cup.and.saucer.fill", in: context)
 
-        let samples: [(String, Double, Int, SpendCategory, UUID?)] = [
-            ("Whole Foods Market", -86.42, 0, .groceries, nil),
-            ("Trader Joe's", -54.18, 6, .groceries, nil),
-            ("Blue Bottle Coffee", -6.75, 1, .dining, nil),
-            ("Mokafe", -28.40, 8, .dining, nil),
-            ("Shell Gas", -54.10, 2, .transport, nil),
-            ("Uber", -18.25, 9, .transport, nil),
-            ("Apple Services", -16.99, 3, .subscriptions, nil),
-            ("Spotify", -11.99, 10, .subscriptions, nil),
-            ("Patagonia Nano Puff", -229.00, 5, .shopping, nil),
-            ("Target", -67.52, 7, .shopping, nil),
-            ("AMC Theatres", -32.00, 4, .entertainment, nil),
-            ("IKEA kitchen gear", -124.00, 3, .home, kitchen.id),
-            ("PG&E", -98.40, 8, .home, utilities.id),
-            ("CVS Pharmacy", -22.15, 9, .health, nil),
-            ("Payroll Deposit", 2400.00, 4, .income, nil),
+        let samples: [(String, Double, Int, SpendCategory, UUID?, String, String)] = [
+            ("Whole Foods Market", -86.42, 0, .groceries, nil, "Chase", "Sapphire ••4242"),
+            ("Trader Joe's", -54.18, 6, .groceries, nil, "Chase", "Checking ••1234"),
+            ("Blue Bottle Coffee", -6.75, 1, .dining, nil, "Amex", "Gold ••1005"),
+            ("Mokafe", -28.40, 8, .dining, nil, "Chase", "Sapphire ••4242"),
+            ("Shell Gas", -54.10, 2, .transport, nil, "Chase", "Checking ••1234"),
+            ("Uber", -18.25, 9, .transport, nil, "Amex", "Gold ••1005"),
+            ("Apple Services", -16.99, 3, .subscriptions, nil, "Amex", "Gold ••1005"),
+            ("Spotify", -11.99, 10, .subscriptions, nil, "Chase", "Sapphire ••4242"),
+            ("Patagonia Nano Puff", -229.00, 5, .shopping, nil, "Amex", "Gold ••1005"),
+            ("Target", -67.52, 7, .shopping, nil, "Chase", "Checking ••1234"),
+            ("AMC Theatres", -32.00, 4, .entertainment, nil, "Chase", "Sapphire ••4242"),
+            ("IKEA kitchen gear", -124.00, 3, .home, kitchen.id, "Chase", "Checking ••1234"),
+            ("PG&E", -98.40, 8, .billsUtilities, nil, "Chase", "Checking ••1234"),
+            ("CVS Pharmacy", -22.15, 9, .health, nil, "Amex", "Gold ••1005"),
+            ("Payroll Deposit", 2400.00, 4, .income, nil, "Chase", "Checking ••1234"),
         ]
 
-        for (merchant, amount, daysAgo, category, subID) in samples {
+        for (merchant, amount, daysAgo, category, subID, institution, account) in samples {
             let day = cal.date(byAdding: .day, value: -daysAgo, to: Date()) ?? Date()
             let tx = SpendTransactionEntity(
                 remoteID: "demo-\(merchant)-\(daysAgo)",
-                accountName: "Checking ••1234",
+                accountName: account,
+                institutionName: institution,
                 merchant: merchant,
                 amount: amount,
                 postedAt: day,
@@ -60,6 +61,7 @@ enum SpendStore {
         setBudget(300, for: .shopping, subcategoryID: nil, in: context)
         setBudget(250, for: .home, subcategoryID: nil, in: context)
         setBudget(150, for: .home, subcategoryID: kitchen.id, in: context)
+        setBudget(220, for: .billsUtilities, subcategoryID: nil, in: context)
         setBudget(120, for: .entertainment, subcategoryID: nil, in: context)
         setBudget(80, for: .subscriptions, subcategoryID: nil, in: context)
 
@@ -85,9 +87,70 @@ enum SpendStore {
         descriptor.fetchLimit = 1
         if (try? context.fetch(descriptor))?.isEmpty == false { return }
         _ = ensureSubcategory(named: "Kitchen", parent: .home, systemImage: "fork.knife.circle", in: context)
-        _ = ensureSubcategory(named: "Utilities", parent: .home, systemImage: "bolt.fill", in: context)
         _ = ensureSubcategory(named: "Coffee", parent: .dining, systemImage: "cup.and.saucer.fill", in: context)
         try? context.save()
+    }
+
+    /// Move legacy Home → Utilities/Bills purchases into the top-level Bills & Utilities category.
+    static func migrateHomeUtilitiesToBillsCategoryIfNeeded(in context: ModelContext) {
+        let flag = "spend_bills_utilities_category_v1"
+        guard !UserDefaults.standard.bool(forKey: flag) else { return }
+
+        let subs = (try? context.fetch(FetchDescriptor<SpendSubcategoryEntity>())) ?? []
+        let legacyIDs = Set(
+            subs.filter { sub in
+                sub.parentCategory == .home && isLegacyUtilitiesSubcategoryName(sub.name)
+            }.map(\.id)
+        )
+        let txs = (try? context.fetch(FetchDescriptor<SpendTransactionEntity>())) ?? []
+
+        for tx in txs where tx.userCategoryID == nil {
+            if let sid = tx.subcategoryID, legacyIDs.contains(sid) {
+                tx.assign(builtIn: .billsUtilities)
+                continue
+            }
+            // Re-home rent/utility purchases that were auto-filed under Home.
+            guard tx.category == .home else { continue }
+            let inferred = SpendCategory.infer(
+                from: tx.merchant,
+                tellerCategory: tx.tellerCategory.isEmpty ? nil : tx.tellerCategory
+            )
+            if inferred == .billsUtilities {
+                tx.assign(builtIn: .billsUtilities)
+            }
+        }
+
+        if !legacyIDs.isEmpty {
+            let budgets = (try? context.fetch(FetchDescriptor<SpendBudgetEntity>())) ?? []
+            var billsBudget = budgets.first { $0.category == .billsUtilities && $0.subcategoryID == nil }
+            for budget in budgets where budget.subcategoryID.map(legacyIDs.contains) == true {
+                if billsBudget == nil {
+                    budget.subcategoryID = nil
+                    budget.category = .billsUtilities
+                    billsBudget = budget
+                } else if let existing = billsBudget {
+                    existing.monthlyAmount = max(existing.monthlyAmount, budget.monthlyAmount)
+                    context.delete(budget)
+                }
+            }
+
+            for sub in subs where legacyIDs.contains(sub.id) {
+                context.delete(sub)
+            }
+        }
+
+        try? context.save()
+        UserDefaults.standard.set(true, forKey: flag)
+    }
+
+    private static func isLegacyUtilitiesSubcategoryName(_ name: String) -> Bool {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch n {
+        case "utilities", "utility", "bills", "bills & utilities", "bills/utilities", "bills and utilities":
+            return true
+        default:
+            return n.contains("utilit")
+        }
     }
 
     static func seedDefaultBudgetsIfNeeded(in context: ModelContext) {
@@ -191,7 +254,9 @@ enum SpendStore {
     ) {
         let budgets = (try? context.fetch(FetchDescriptor<SpendBudgetEntity>())) ?? []
         let match = budgets.first { budget in
-            budget.category == category && budget.subcategoryID == subcategoryID
+            !budget.isAllExceptBillsUtilities
+                && budget.category == category
+                && budget.subcategoryID == subcategoryID
         }
         if amount <= 0 {
             if let match { context.delete(match) }
@@ -212,7 +277,70 @@ enum SpendStore {
         subcategoryID: UUID?,
         budgets: [SpendBudgetEntity]
     ) -> Double? {
-        budgets.first { $0.category == category && $0.subcategoryID == subcategoryID }?.monthlyAmount
+        budgets.first {
+            !$0.isAllExceptBillsUtilities
+                && $0.category == category
+                && $0.subcategoryID == subcategoryID
+        }?.monthlyAmount
+    }
+
+    static func allExceptBillsUtilitiesBudget(budgets: [SpendBudgetEntity]) -> Double? {
+        budgets.first(where: \.isAllExceptBillsUtilities)?.monthlyAmount
+    }
+
+    static func setAllExceptBillsUtilitiesBudget(_ amount: Double, in context: ModelContext) {
+        let budgets = (try? context.fetch(FetchDescriptor<SpendBudgetEntity>())) ?? []
+        let match = budgets.first(where: \.isAllExceptBillsUtilities)
+        if amount <= 0 {
+            if let match { context.delete(match) }
+            try? context.save()
+            return
+        }
+        if let match {
+            match.monthlyAmount = amount
+            match.updatedAt = Date()
+        } else {
+            context.insert(SpendBudgetEntity(allExceptBillsUtilitiesAmount: amount))
+        }
+        try? context.save()
+    }
+
+    /// Overview budget: prefers the discretionary envelope when set; otherwise sum of category budgets.
+    struct PrimaryBudget: Equatable {
+        let amount: Double
+        let excludesBillsUtilities: Bool
+
+        var title: String {
+            excludesBillsUtilities ? "All except bills" : "Budget"
+        }
+    }
+
+    static func primaryBudget(budgets: [SpendBudgetEntity]) -> PrimaryBudget? {
+        if let envelope = allExceptBillsUtilitiesBudget(budgets: budgets), envelope > 0 {
+            return PrimaryBudget(amount: envelope, excludesBillsUtilities: true)
+        }
+        let total = totalBudgeted(budgets: budgets)
+        return total > 0 ? PrimaryBudget(amount: total, excludesBillsUtilities: false) : nil
+    }
+
+    /// Spend counted against the overview budget (optionally excluding Bills & Utilities).
+    static func spendTowardPrimaryBudget(
+        transactions: [SpendTransactionEntity],
+        budgets: [SpendBudgetEntity],
+        userCategories: [SpendUserCategoryEntity] = [],
+        in range: (start: Date, end: Date),
+        excludesBillsUtilities: Bool
+    ) -> Double {
+        let slices = categorySlices(
+            transactions: transactions,
+            budgets: budgets,
+            userCategories: userCategories,
+            in: range
+        )
+        return slices
+            .filter { !excludesBillsUtilities || $0.category != .billsUtilities }
+            .map(\.amount)
+            .reduce(0, +)
     }
 
     /// Outflows in `[start, end)`.
@@ -341,7 +469,10 @@ enum SpendStore {
     }
 
     static func totalBudgeted(budgets: [SpendBudgetEntity]) -> Double {
-        budgets.filter { $0.subcategoryID == nil }.map(\.monthlyAmount).reduce(0, +)
+        budgets
+            .filter { $0.subcategoryID == nil && !$0.isAllExceptBillsUtilities }
+            .map(\.monthlyAmount)
+            .reduce(0, +)
     }
 
     /// Persist a newly linked Plaid Item, then sync transactions.
@@ -1032,6 +1163,22 @@ enum SpendStore {
         CadenceCloudStore.save(context, label: "deleteUseLog")
     }
 
+    /// Distinct linked cards/accounts seen on synced purchases (newest first), for manual pickers.
+    static func knownCards(from transactions: [SpendTransactionEntity]) -> [(institution: String, account: String, caption: String)] {
+        var seen = Set<String>()
+        var rows: [(institution: String, account: String, caption: String)] = []
+        for tx in transactions {
+            let account = tx.accountName.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !account.isEmpty, account != "Manual" else { continue }
+            let institution = tx.institutionName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = "\(institution.lowercased())|\(account.lowercased())"
+            guard seen.insert(key).inserted else { continue }
+            let caption = [institution, account].filter { !$0.isEmpty }.joined(separator: " · ")
+            rows.append((institution, account, caption))
+        }
+        return rows
+    }
+
     /// Manual cash / card purchase (not from bank sync). Amount is money out (stored negative).
     @discardableResult
     static func addManualPurchase(
@@ -1042,12 +1189,17 @@ enum SpendStore {
         userCategoryID: UUID? = nil,
         subcategoryID: UUID? = nil,
         notes: String = "",
+        accountName: String = "Manual",
+        institutionName: String = "",
         in context: ModelContext
     ) -> SpendTransactionEntity {
         let spend = -abs(amount)
         let tx = SpendTransactionEntity(
             remoteID: "manual-\(UUID().uuidString)",
-            accountName: "Manual",
+            accountName: accountName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "Manual"
+                : accountName.trimmingCharacters(in: .whitespacesAndNewlines),
+            institutionName: institutionName.trimmingCharacters(in: .whitespacesAndNewlines),
             merchant: merchant.trimmingCharacters(in: .whitespacesAndNewlines),
             amount: spend,
             postedAt: postedAt,

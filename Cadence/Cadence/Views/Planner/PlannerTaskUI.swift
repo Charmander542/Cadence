@@ -14,12 +14,14 @@ struct TaskTagChips: View {
                     let color = colorMap[tag] ?? Theme.accent
                     Text("#\(tag)")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.onFill)
                         .padding(.horizontal, Theme.Space.sm - 2)
                         .padding(.vertical, Theme.Space.xs / 2)
                         .background(color.opacity(0.85), in: Capsule())
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(tags.map { "tag \($0)" }.joined(separator: ", "))
         }
     }
 }
@@ -130,7 +132,7 @@ struct ColorSwatchGrid: View {
                             if selectedHex == hex {
                                 Image(systemName: "checkmark")
                                     .font(.caption.weight(.bold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Theme.onFill)
                             }
                         }
                 }

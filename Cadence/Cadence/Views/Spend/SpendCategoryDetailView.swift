@@ -221,7 +221,9 @@ struct SpendCategoryDetailView: View {
             .padding(.horizontal, Theme.Space.lg)
 
             if kids.isEmpty {
-                Text("Add Kitchen, Utilities, or anything you care about under \(category.title). Tap + to create one.")
+                Text(category == .billsUtilities
+                     ? "Add Electric, Water, or Internet under Bills & Utilities. Tap + to create one."
+                     : "Add Kitchen or anything you care about under \(category.title). Tap + to create one.")
                     .font(.caption)
                     .foregroundStyle(Theme.muted)
                     .padding(.horizontal, Theme.Space.lg)
@@ -387,14 +389,26 @@ struct SpendCategoryDetailView: View {
                                         Text(subLabel(for: tx))
                                             .font(.caption2)
                                             .foregroundStyle(Theme.muted)
+                                            .lineLimit(1)
                                     }
                                     Spacer()
                                     Text(SpendFormat.money(tx.amount))
                                         .font(.subheadline.weight(.semibold).monospacedDigit())
-                                        .foregroundStyle(tx.isIgnored ? Theme.muted : Theme.ink)
+                                        .foregroundStyle(
+                                            tx.isIgnored ? Theme.muted
+                                                : (tx.isRefund ? Theme.success : Theme.ink)
+                                        )
                                 }
                                 .padding(.horizontal, Theme.Space.md)
                                 .padding(.vertical, Theme.Space.sm)
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel({
+                                    var parts = [tx.merchant, SpendFormat.money(tx.amount)]
+                                    if !tx.trimmedDescription.isEmpty { parts.insert(tx.trimmedDescription, at: 1) }
+                                    if !tx.sourceCaption.isEmpty { parts.append(tx.sourceCaption) }
+                                    return parts.joined(separator: ", ")
+                                }())
+                                .accessibilityHint("Opens purchase details")
                             }
                             .buttonStyle(.plain)
                             if tx.id != purchases.prefix(30).last?.id {
@@ -409,11 +423,15 @@ struct SpendCategoryDetailView: View {
     }
 
     private func subLabel(for tx: SpendTransactionEntity) -> String {
+        var parts: [String] = [tx.postedAt.formatted(date: .abbreviated, time: .omitted)]
+        if !tx.sourceCaption.isEmpty {
+            parts.append(tx.sourceCaption)
+        }
         if let id = tx.subcategoryID,
            let name = kids.first(where: { $0.id == id })?.name {
-            return name
+            parts.append(name)
         }
-        return tx.postedAt.formatted(date: .abbreviated, time: .omitted)
+        return parts.joined(separator: " · ")
     }
 }
 
@@ -629,7 +647,11 @@ private struct SpendCategoryTransactionEditor: View {
             Form {
                 Section {
                     LabeledContent("Merchant", value: transaction.merchant)
-                    LabeledContent("Amount", value: SpendFormat.money(transaction.amount))
+                    LabeledContent("Amount") {
+                        Text(SpendFormat.money(transaction.amount))
+                            .foregroundStyle(transaction.isRefund ? Theme.success : Theme.ink)
+                    }
+                    LabeledContent("Card", value: transaction.cardLabel)
                 }
                 Section("Description") {
                     SpendPurchaseDescriptionField(initial: transaction.notes) { text in

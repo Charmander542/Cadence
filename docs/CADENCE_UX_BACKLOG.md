@@ -2389,9 +2389,120 @@ _(See prior entries — all pre-H batches verified 2026-08-30.)_
 
 | Field | Value |
 |-------|-------|
-| **Phase** | `PAUSED` |
-| **Next batch** | **LN** |
-| **Summary** | Paused. Spend: list all linked banks; Ignore category for savings (off pie/budget). |
+| **Phase** | `RUNNING` |
+| **Next batch** | **LZ** |
+| **Summary** | LY verified; next audit Calendar / Focus / Spend. |
+
+### Batch LY — Today / Habits / Matrix polish (audit post-LX)
+
+- [x] **Today Tasks silently caps at 5** — show all open today tasks. — 2026-11-18
+  → Fix: removed `openToday.prefix(5)`.
+- [x] **Day agenda rows not completable** — `TaskCheckbox` + complete. — 2026-11-18
+  → Fix: `DayAgendaSection` checkbox + `completeDayTask`.
+- [x] **DayDetail add only when empty** — ADD TASK / ADD EVENT when populated too. — 2026-11-18
+- [x] **Task tag chips** — `Theme.onFill` + a11y label; swatch checkmarks too. — 2026-11-18
+- [x] **NewHabitSheet Cancel** — `CANCEL` / `DELETE` caps. — 2026-11-18
+- [x] **Matrix empty wells** — sunken dashed + tap-to-add (JL: no DROP HERE). — 2026-11-18
+  → Verified: 2026-11-18 build OK (iPhone 17 Pro Max).
+
+### Batch LZ — Fresh UX audit (post-LY)
+
+- [ ] **Audit** Calendar / Focus / Spend for next P2 polish.
+  → Fix: pending.
+
+### Batch LX — Meals / Shop / Browse theming (audit post-LW)
+
+- [x] **Recipe detail List on Theme.canvas** — hide system grouped chrome. — 2026-11-18
+  → Fix: `RecipeDetailView` `scrollContentBackground(.hidden)` + `Theme.canvas`.
+- [x] **Browse no-matches uses Theme.EmptyState** — 2026-11-18
+  → Fix: `BrowseView` empty branch.
+- [x] **Shop sheet dual headers** — large title + DONE inset. — 2026-11-18
+  → Fix: `.navigationBarTitleDisplayMode(.inline)`.
+- [x] **Meals dinner CTA casing** — Reroll/Change → REROLL/CHANGE. — 2026-11-18
+- [x] **Hardcoded white/green → Theme** — chips `Theme.onFill`, pantry swipe `Theme.success`, step badges adaptive. — 2026-11-18
+- [x] **Shop empty manual add shows PRODUCE** — 2026-11-18
+  → Verified: 2026-11-18 build OK (iPhone 17 Pro Max).
+
+### Batch LY — Fresh UX audit (post-LX)
+
+- [ ] **Audit** Today / Habits / Matrix for next P2 polish.
+  → Fix: pending.
+
+### Batch LW — Refund amount color (user)
+
+- [x] **Transaction amount green when refund** — money-in (`amount > 0`) uses `Theme.success` on home rows, category rows, and purchase sheets. — 2026-11-18
+  → Fix: `SpendTransactionEntity.isRefund`; `Theme.success`; `SpendHomeView` + `SpendCategoryDetailView` amount foreground.
+  → Verified: 2026-11-18 build OK (iPhone 17 Pro Max).
+
+### Batch LV — All Except Bills budget (user)
+
+- [x] **Budgets: All Except Bills & Utilities** — discretionary envelope; overview uses it (vs spend excluding bills) when set. — 2026-11-17
+  → Fix: `SpendBudgetEntity.allExceptBillsUtilitiesRaw`; `SpendStore.primaryBudget` / `setAllExceptBillsUtilitiesBudget`; Budgets top section + home summary.
+  → Verified: build OK (iPhone 17 Pro Max).
+
+### Batch LW — Fresh UX audit (post-LV) — superseded by refund batch
+
+- [x] **Superseded** — user refund-color request took next slot; audit deferred to LX. — 2026-11-18
+
+### Batch LU — Bills & Utilities category (user)
+
+- [x] **Add top-level Bills & Utilities category** — not Home→Utilities; rent/utility inference maps here; migrate legacy Home Utilities. — 2026-11-17
+  → Fix: `SpendCategory.billsUtilities`; infer + demo + migration.
+- [x] **Pie Hide/Show Bills on main donut** — toggles the Bills & Utilities slice; budget stays full. — 2026-11-17
+  → Fix: `SpendPreferences.pieHidesBillsUtilities`; donut **HIDE BILLS** / **SHOW BILLS**.
+  → Verified: build OK (iPhone 17 Pro Max).
+
+### Batch LT — Pie hide utilities (user) — superseded by LU
+
+- [x] **Superseded** — was Home→Utilities subcategory hide; replaced by top-level Bills & Utilities. — 2026-11-17
+
+### Batch LV — Fresh UX audit (post-LU)
+
+- [ ] **Audit** Meals / Shop / Browse for next P2 polish.
+  → Fix: pending.
+
+### Batch LP — Filter purchases by card (audit)
+
+- [x] **Purchases can filter by card/account** — All cards + per-account chips when 2+ cards exist. — 2026-11-17
+  → Fix: `cardFilterKey` on `SpendHomeView`; chips above PURCHASES; stale-key clear.
+  → Verified: build OK (iPhone 17 Pro Max).
+
+### Batch LO — Manual purchase card picker (audit follow-up)
+
+- [x] **Add purchase can choose which card paid** — picker lists linked cards from history + Manual/cash. — 2026-11-17
+  → Fix: `SpendStore.knownCards` + `addManualPurchase(accountName:institutionName:)`; `AddPurchaseSheet` Card picker.
+  → Verified: build OK (iPhone 17 Pro Max).
+
+### Batch LN — Spend transaction card label (user)
+
+- [x] **Each purchase shows which card was used** — meta line puts card/account after date (before category) so it isn’t truncated; category drill-down rows + editors show Card; demo seeds vary cards. — 2026-11-17
+  → Fix: `SpendTransactionEntity.cardLabel`; `SpendHomeView.sourceLine` / sheet; `SpendCategoryDetailView.subLabel` + editor; demo seed institution/account pairs.
+  → Verified: build OK (iPhone 17 Pro Max); code review of home/category list meta + Card labeled contents.
+
+### Batch LQ — Card filter empty state
+
+- [x] **Filtered purchases empty state said Connect Plaid** — “No purchases on this card” + ALL CARDS clears filter. — 2026-11-17
+  → Fix: `purchasesList` branches on `cardFilterKey`.
+  → Verified: build OK (iPhone 17 Pro Max).
+
+### Batch LR — Fresh UX audit (post-LQ)
+
+- [x] **Settings search empty uses system ContentUnavailableView** — Theme.EmptyState “No settings match”. — 2026-11-17
+  → Fix: `SettingsView` filtered-empty branch.
+- [x] **PlaceholderPageView unused** — left in place (no dial stubs reference it); no change.
+- [x] **Append**.
+
+### Batch LS — Focus stats empty polish (audit)
+
+- [x] **Focus stats recent list empty was plain text** — title + ADD SESSION CTA. — 2026-11-17
+  → Fix: `FocusStatsView` recent empty + ring “No focus yet”.
+- [x] **Body / News skim** — no system-secondary / ContentUnavailable leftovers.
+- [x] **Append**.
+
+### Batch LT — Fresh UX audit (post-LS)
+
+- [ ] **Audit** Meals / Shop / Browse for next P2 polish.
+  → Fix: pending.
 
 ### Batch LL — Calendar today swipe lag (user)
 

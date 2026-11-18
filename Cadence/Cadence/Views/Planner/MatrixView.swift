@@ -134,7 +134,25 @@ struct MatrixView: View {
             .accessibilityLabel(matrixQuadrantHeaderLabel(q, count: items.count))
             .accessibilityAddTraits(.isHeader)
             if items.isEmpty {
-                Spacer(minLength: 0)
+                Button {
+                    showQuickAdd = true
+                } label: {
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                        .fill(Theme.sunken)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
+                                .strokeBorder(q.tint.opacity(0.28), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+                        )
+                        .overlay {
+                            Image(systemName: "plus")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(q.tint.opacity(0.7))
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Add task to \(q.roman). \(q.title)")
+                .accessibilityHint("Opens quick add for this priority")
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.Space.sm) {

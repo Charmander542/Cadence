@@ -1,5 +1,6 @@
 import WidgetKit
 import SwiftUI
+import Charts
 import AppIntents
 import UIKit
 
@@ -1162,6 +1163,91 @@ struct CountdownWidgetView: View {
     }
 }
 
+// MARK: - Spend Pie (small)
+
+struct SpendPieWidget: Widget {
+    let kind = "SpendPieWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: CadenceWidgetProvider()) { entry in
+            SpendPieWidgetView(entry: entry)
+        }
+        .configurationDisplayName("Spend")
+        .description("This month’s spending pie with total in the center.")
+        .supportedFamilies([.systemSmall])
+    }
+}
+
+struct SpendPieWidgetView: View {
+    var entry: CadenceWidgetEntry
+
+    private var slices: [WidgetSpendSlice] { entry.snapshot.spendSlices }
+    private var total: Double { entry.snapshot.spendTotal }
+    private var monthLabel: String {
+        let label = entry.snapshot.spendMonthLabel
+        return label.isEmpty ? "THIS MONTH" : label
+    }
+
+    var body: some View {
+        ZStack {
+            if slices.isEmpty {
+                Circle()
+                    .stroke(WidgetTheme.sunken, lineWidth: 18)
+                    .padding(10)
+            } else {
+                Chart(slices) { slice in
+                    SectorMark(
+                        angle: .value("Amount", max(slice.amount, 0.01)),
+                        innerRadius: .ratio(0.62),
+                        outerRadius: .ratio(1.0),
+                        angularInset: 1.2
+                    )
+                    .foregroundStyle(Color(red: slice.red, green: slice.green, blue: slice.blue))
+                    .cornerRadius(2)
+                }
+                .chartLegend(.hidden)
+                .padding(6)
+            }
+
+            VStack(spacing: 2) {
+                Text("TOTAL")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.7)
+                    .foregroundStyle(WidgetTheme.muted)
+                Text(moneyLabel(total))
+                    .font(.system(size: total >= 10_000 ? 15 : 17, weight: .bold).monospacedDigit())
+                    .foregroundStyle(WidgetTheme.ink)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+                Text(monthLabel)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(WidgetTheme.muted)
+            }
+            .allowsHitTesting(false)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .containerBackground(for: .widget) {
+            WidgetTheme.chromeBackground
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Total spend \(moneyLabel(total)) in \(monthLabel)")
+    }
+
+    private func moneyLabel(_ value: Double) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.currencyCode = "USD"
+        if value >= 100 {
+            f.maximumFractionDigits = 0
+            f.minimumFractionDigits = 0
+        } else {
+            f.maximumFractionDigits = 2
+            f.minimumFractionDigits = 0
+        }
+        return f.string(from: NSNumber(value: value)) ?? String(format: "$%.0f", value)
+    }
+}
+
 // MARK: - Bundle
 
 @main
@@ -1171,5 +1257,6 @@ struct CadenceWidgetsBundle: WidgetBundle {
         MatrixWidget()
         CalendarWidget()
         CountdownWidget()
+        SpendPieWidget()
     }
 }

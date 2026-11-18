@@ -41,13 +41,19 @@ struct NewHabitSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("CANCEL") { dismiss() }
+                        .font(.caption.weight(.bold))
+                        .tracking(0.7)
                         .foregroundStyle(Theme.accent)
+                        .accessibilityLabel("Cancel")
                         .accessibilityHint("Discards habit changes")
                 }
                 if isEditing {
                     ToolbarItem(placement: .destructiveAction) {
-                        Button("Delete", role: .destructive) { deleteHabit() }
+                        Button("DELETE", role: .destructive) { deleteHabit() }
+                            .font(.caption.weight(.bold))
+                            .tracking(0.7)
+                            .accessibilityLabel("Delete")
                             .accessibilityHint("Permanently removes this habit and its history")
                     }
                 }

@@ -24,6 +24,10 @@ enum Theme {
         )
     }
     static let danger = Color(red: 1, green: 0.32, blue: 0.32)
+    /// Green — money in / refunds / positive deltas.
+    static let success = Color(red: 0.35, green: 0.82, blue: 0.55)
+    /// Text on filled accent/cta capsules (orange/blue fills stay saturated in both appearances).
+    static let onFill = Color.white
 
     static var canvas: Color { adaptive(light: .systemGroupedBackground, dark: .black) }
     static var surface: Color {

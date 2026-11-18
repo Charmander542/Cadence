@@ -8,6 +8,7 @@ enum SpendPreferences {
     private static let demoSeededKey = "spend_demo_seeded_v9"
     private static let clientUserIDKey = "plaid_client_user_id"
     private static let iCloudKeychainSyncKey = "plaid_icloud_keychain_sync"
+    private static let pieHidesBillsUtilitiesKey = "spend_pie_hides_bills_utilities"
 
     /// Prefill only — not a secret. Secret stays in Keychain / PlaidLocal.plist.
     static let defaultClientID = "6aa4147dd8c4dd000dcfc579"
@@ -79,6 +80,18 @@ enum SpendPreferences {
     static var hasDemoSeed: Bool {
         get { UserDefaults.standard.bool(forKey: demoSeededKey) }
         set { UserDefaults.standard.set(newValue, forKey: demoSeededKey) }
+    }
+
+    /// When true, the Bills & Utilities category is omitted from the overview pie.
+    static var pieHidesBillsUtilities: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: pieHidesBillsUtilitiesKey) != nil {
+                return UserDefaults.standard.bool(forKey: pieHidesBillsUtilitiesKey)
+            }
+            // Migrate prior Home→Utilities hide preference if present.
+            return UserDefaults.standard.bool(forKey: "spend_pie_hides_utilities")
+        }
+        set { UserDefaults.standard.set(newValue, forKey: pieHidesBillsUtilitiesKey) }
     }
 
     /// When on (default), Plaid secret + Item tokens sync via **iCloud Keychain** so

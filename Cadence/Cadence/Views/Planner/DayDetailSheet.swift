@@ -49,6 +49,8 @@ struct DayDetailSheet: View {
 }
 
 struct DayAgendaSection: View {
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var appModel: AppModel
     @Query(sort: \PlannerTaskEntity.dueAt) private var tasks: [PlannerTaskEntity]
     let day: Date
 
@@ -110,34 +112,35 @@ struct DayAgendaSection: View {
                     VStack(alignment: .leading, spacing: Theme.Space.sm) {
                         daySectionHeader("TASKS")
                         ForEach(dayTasks) { task in
-                            Button {
-                                editingTask = task
-                            } label: {
-                                HStack(spacing: Theme.Space.sm + 2) {
-                                    Circle()
-                                        .stroke(Theme.muted, lineWidth: 1.5)
-                                        .frame(width: 18, height: 18)
-                                    Text(task.title)
-                                        .font(.subheadline)
-                                        .foregroundStyle(Theme.ink)
-                                    Spacer()
-                                    if task.isOverdue {
-                                        Text("OVERDUE")
-                                            .font(.caption2.weight(.bold))
-                                            .tracking(0.7)
-                                            .foregroundStyle(Theme.danger)
-                                            .accessibilityHidden(true)
-                                    }
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption2)
-                                        .foregroundStyle(Theme.muted)
+                            HStack(spacing: Theme.Space.sm + 2) {
+                                TaskCheckbox(completed: task.isCompleted, overdue: task.isOverdue) {
+                                    completeDayTask(task)
                                 }
-                                .padding(.vertical, Theme.Space.xs)
+                                Button {
+                                    editingTask = task
+                                } label: {
+                                    HStack(spacing: Theme.Space.sm + 2) {
+                                        Text(task.title)
+                                            .font(.subheadline)
+                                            .foregroundStyle(Theme.ink)
+                                        Spacer()
+                                        if task.isOverdue {
+                                            Text("OVERDUE")
+                                                .font(.caption2.weight(.bold))
+                                                .tracking(0.7)
+                                                .foregroundStyle(Theme.danger)
+                                                .accessibilityHidden(true)
+                                        }
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption2)
+                                            .foregroundStyle(Theme.muted)
+                                    }
+                                    .padding(.vertical, Theme.Space.xs)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(dayTaskAccessibilityLabel(task))
+                                .accessibilityHint("Double tap to edit task")
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityElement(children: .combine)
-                            .accessibilityLabel(dayTaskAccessibilityLabel(task))
-                            .accessibilityHint("Double tap to edit task")
                         }
                     }
                     .padding(Theme.Space.md + 2)
@@ -191,6 +194,21 @@ struct DayAgendaSection: View {
                     )
                     .shadow(color: Theme.cardShadow, radius: 8, y: 3)
                 }
+
+                HStack(spacing: Theme.Space.sm + 2) {
+                    Button("ADD TASK") { showQuickAdd = true }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.cta)
+                        .accessibilityHint("Opens quick add with this day as due date")
+                    Button("ADD EVENT") {
+                        newEventContext = EventSheetContext(startDate: day)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Theme.cta)
+                    .accessibilityHint("Creates a calendar event on this day")
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, Theme.Space.xs)
             }
         }
         .sheet(item: $editingTask) { task in
@@ -213,6 +231,15 @@ struct DayAgendaSection: View {
             .tracking(0.7)
             .foregroundStyle(Theme.muted)
             .accessibilityAddTraits(.isHeader)
+    }
+
+    private func completeDayTask(_ task: PlannerTaskEntity) {
+        appModel.taskCompletionHaptic()
+        task.isCompleted = true
+        task.completedAt = .now
+        try? modelContext.save()
+        Task { await PlannerSyncCoordinator.shared.taskDidChange(task, in: modelContext) }
+        WidgetSnapshotWriter.publish(in: modelContext)
     }
 
     private func dayTaskAccessibilityLabel(_ task: PlannerTaskEntity) -> String {

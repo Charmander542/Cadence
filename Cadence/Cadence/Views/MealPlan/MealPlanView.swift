@@ -345,10 +345,11 @@ struct MealPlanView: View {
                         if swappingDay == day {
                             ProgressView()
                         } else {
-                            Label("Reroll", systemImage: "arrow.triangle.2.circlepath")
+                            Label("REROLL", systemImage: "arrow.triangle.2.circlepath")
                         }
                     }
-                    .font(.caption.weight(.semibold))
+                    .font(.caption.weight(.bold))
+                    .tracking(0.3)
                     .disabled(swappingDay != nil)
                     .accessibilityLabel("Reroll dinner")
                     .accessibilityHint("Picks a different dinner recipe for this day")
@@ -356,9 +357,10 @@ struct MealPlanView: View {
                     Button {
                         substituteDay = day
                     } label: {
-                        Label("Change", systemImage: "magnifyingglass")
+                        Label("CHANGE", systemImage: "magnifyingglass")
                     }
-                    .font(.caption.weight(.semibold))
+                    .font(.caption.weight(.bold))
+                    .tracking(0.3)
                     .accessibilityLabel("Change dinner")
                     .accessibilityHint("Search cookbooks and pick a recipe for this day")
 
@@ -608,6 +610,8 @@ struct RecipeDetailView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.canvas)
         .animation(.easeInOut(duration: 0.28), value: settling)
         .navigationTitle(Theme.recipeDisplayName(active.name))
         .navigationBarTitleDisplayMode(.inline)
@@ -776,9 +780,9 @@ private struct RecipeStepRow: View {
         HStack(alignment: .top, spacing: Theme.Space.md) {
             Text("\(step.stepNumber)")
                 .font(.caption.weight(.bold))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(Theme.ink)
                 .frame(width: 26, height: 26)
-                .background(Theme.cta, in: Circle())
+                .background(Theme.cta.opacity(0.22), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Theme.Space.sm - 2) {
                 if !step.instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

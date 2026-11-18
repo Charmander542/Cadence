@@ -24,6 +24,8 @@ struct SpendHomeView: View {
     @State private var categoryFilter: SpendCategory?
     /// When multiple banks are linked, optional Plaid item_id filter (`nil` = all).
     @State private var enrollmentFilterID: String?
+    /// Optional card/account filter for the purchases list (`nil` = all). Key = "institution|account".
+    @State private var cardFilterKey: String?
     @State private var monthOffset: Int = 0
     @State private var selectedTransaction: SpendTransactionEntity?
     @State private var selectedItem: SpendTrackedItemEntity?
@@ -43,6 +45,8 @@ struct SpendHomeView: View {
     @State private var showCategories = false
     @State private var isSyncing = false
     @State private var syncMessage: String?
+    /// Omits Bills & Utilities category from the overview pie (persisted).
+    @State private var hideBillsUtilitiesFromPie = SpendPreferences.pieHidesBillsUtilities
 
     private enum Segment: String, CaseIterable, Identifiable {
         case overview, purchases, trackers
@@ -96,13 +100,43 @@ struct SpendHomeView: View {
         return names.joined(separator: " · ")
     }
 
+    private var pieSourceTransactions: [SpendTransactionEntity] {
+        guard hideBillsUtilitiesFromPie else { return Array(scopedTransactions) }
+        return scopedTransactions.filter { $0.category != .billsUtilities }
+    }
+
     private var categorySlices: [SpendCategorySlice] {
         SpendStore.categorySlices(
-            transactions: scopedTransactions,
+            transactions: pieSourceTransactions,
             budgets: budgets,
             userCategories: userCategories,
             in: monthRange
         )
+    }
+
+    private var primaryBudget: SpendStore.PrimaryBudget? {
+        SpendStore.primaryBudget(budgets: budgets)
+    }
+
+    /// Spend counted on the budget card (excludes Bills & Utilities when that envelope is set).
+    private var budgetMonthSpend: Double {
+        SpendStore.spendTowardPrimaryBudget(
+            transactions: scopedTransactions,
+            budgets: budgets,
+            userCategories: userCategories,
+            in: monthRange,
+            excludesBillsUtilities: primaryBudget?.excludesBillsUtilities ?? false
+        )
+    }
+
+    private var billsUtilitiesSpendThisMonth: Double {
+        SpendStore.spendingTransactions(scopedTransactions, in: monthRange, category: .billsUtilities)
+            .map { abs($0.amount) }
+            .reduce(0, +)
+    }
+
+    private var showBillsUtilitiesPieToggle: Bool {
+        billsUtilitiesSpendThisMonth > 0 || hideBillsUtilitiesFromPie
     }
 
     /// Pie stays spend-only; breakdown also lists unused custom categories so new ones are visible.
@@ -139,7 +173,7 @@ struct SpendHomeView: View {
             }
             let subs = SpendStore.subcategorySlices(
                 for: cat.category,
-                transactions: transactions,
+                transactions: pieSourceTransactions,
                 subcategories: subcategories,
                 budgets: budgets,
                 in: monthRange
@@ -172,23 +206,43 @@ struct SpendHomeView: View {
     }
 
     private var totalBudget: Double {
-        SpendStore.totalBudgeted(budgets: budgets)
+        primaryBudget?.amount ?? 0
     }
 
     private var budgetRemaining: Double? {
         guard totalBudget > 0 else { return nil }
-        return totalBudget - monthSpend
+        return totalBudget - budgetMonthSpend
+    }
+
+    private var knownCards: [(institution: String, account: String, caption: String)] {
+        SpendStore.knownCards(from: Array(scopedTransactions))
     }
 
     private var visibleTransactions: [SpendTransactionEntity] {
-        let txs = SpendStore.spendingTransactions(scopedTransactions, in: monthRange, category: categoryFilter)
+        var txs = SpendStore.spendingTransactions(scopedTransactions, in: monthRange, category: categoryFilter)
+        if let cardFilterKey {
+            txs = txs.filter { cardKey(for: $0) == cardFilterKey }
+        }
         return txs.sorted { $0.postedAt > $1.postedAt }
+    }
+
+    private func cardKey(for tx: SpendTransactionEntity) -> String {
+        let institution = tx.institutionName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let account = tx.accountName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return "\(institution)|\(account)"
+    }
+
+    private func cardKey(institution: String, account: String) -> String {
+        "\(institution.lowercased())|\(account.lowercased())"
     }
 
     var body: some View {
         mainChrome
             .onChange(of: enrollments.count) { _, _ in
                 clearStaleEnrollmentFilter()
+            }
+            .onChange(of: knownCards.count) { _, _ in
+                clearStaleCardFilter()
             }
             .onAppear(perform: handleAppear)
             .onChange(of: monthOffset) { _, _ in
@@ -264,6 +318,7 @@ struct SpendHomeView: View {
             showConnectInfo: $showConnectInfo,
             subcategories: subcategories,
             userCategories: userCategories,
+            knownCards: knownCards,
             focusMonth: focusMonth
         )
     }
@@ -275,10 +330,19 @@ struct SpendHomeView: View {
         }
     }
 
+    private func clearStaleCardFilter() {
+        guard let filter = cardFilterKey else { return }
+        let keys = Set(knownCards.map { cardKey(institution: $0.institution, account: $0.account) })
+        if !keys.contains(filter) {
+            cardFilterKey = nil
+        }
+    }
+
     private func handleAppear() {
         SpendPreferences.ingestLocalSecretsIfNeeded()
         SpendStore.seedDemoIfNeeded(in: modelContext)
         SpendStore.refreshAutoCategories(in: modelContext)
+        clearStaleCardFilter()
         // Heal empty Plaid history after a store wipe left a stale sync cursor.
         let hasPlaidTxs = transactions.contains { !$0.remoteID.hasPrefix("demo-") }
         if !enrollments.isEmpty, !hasPlaidTxs, !isSyncing {
@@ -359,12 +423,15 @@ struct SpendHomeView: View {
     }
 
     private var budgetSummaryCard: some View {
-        Theme.Card {
+        let excludesBills = primaryBudget?.excludesBillsUtilities == true
+        return Theme.Card {
             VStack(alignment: .leading, spacing: Theme.Space.md) {
                 HStack {
                     Theme.IconWell(systemImage: "chart.pie.fill", tint: Theme.accent, size: 36)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(shortMonthLabel.uppercased()) BUDGET")
+                        Text(excludesBills
+                             ? "\(shortMonthLabel.uppercased()) · EXCEPT BILLS"
+                             : "\(shortMonthLabel.uppercased()) BUDGET")
                             .font(.caption2.weight(.bold))
                             .tracking(0.7)
                             .foregroundStyle(Theme.muted)
@@ -375,7 +442,7 @@ struct SpendHomeView: View {
                                 .font(Theme.display(.title2))
                                 .foregroundStyle(remaining >= 0 ? Theme.ink : Theme.danger)
                         } else {
-                            Text("Set category budgets")
+                            Text("Set a budget")
                                 .font(Theme.display(.title3))
                                 .foregroundStyle(Theme.ink)
                         }
@@ -395,17 +462,19 @@ struct SpendHomeView: View {
 
                 if totalBudget > 0 {
                     GeometryReader { geo in
-                        let progress = min(monthSpend / max(totalBudget, 1), 1)
+                        let progress = min(budgetMonthSpend / max(totalBudget, 1), 1)
                         ZStack(alignment: .leading) {
                             Capsule().fill(Theme.sunken)
                             Capsule()
-                                .fill(monthSpend > totalBudget ? Theme.danger : Theme.accent)
+                                .fill(budgetMonthSpend > totalBudget ? Theme.danger : Theme.accent)
                                 .frame(width: max(8, geo.size.width * progress))
                         }
                     }
                     .frame(height: 8)
                     HStack {
-                        Text("\(SpendFormat.money(monthSpend)) spent")
+                        Text(excludesBills
+                             ? "\(SpendFormat.money(budgetMonthSpend)) discretionary"
+                             : "\(SpendFormat.money(budgetMonthSpend)) spent")
                             .font(.caption)
                             .foregroundStyle(Theme.muted)
                         Spacer()
@@ -414,7 +483,7 @@ struct SpendHomeView: View {
                             .foregroundStyle(Theme.ink)
                     }
                 } else {
-                    Text("Budgets keep spending helpful — set limits per category or subcategory like Kitchen.")
+                    Text("Try All Except Bills & Utilities for a discretionary envelope, or set limits per category.")
                         .font(.caption)
                         .foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -422,11 +491,67 @@ struct SpendHomeView: View {
             }
         }
         .accessibilityElement(children: .contain)
+        .accessibilityLabel({
+            if let remaining = budgetRemaining {
+                let scope = excludesBills ? "except bills and utilities" : "total"
+                return remaining >= 0
+                    ? "\(SpendFormat.money(remaining)) left on \(scope) budget"
+                    : "\(SpendFormat.money(abs(remaining))) over \(scope) budget"
+            }
+            return "No budget set"
+        }())
     }
 
     private var donutCard: some View {
         Theme.Card {
             VStack(spacing: Theme.Space.md) {
+                if showBillsUtilitiesPieToggle {
+                    HStack {
+                        Spacer(minLength: 0)
+                        Button {
+                            pieTapConsumed = true
+                            hideBillsUtilitiesFromPie.toggle()
+                            SpendPreferences.pieHidesBillsUtilities = hideBillsUtilitiesFromPie
+                            collapsePieFocus()
+                            WidgetSnapshotWriter.publish(in: modelContext)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: hideBillsUtilitiesFromPie ? "eye" : "eye.slash")
+                                    .font(.caption.weight(.semibold))
+                                Text(hideBillsUtilitiesFromPie ? "SHOW BILLS" : "HIDE BILLS")
+                                    .font(.caption2.weight(.bold))
+                                    .tracking(0.7)
+                            }
+                            .foregroundStyle(hideBillsUtilitiesFromPie ? Theme.cta : Theme.muted)
+                            .padding(.horizontal, Theme.Space.md)
+                            .padding(.vertical, Theme.Space.xs + 2)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(hideBillsUtilitiesFromPie ? Theme.cta.opacity(0.16) : Theme.sunken)
+                            )
+                            .overlay(
+                                Capsule(style: .continuous)
+                                    .strokeBorder(
+                                        hideBillsUtilitiesFromPie ? Theme.cta.opacity(0.55) : Theme.hairline,
+                                        lineWidth: 1
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            hideBillsUtilitiesFromPie
+                            ? "Show Bills and Utilities on pie"
+                            : "Hide Bills and Utilities on pie"
+                        )
+                        .accessibilityHint(
+                            hideBillsUtilitiesFromPie
+                            ? "Puts the Bills and Utilities slice back on the spending pie"
+                            : "Removes the Bills and Utilities slice so discretionary spend is clearer. Budget totals stay the same."
+                        )
+                        .accessibilityAddTraits(.isButton)
+                    }
+                }
+
                 ZStack {
                     if pieSectors.isEmpty {
                         Circle()
@@ -469,10 +594,19 @@ struct SpendHomeView: View {
                 }
                 .frame(maxWidth: .infinity)
 
+                if hideBillsUtilitiesFromPie, billsUtilitiesSpendThisMonth > 0, pieFocus == nil {
+                    Text("Pie excludes \(SpendFormat.money(billsUtilitiesSpendThisMonth)) bills & utilities")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.muted)
+                        .multilineTextAlignment(.center)
+                }
+
                 if let focused = pieFocus {
                     expandedSliceLegend(for: focused)
                 } else if categorySlices.isEmpty {
-                    Text("No purchases this month yet.")
+                    Text(hideBillsUtilitiesFromPie
+                         ? "No discretionary purchases this month."
+                         : "No purchases this month yet.")
                         .font(.subheadline)
                         .foregroundStyle(Theme.muted)
                 } else {
@@ -912,17 +1046,49 @@ struct SpendHomeView: View {
                 .padding(.horizontal, Theme.Space.lg)
                 .accessibilityAddTraits(.isHeader)
 
-            if visibleTransactions.isEmpty {
-                Theme.EmptyState(
-                    systemImage: "creditcard",
-                    title: "No purchases yet",
-                    message: "Connect Plaid or switch months — categorized buys show up here.",
-                    cta: "CONNECT PLAID",
-                    ctaHint: "Opens Spend settings"
-                ) {
-                    showConnectInfo = true
+            if knownCards.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: Theme.Space.sm) {
+                        bankChip(title: "All cards", selected: cardFilterKey == nil) {
+                            cardFilterKey = nil
+                        }
+                        ForEach(Array(knownCards.enumerated()), id: \.offset) { _, card in
+                            let key = cardKey(institution: card.institution, account: card.account)
+                            bankChip(title: card.account, selected: cardFilterKey == key) {
+                                cardFilterKey = key
+                            }
+                        }
+                    }
+                    .padding(.horizontal, Theme.Space.lg)
                 }
-                .padding(.horizontal, Theme.Space.lg)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Filter by card")
+            }
+
+            if visibleTransactions.isEmpty {
+                if cardFilterKey != nil {
+                    Theme.EmptyState(
+                        systemImage: "creditcard",
+                        title: "No purchases on this card",
+                        message: "Try another card or All cards — or switch months.",
+                        cta: "ALL CARDS",
+                        ctaHint: "Clears the card filter"
+                    ) {
+                        cardFilterKey = nil
+                    }
+                    .padding(.horizontal, Theme.Space.lg)
+                } else {
+                    Theme.EmptyState(
+                        systemImage: "creditcard",
+                        title: "No purchases yet",
+                        message: "Connect Plaid or switch months — categorized buys show up here.",
+                        cta: "CONNECT PLAID",
+                        ctaHint: "Opens Spend settings"
+                    ) {
+                        showConnectInfo = true
+                    }
+                    .padding(.horizontal, Theme.Space.lg)
+                }
             } else {
                 Theme.Card {
                     VStack(spacing: 0) {
@@ -974,7 +1140,7 @@ struct SpendHomeView: View {
             Spacer(minLength: Theme.Space.sm)
             Text(SpendFormat.money(tx.amount))
                 .font(.subheadline.weight(.semibold).monospacedDigit())
-                .foregroundStyle(tx.amount >= 0 ? Theme.cta : Theme.ink)
+                .foregroundStyle(tx.isRefund ? Theme.success : Theme.ink)
         }
         .padding(.horizontal, Theme.Space.md)
         .padding(.vertical, Theme.Space.sm)
@@ -1112,10 +1278,12 @@ struct SpendHomeView: View {
     }
 
     private func sourceLine(for tx: SpendTransactionEntity, subcategoryName: String?) -> String {
-        var parts = [shortDate(tx.postedAt), subcategoryName ?? tx.category.title]
+        // Card/account early so lineLimit(1) doesn't truncate it off the trailing end.
+        var parts = [shortDate(tx.postedAt)]
         if !tx.sourceCaption.isEmpty {
             parts.append(tx.sourceCaption)
         }
+        parts.append(subcategoryName ?? tx.category.title)
         return parts.joined(separator: " · ")
     }
 
@@ -1132,6 +1300,7 @@ struct SpendHomeView: View {
         do {
             let result = try await SpendStore.syncAllEnrollments(in: modelContext, forceFullResync: true)
             SpendStore.refreshAutoCategories(in: modelContext)
+            WidgetSnapshotWriter.publish(in: modelContext)
             let total = SpendStore.localPlaidTransactionCount(in: modelContext)
             if total == 0 {
                 syncMessage = result.upserted == 0
@@ -1183,6 +1352,7 @@ private struct SpendHomeSheetsModifier: ViewModifier {
     @Binding var showConnectInfo: Bool
     var subcategories: [SpendSubcategoryEntity]
     var userCategories: [SpendUserCategoryEntity]
+    var knownCards: [(institution: String, account: String, caption: String)]
     var focusMonth: Date
 
     func body(content: Content) -> some View {
@@ -1202,7 +1372,11 @@ private struct SpendHomeSheetsModifier: ViewModifier {
                 }
             }
             .sheet(isPresented: $showAddPurchase) {
-                AddPurchaseSheet(userCategories: userCategories, subcategories: subcategories)
+                AddPurchaseSheet(
+                    userCategories: userCategories,
+                    subcategories: subcategories,
+                    knownCards: knownCards
+                )
             }
             .sheet(isPresented: $showAddTracked) {
                 AddTrackedItemSheet()
@@ -1265,13 +1439,12 @@ private struct SpendTransactionSheet: View {
             List {
                 Section {
                     LabeledContent("Merchant", value: transaction.merchant)
-                    LabeledContent("Amount", value: SpendFormat.money(transaction.amount))
+                    LabeledContent("Amount") {
+                        Text(SpendFormat.money(transaction.amount))
+                            .foregroundStyle(transaction.isRefund ? Theme.success : Theme.ink)
+                    }
                     LabeledContent("Date", value: transaction.postedAt.formatted(date: .abbreviated, time: .omitted))
-                    LabeledContent("Account", value: {
-                        let caption = transaction.sourceCaption
-                        if !caption.isEmpty { return caption }
-                        return transaction.accountName.isEmpty ? "—" : transaction.accountName
-                    }())
+                    LabeledContent("Card", value: transaction.cardLabel)
                 } header: {
                     spendSheetSectionHeader("PURCHASE")
                 }
@@ -1396,6 +1569,7 @@ private struct AddPurchaseSheet: View {
     @Environment(\.modelContext) private var modelContext
     var userCategories: [SpendUserCategoryEntity]
     var subcategories: [SpendSubcategoryEntity]
+    var knownCards: [(institution: String, account: String, caption: String)] = []
 
     @State private var merchant = ""
     @State private var amountText = ""
@@ -1403,6 +1577,8 @@ private struct AddPurchaseSheet: View {
     @State private var notes = ""
     @State private var categoryTag = "b-\(SpendCategory.shopping.rawValue)"
     @State private var subcategoryID: UUID?
+    /// `manual` or `card-<index>` into `knownCards`.
+    @State private var cardTag = "manual"
 
     private var categorySubs: [SpendSubcategoryEntity] {
         guard categoryTag.hasPrefix("b-"),
@@ -1411,6 +1587,16 @@ private struct AddPurchaseSheet: View {
         else { return [] }
         return subcategories.filter { $0.parentCategory == cat }
             .sorted { $0.sortOrder < $1.sortOrder }
+    }
+
+    private var selectedCard: (institution: String, account: String) {
+        if cardTag.hasPrefix("card-"),
+           let idx = Int(cardTag.dropFirst(5)),
+           knownCards.indices.contains(idx) {
+            let card = knownCards[idx]
+            return (card.institution, card.account)
+        }
+        return ("", "Manual")
     }
 
     var body: some View {
@@ -1430,6 +1616,13 @@ private struct AddPurchaseSheet: View {
                         in: ...Date(),
                         displayedComponents: .date
                     )
+                    Picker("Card", selection: $cardTag) {
+                        Text("Manual / cash").tag("manual")
+                        ForEach(Array(knownCards.enumerated()), id: \.offset) { index, card in
+                            Text(card.caption).tag("card-\(index)")
+                        }
+                    }
+                    .accessibilityHint("Which card or account paid for this purchase")
                 } header: {
                     spendSheetSectionHeader("PURCHASE")
                 }
@@ -1493,6 +1686,7 @@ private struct AddPurchaseSheet: View {
     private func save() {
         guard let amount = Double(amountText), amount > 0 else { return }
         let name = merchant.trimmingCharacters(in: .whitespacesAndNewlines)
+        let card = selectedCard
         if categoryTag.hasPrefix("u-"),
            let uuid = UUID(uuidString: String(categoryTag.dropFirst(2))) {
             _ = SpendStore.addManualPurchase(
@@ -1501,6 +1695,8 @@ private struct AddPurchaseSheet: View {
                 postedAt: postedAt,
                 userCategoryID: uuid,
                 notes: notes,
+                accountName: card.account,
+                institutionName: card.institution,
                 in: modelContext
             )
         } else if let raw = categoryTag.split(separator: "-", maxSplits: 1).last,
@@ -1512,6 +1708,8 @@ private struct AddPurchaseSheet: View {
                 category: cat,
                 subcategoryID: subcategoryID,
                 notes: notes,
+                accountName: card.account,
+                institutionName: card.institution,
                 in: modelContext
             )
         } else {
@@ -1520,6 +1718,8 @@ private struct AddPurchaseSheet: View {
                 amount: amount,
                 postedAt: postedAt,
                 notes: notes,
+                accountName: card.account,
+                institutionName: card.institution,
                 in: modelContext
             )
         }

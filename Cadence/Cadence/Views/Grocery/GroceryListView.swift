@@ -96,6 +96,13 @@ struct GroceryListView: View {
                                 .disabled(draftItemNames["produce", default: ""].trimmingCharacters(in: .whitespaces).isEmpty)
                                 .accessibilityHint("Adds typed item to Produce")
                         }
+                    } header: {
+                        Text("PRODUCE")
+                            .font(.caption2.weight(.bold))
+                            .tracking(0.7)
+                            .foregroundStyle(Theme.muted)
+                            .textCase(nil)
+                            .accessibilityAddTraits(.isHeader)
                     } footer: {
                         Text("Or type a one-off item above.")
                             .font(.caption)
@@ -159,6 +166,7 @@ struct GroceryListView: View {
                 }
             }
             .navigationTitle("Shop")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
@@ -532,7 +540,7 @@ struct PantryEditor: View {
                             } label: {
                                 Label("Add to Shop", systemImage: "cart")
                             }
-                            .tint(.green)
+                            .tint(Theme.success)
                             .accessibilityLabel("Add \(item.name) to shop list")
                             .accessibilityHint("Adds staple to this week's shop list")
                         }

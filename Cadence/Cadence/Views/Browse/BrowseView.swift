@@ -54,7 +54,7 @@ struct BrowseView: View {
                             } label: {
                                 Text(c.capitalized)
                                     .font(.subheadline.weight(course == c ? .bold : .semibold))
-                                    .foregroundStyle(course == c ? Color.white : Theme.ink)
+                                    .foregroundStyle(course == c ? Theme.onFill : Theme.ink)
                                     .padding(.horizontal, Theme.Space.md + 2)
                                     .padding(.vertical, Theme.Space.sm)
                                     .background(
@@ -106,34 +106,23 @@ struct BrowseView: View {
             }
             if filtered.isEmpty {
                 Section {
-                    VStack(spacing: Theme.Space.md) {
-                        Theme.IconWell(systemImage: "magnifyingglass", tint: Theme.muted, size: 48)
-                        Text("NO MATCHES")
-                            .font(.caption2.weight(.bold))
-                            .tracking(0.7)
-                            .foregroundStyle(Theme.muted)
-                        Text("No recipes match")
-                            .font(Theme.display(.headline))
-                            .foregroundStyle(Theme.ink)
-                        Text("Try another course filter or search term.")
-                            .font(.subheadline)
-                            .foregroundStyle(Theme.muted)
-                            .multilineTextAlignment(.center)
-                        Button {
-                            course = "all"
-                            query = ""
-                            searchQuery = ""
-                            displayLimit = pageSize
-                        } label: {
-                            Theme.MetaPill(text: "CLEAR FILTERS", tone: .cta)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Clear filters")
-                        .accessibilityHint("Resets course filter and search")
+                    Theme.EmptyState(
+                        systemImage: "magnifyingglass",
+                        title: "No recipes match",
+                        message: "Try another course filter or search term.",
+                        cta: "CLEAR FILTERS",
+                        ctaHint: "Resets course filter and search"
+                    ) {
+                        course = "all"
+                        query = ""
+                        searchQuery = ""
+                        displayLimit = pageSize
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, Theme.Space.xxl)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    .frame(minHeight: 280)
                     .accessibilityElement(children: .contain)
+                    .accessibilityLabel("No recipes match. Try another course filter or search term.")
                 }
             } else {
                 ForEach(results) { recipe in

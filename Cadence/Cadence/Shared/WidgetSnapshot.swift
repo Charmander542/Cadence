@@ -177,6 +177,16 @@ struct WidgetCalendarDay: Codable, Identifiable, Hashable {
     }
 }
 
+/// One category wedge for the Spend pie widget (RGB so the extension needs no Spend models).
+struct WidgetSpendSlice: Codable, Identifiable, Hashable {
+    var id: String
+    var title: String
+    var amount: Double
+    var red: Double
+    var green: Double
+    var blue: Double
+}
+
 struct WidgetSnapshot: Codable {
     var updatedAt: Date
     var tasks: [WidgetTaskItem]
@@ -188,6 +198,11 @@ struct WidgetSnapshot: Codable {
     var matrixQuadrants: [WidgetMatrixQuadrant]
     /// Next several calendar days (today → +6).
     var calendarDays: [WidgetCalendarDay]
+    /// Current-month category wedges for the Spend pie widget.
+    var spendSlices: [WidgetSpendSlice]
+    var spendTotal: Double
+    /// e.g. "NOV" for the center subtitle.
+    var spendMonthLabel: String
 
     static let empty = WidgetSnapshot(
         updatedAt: .now,
@@ -197,7 +212,10 @@ struct WidgetSnapshot: Codable {
         pendingTaskToggles: [],
         pendingHabitToggles: [],
         matrixQuadrants: WidgetSnapshot.placeholderMatrix,
-        calendarDays: []
+        calendarDays: [],
+        spendSlices: [],
+        spendTotal: 0,
+        spendMonthLabel: ""
     )
 
     static let placeholderMatrix: [WidgetMatrixQuadrant] = [
@@ -211,6 +229,7 @@ struct WidgetSnapshot: Codable {
         case updatedAt, tasks, habits, nextEvent
         case pendingTaskToggles, pendingHabitToggles
         case matrixQuadrants, calendarDays
+        case spendSlices, spendTotal, spendMonthLabel
     }
 
     init(
@@ -221,7 +240,10 @@ struct WidgetSnapshot: Codable {
         pendingTaskToggles: [UUID],
         pendingHabitToggles: [UUID],
         matrixQuadrants: [WidgetMatrixQuadrant],
-        calendarDays: [WidgetCalendarDay]
+        calendarDays: [WidgetCalendarDay],
+        spendSlices: [WidgetSpendSlice] = [],
+        spendTotal: Double = 0,
+        spendMonthLabel: String = ""
     ) {
         self.updatedAt = updatedAt
         self.tasks = tasks
@@ -231,6 +253,9 @@ struct WidgetSnapshot: Codable {
         self.pendingHabitToggles = pendingHabitToggles
         self.matrixQuadrants = matrixQuadrants
         self.calendarDays = calendarDays
+        self.spendSlices = spendSlices
+        self.spendTotal = spendTotal
+        self.spendMonthLabel = spendMonthLabel
     }
 
     init(from decoder: Decoder) throws {
@@ -244,6 +269,9 @@ struct WidgetSnapshot: Codable {
         matrixQuadrants = try c.decodeIfPresent([WidgetMatrixQuadrant].self, forKey: .matrixQuadrants)
             ?? WidgetSnapshot.placeholderMatrix
         calendarDays = try c.decodeIfPresent([WidgetCalendarDay].self, forKey: .calendarDays) ?? []
+        spendSlices = try c.decodeIfPresent([WidgetSpendSlice].self, forKey: .spendSlices) ?? []
+        spendTotal = try c.decodeIfPresent(Double.self, forKey: .spendTotal) ?? 0
+        spendMonthLabel = try c.decodeIfPresent(String.self, forKey: .spendMonthLabel) ?? ""
     }
 
     func encode(to encoder: Encoder) throws {
@@ -256,6 +284,9 @@ struct WidgetSnapshot: Codable {
         try c.encode(pendingHabitToggles, forKey: .pendingHabitToggles)
         try c.encode(matrixQuadrants, forKey: .matrixQuadrants)
         try c.encode(calendarDays, forKey: .calendarDays)
+        try c.encode(spendSlices, forKey: .spendSlices)
+        try c.encode(spendTotal, forKey: .spendTotal)
+        try c.encode(spendMonthLabel, forKey: .spendMonthLabel)
     }
 }
 

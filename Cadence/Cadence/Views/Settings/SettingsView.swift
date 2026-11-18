@@ -201,9 +201,14 @@ struct SettingsView: View {
                     }
                 } else if filteredRoutes.isEmpty {
                     Section {
-                        ContentUnavailableView.search(text: searchText)
+                        Theme.EmptyState(
+                            systemImage: "magnifyingglass",
+                            title: "No settings match",
+                            message: "Try another word — or clear search to see everything."
+                        )
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
                     }
-                    .listRowBackground(Color.clear)
                 }
             }
             .navigationTitle("Settings")

@@ -380,6 +380,7 @@ struct SpendSettingsView: View {
         defer { isBusy = false }
         do {
             let result = try await SpendStore.syncAllEnrollments(in: modelContext)
+            WidgetSnapshotWriter.publish(in: modelContext)
             showStatus(
                 result.summary,
                 tone: result.failures.isEmpty ? .accent : .danger,

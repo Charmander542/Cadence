@@ -1,5 +1,7 @@
 import Foundation
 import SwiftData
+import SwiftUI
+import UIKit
 import WidgetKit
 
 enum WidgetSnapshotWriter {
@@ -80,6 +82,7 @@ enum WidgetSnapshotWriter {
         let nextEvent = CountdownTracking.resolveNextEvent(from: allTasks)
         let matrixQuadrants = buildMatrixQuadrants(from: allTasks)
         let calendarDays = buildCalendarDays(from: allTasks)
+        let spend = buildSpendPie(in: context)
 
         var snap = WidgetSnapshotStore.load()
         snap.updatedAt = .now
@@ -88,6 +91,9 @@ enum WidgetSnapshotWriter {
         snap.nextEvent = nextEvent
         snap.matrixQuadrants = matrixQuadrants
         snap.calendarDays = calendarDays
+        snap.spendSlices = spend.slices
+        snap.spendTotal = spend.total
+        snap.spendMonthLabel = spend.monthLabel
         WidgetSnapshotStore.save(snap)
         scheduleTimelineReload()
     }
@@ -161,6 +167,50 @@ enum WidgetSnapshotWriter {
                 timedEvents: timed
             )
         }
+    }
+
+    /// Current-month category wedges for the small Spend pie widget.
+    @MainActor
+    private static func buildSpendPie(in context: ModelContext) -> (slices: [WidgetSpendSlice], total: Double, monthLabel: String) {
+        let monthRange = SpendStore.monthBounds()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM"
+        let monthLabel = formatter.string(from: monthRange.start).uppercased()
+
+        var transactions = (try? context.fetch(FetchDescriptor<SpendTransactionEntity>())) ?? []
+        if SpendPreferences.pieHidesBillsUtilities {
+            transactions = transactions.filter { $0.category != .billsUtilities }
+        }
+        let budgets = (try? context.fetch(FetchDescriptor<SpendBudgetEntity>())) ?? []
+        let userCategories = (try? context.fetch(FetchDescriptor<SpendUserCategoryEntity>())) ?? []
+        let slices = SpendStore.categorySlices(
+            transactions: transactions,
+            budgets: budgets,
+            userCategories: userCategories,
+            in: monthRange
+        )
+        let widgetSlices = slices.map { slice -> WidgetSpendSlice in
+            let rgb = rgbComponents(from: slice.color)
+            return WidgetSpendSlice(
+                id: slice.id,
+                title: slice.title,
+                amount: slice.amount,
+                red: rgb.r,
+                green: rgb.g,
+                blue: rgb.b
+            )
+        }
+        let total = widgetSlices.map(\.amount).reduce(0, +)
+        return (widgetSlices, total, monthLabel)
+    }
+
+    private static func rgbComponents(from color: Color) -> (r: Double, g: Double, b: Double) {
+        let ui = UIColor(color)
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard ui.getRed(&r, green: &g, blue: &b, alpha: &a) else {
+            return (0.62, 0.64, 0.70)
+        }
+        return (Double(r), Double(g), Double(b))
     }
 
     /// Timed blocks for today's dual-column timeline (events + due tasks with a clock time).

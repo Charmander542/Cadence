@@ -239,11 +239,26 @@ struct FocusStatsView: View {
             }
 
             if recent.isEmpty {
-                Text("No focus sessions yet. Start a Pomo or Stopwatch.")
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.muted)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(Theme.Space.md)
+                VStack(alignment: .leading, spacing: Theme.Space.sm) {
+                    Text("Nothing logged yet")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                    Text("Finish a Pomo or Stopwatch — or add a session.")
+                        .font(.caption)
+                        .foregroundStyle(Theme.muted)
+                    Button {
+                        showManualAdd = true
+                    } label: {
+                        Text("ADD SESSION")
+                            .font(.caption.weight(.bold))
+                            .tracking(0.7)
+                            .foregroundStyle(Theme.cta)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens form to log a past focus session")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(Theme.Space.md)
             } else {
                 VStack(spacing: 0) {
                     ForEach(recent, id: \.id) { session in
@@ -669,9 +684,10 @@ private struct FocusDonutChart: View {
                             .foregroundStyle(Theme.muted)
                     }
                 } else {
-                    Text("No Data")
+                    Text("No focus yet")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.muted)
+                        .accessibilityLabel("No focus time recorded")
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

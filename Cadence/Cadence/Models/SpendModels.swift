@@ -11,10 +11,12 @@ enum SpendCategory: String, CaseIterable, Identifiable, Codable {
     case shopping
     case health
     case home
+    case billsUtilities
     case subscriptions
     case entertainment
     case income
     case transfer
+    case ignore
     case other
 
     var id: String { rawValue }
@@ -27,10 +29,12 @@ enum SpendCategory: String, CaseIterable, Identifiable, Codable {
         case .shopping: return "Shopping"
         case .health: return "Health"
         case .home: return "Home"
+        case .billsUtilities: return "Bills & Utilities"
         case .subscriptions: return "Subscriptions"
         case .entertainment: return "Entertainment"
         case .income: return "Income"
         case .transfer: return "Transfer"
+        case .ignore: return "Ignore"
         case .other: return "Other"
         }
     }
@@ -43,10 +47,12 @@ enum SpendCategory: String, CaseIterable, Identifiable, Codable {
         case .shopping: return "bag"
         case .health: return "heart"
         case .home: return "house"
+        case .billsUtilities: return "bolt.fill"
         case .subscriptions: return "arrow.triangle.2.circlepath"
         case .entertainment: return "theatermasks"
         case .income: return "arrow.down.circle"
         case .transfer: return "arrow.left.arrow.right"
+        case .ignore: return "eye.slash"
         case .other: return "ellipsis.circle"
         }
     }
@@ -60,17 +66,24 @@ enum SpendCategory: String, CaseIterable, Identifiable, Codable {
         case .shopping: return Color(red: 0.95, green: 0.82, blue: 0.42)       // soft yellow
         case .health: return Color(red: 0.95, green: 0.55, blue: 0.62)         // coral
         case .home: return Color(red: 0.45, green: 0.62, blue: 0.95)           // periwinkle
+        case .billsUtilities: return Color(red: 0.55, green: 0.70, blue: 0.88) // soft steel blue
         case .subscriptions: return Color(red: 0.62, green: 0.48, blue: 0.92)  // violet
         case .entertainment: return Color(red: 0.98, green: 0.62, blue: 0.38)  // peach
         case .income: return Color(red: 0.35, green: 0.78, blue: 0.52)         // green
         case .transfer: return Color(red: 0.55, green: 0.58, blue: 0.65)       // slate
+        case .ignore: return Color(red: 0.48, green: 0.52, blue: 0.58)         // dim slate
         case .other: return Color(red: 0.62, green: 0.64, blue: 0.70)          // gray
         }
     }
 
-    /// Categories that appear in spending breakdown / budgets (excludes money-in & transfers).
+    /// Categories that appear in spending breakdown / budgets (excludes money-in, transfers, and Ignore).
     static var spendingCases: [SpendCategory] {
-        allCases.filter { $0 != .income && $0 != .transfer }
+        allCases.filter { $0 != .income && $0 != .transfer && $0 != .ignore }
+    }
+
+    /// Built-in categories the user can assign in pickers (spending + Ignore).
+    static var pickerCases: [SpendCategory] {
+        spendingCases + [.ignore]
     }
 
     /// Map Plaid `personal_finance_category` (+ merchant keywords) → Cadence category.
@@ -94,7 +107,9 @@ enum SpendCategory: String, CaseIterable, Identifiable, Codable {
             || pfc.contains("TV_AND_MOVIES") || pfc.contains("SPORTING") { return .entertainment }
         if pfc.contains("RENT") || pfc.contains("UTILITIES")
             || pfc.contains("INTERNET") || pfc.contains("TELEPHONE")
-            || pfc.contains("HOME_IMPROVEMENT") || pfc.contains("FURNITURE") { return .home }
+            || pfc.contains("WATER") || pfc.contains("GAS_AND_ELECTRICITY")
+            || pfc.contains("SEWAGE") || pfc.contains("GARBAGE") { return .billsUtilities }
+        if pfc.contains("HOME_IMPROVEMENT") || pfc.contains("FURNITURE") { return .home }
         if pfc.contains("LOAN") || pfc.contains("CREDIT_CARD_PAYMENT") { return .transfer }
         if pfc.contains("SUBSCRIPTION") || pfc.contains("TELECOMMUNICATION") { return .subscriptions }
 
@@ -109,7 +124,8 @@ enum SpendCategory: String, CaseIterable, Identifiable, Codable {
         if pfc.hasPrefix("ENTERTAINMENT") { return .entertainment }
         if pfc.hasPrefix("PERSONAL_CARE") || pfc.hasPrefix("MEDICAL")
             || pfc.hasPrefix("HEALTHCARE") { return .health }
-        if pfc.hasPrefix("RENT_AND_UTILITIES") || pfc.hasPrefix("HOME_IMPROVEMENT") { return .home }
+        if pfc.hasPrefix("RENT_AND_UTILITIES") { return .billsUtilities }
+        if pfc.hasPrefix("HOME_IMPROVEMENT") { return .home }
         if pfc.hasPrefix("GENERAL_SERVICES") { return .other }
         if pfc.hasPrefix("BANK_FEES") || pfc.hasPrefix("LOAN_PAYMENTS") { return .transfer }
         if pfc.hasPrefix("GOVERNMENT") { return .other }
@@ -133,7 +149,9 @@ enum SpendCategory: String, CaseIterable, Identifiable, Codable {
         if hay.contains("pharmacy") || hay.contains("cvs") || hay.contains("walgreens")
             || hay.contains("gym") || hay.contains("doctor") { return .health }
         if hay.contains("rent") || hay.contains("utility") || hay.contains("electric")
-            || hay.contains("pg&e") || hay.contains("home depot") || hay.contains("lowe") { return .home }
+            || hay.contains("pg&e") || hay.contains("pge") || hay.contains("comcast")
+            || hay.contains("verizon") || hay.contains("at&t") || hay.contains("water bill") { return .billsUtilities }
+        if hay.contains("home depot") || hay.contains("lowe") { return .home }
         if hay.contains("movie") || hay.contains("ticket") || hay.contains("amc")
             || hay.contains("steam") || hay.contains("concert") { return .entertainment }
         return .other
@@ -283,6 +301,12 @@ final class SpendTransactionEntity {
         set { categoryRaw = newValue.rawValue }
     }
 
+    /// Savings / ignored purchases stay off the pie and budget, and render muted.
+    var isIgnored: Bool { category == .ignore }
+
+    /// Money in (Cadence stores spend as negative; refunds/credits are positive).
+    var isRefund: Bool { amount > 0 }
+
     /// Manual note shown as Description on the purchase. Used as the cost/use title when set.
     var trimmedDescription: String {
         notes.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -299,6 +323,13 @@ final class SpendTransactionEntity {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return parts.joined(separator: " · ")
+    }
+
+    /// Card/account shown on purchase rows (falls back to institution only).
+    var cardLabel: String {
+        let caption = sourceCaption
+        if !caption.isEmpty { return caption }
+        return "—"
     }
 
     func assign(builtIn category: SpendCategory) {
@@ -404,8 +435,12 @@ final class SpendUserCategoryEntity {
 /// Monthly budget for a parent category or a subcategory.
 @Model
 final class SpendBudgetEntity {
+    /// Sentinel `categoryRaw` for the discretionary envelope (everything except Bills & Utilities).
+    static let allExceptBillsUtilitiesRaw = "allExceptBillsUtilities"
+
     var id: UUID = UUID()
     /// Parent category raw value. Always set (even for subcategory budgets — for grouping).
+    /// Special: `allExceptBillsUtilities` = budget for all spend except Bills & Utilities.
     var categoryRaw: String = "other"
     /// When set, this budget applies to the subcategory instead of the whole category.
     var subcategoryID: UUID?
@@ -417,10 +452,22 @@ final class SpendBudgetEntity {
         set { categoryRaw = newValue.rawValue }
     }
 
+    var isAllExceptBillsUtilities: Bool {
+        categoryRaw == Self.allExceptBillsUtilitiesRaw && subcategoryID == nil
+    }
+
     init(category: SpendCategory, subcategoryID: UUID? = nil, monthlyAmount: Double) {
         categoryRaw = category.rawValue
         self.subcategoryID = subcategoryID
         self.monthlyAmount = monthlyAmount
+        updatedAt = Date()
+    }
+
+    /// Discretionary envelope budget (not tied to a built-in category).
+    init(allExceptBillsUtilitiesAmount: Double) {
+        categoryRaw = Self.allExceptBillsUtilitiesRaw
+        subcategoryID = nil
+        monthlyAmount = allExceptBillsUtilitiesAmount
         updatedAt = Date()
     }
 }

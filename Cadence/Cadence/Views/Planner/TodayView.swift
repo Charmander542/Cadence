@@ -245,7 +245,7 @@ struct TodayView: View {
                     }
                     if destination == .today, !openToday.isEmpty {
                         sectionCard(id: "tasks", title: "Tasks", count: openToday.count) {
-                            ForEach(openToday.prefix(5)) { task in
+                            ForEach(openToday) { task in
                                 taskRow(task)
                             }
                         }
